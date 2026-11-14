@@ -1,6 +1,7 @@
 import { CharacterClass, EquipSlot, GameItem, PlayerEquipment } from './types';
+import { expandItemCatalog } from './itemCatalogGen';
 
-export const BASE_ITEMS: Record<string, Omit<GameItem, 'id'>> = {
+const HANDCRAFTED_ITEMS: Record<string, Omit<GameItem, 'id'>> = {
   // === STRIKER WEAPONS (Katanas, Dual Daggers, Pulse Pistols) ===
   'cyber_tanto': {
     name: 'Cyber Tanto',
@@ -776,6 +777,9 @@ export const BASE_ITEMS: Record<string, Omit<GameItem, 'id'>> = {
   }
 };
 
+/** Full catalog: handcrafted + generated fillers to 22/bucket (per role for gear). */
+export const BASE_ITEMS: Record<string, Omit<GameItem, 'id'>> = expandItemCatalog(HANDCRAFTED_ITEMS);
+
 let itemCounter = 1;
 
 export function createItem(key: string, customId?: string, itemLevel = 1): GameItem {
@@ -958,7 +962,7 @@ export function attemptUpgradeItem(
   };
 }
 
-export function generateRandomLoot(floor: number): GameItem {
+export function generateRandomLoot(floor: number, preferredClass?: CharacterClass): GameItem {
   const keys = Object.keys(BASE_ITEMS);
   const roll = Math.random();
   let candidateKeys: string[] = [];
@@ -978,6 +982,18 @@ export function generateRandomLoot(floor: number): GameItem {
   }
 
   if (candidateKeys.length === 0) candidateKeys = keys;
+
+  // Bias toward class-compatible gear so expanded per-role pools stay useful
+  if (preferredClass) {
+    const classFit = candidateKeys.filter(k => {
+      const item = BASE_ITEMS[k];
+      if (item.type === 'consumable') return true;
+      if (!item.allowedClasses || item.allowedClasses.length === 0) return true;
+      return item.allowedClasses.includes(preferredClass);
+    });
+    if (classFit.length > 0) candidateKeys = classFit;
+  }
+
   const picked = candidateKeys[Math.floor(Math.random() * candidateKeys.length)];
   // Item level tracks dungeon depth so deeper floors drop stronger gear
   const itemLevel = Math.max(1, floor + Math.floor(Math.random() * 2));

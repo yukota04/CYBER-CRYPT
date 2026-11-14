@@ -59,6 +59,24 @@ test('dungeon generator creates valid walkable rooms, stairs, and checkpoints', 
   );
 });
 
+test('expanded catalog provides 22 items per role gear bucket and shared pools', async () => {
+  const { BASE_ITEMS } = await import('./items');
+  const { CATALOG_TARGET_PER_BUCKET, catalogStats } = await import('./itemCatalogGen');
+  const stats = catalogStats(BASE_ITEMS);
+  for (const role of ['striker', 'technomancer', 'vanguard'] as const) {
+    for (const type of ['weapon', 'offhand', 'helmet', 'chest', 'gloves', 'legs', 'boots'] as const) {
+      assert.ok(
+        (stats[`${role}:${type}`] || 0) >= CATALOG_TARGET_PER_BUCKET,
+        `${role}:${type} should have >= ${CATALOG_TARGET_PER_BUCKET}`
+      );
+    }
+  }
+  for (const type of ['ring', 'earrings', 'consumable'] as const) {
+    const count = Object.values(BASE_ITEMS).filter(i => i.type === type).length;
+    assert.ok(count >= CATALOG_TARGET_PER_BUCKET, `${type} should have >= ${CATALOG_TARGET_PER_BUCKET}`);
+  }
+});
+
 test('procedural monster visual variants evolve across floors and density scales balanced', () => {
   const f1 = generateDungeon(1, 77);
   const f5 = generateDungeon(5, 77);
