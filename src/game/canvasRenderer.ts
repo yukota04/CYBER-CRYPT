@@ -502,15 +502,24 @@ export class CanvasRenderer {
     ctx.fillRect(mx(5, 5) + weaponArmX, weaponArmY, 5, 9);
     ctx.fillRect(mx(22, 5) + offArmX, offArmY, 5, 9);
 
-    // Gloves / hands
+    // Gloves / hands — grip anchors for weapon + offhand (must stay in sync)
+    const weaponHandX = mx(4, 6) + weaponArmX - faceSign * attackSwing * 0.2;
+    const weaponHandY = weaponArmY + 7;
+    const offHandX = mx(22, 6) + offArmX;
+    const offHandY = offArmY + 7;
+    const weaponGripX = weaponHandX + 3;
+    const weaponGripY = weaponHandY + 2.5;
+    const offGripX = offHandX + 3;
+    const offGripY = offHandY + 2.5;
+
     ctx.fillStyle = eq?.gloves ? gloveHex : c.skin;
-    ctx.fillRect(mx(4, 6) + weaponArmX - faceSign * attackSwing * 0.2, weaponArmY + 7, 6, 5);
-    ctx.fillRect(mx(22, 6) + offArmX, offArmY + 7, 6, 5);
+    ctx.fillRect(weaponHandX, weaponHandY, 6, 5);
+    ctx.fillRect(offHandX, offHandY, 6, 5);
     if (eq?.gloves) {
       ctx.strokeStyle = '#0f172a';
       ctx.lineWidth = 1;
-      ctx.strokeRect(mx(4, 6) + 0.5 + weaponArmX, weaponArmY + 7.5, 5, 4);
-      ctx.strokeRect(mx(22, 6) + 0.5 + offArmX, offArmY + 7.5, 5, 4);
+      ctx.strokeRect(weaponHandX + 0.5, weaponHandY + 0.5, 5, 4);
+      ctx.strokeRect(offHandX + 0.5, offHandY + 0.5, 5, 4);
     }
 
     // --- HEAD ---
@@ -548,64 +557,66 @@ export class CanvasRenderer {
       ctx.fillRect(headX + 1, headY - 1, 4, 2.5);
     }
 
-    // --- WEAPON (dominant hand side) ---
+    // --- WEAPON (anchored to weapon-hand grip; swings with the arm) ---
     if (eq?.weapon) {
       const cat = eq.weapon.weaponCategory || 'sword';
-      const handX = (facingLeft ? px + 2 : px + 24) + weaponArmX - faceSign * attackSwing * 0.45;
-      const wepY = weaponArmY - 6 - attackSwing * 1.15;
+      // Walk bob + attack arc both rotate around the grip so the blade never drifts off the hand
+      const walkTwist = Math.sin(walkPhase) * 0.12 * moveBlend;
+      const attackTwist = faceSign * attackSwing * 0.14;
       ctx.save();
-      if (attackT > 0.02) {
-        const pivotX = handX + 1.5;
-        const pivotY = weaponArmY + 8;
-        ctx.translate(pivotX, pivotY);
-        ctx.rotate(faceSign * attackSwing * 0.16);
-        ctx.translate(-pivotX, -pivotY);
-      }
+      ctx.translate(weaponGripX, weaponGripY);
+      ctx.rotate(walkTwist + attackTwist);
+      // Draw relative to grip (0,0). Blade extends "up" from the hand by default.
+      const hx = -1.5;
+      const hy = -14;
       ctx.fillStyle = wepHex;
       if (cat === 'greatsword') {
-        ctx.fillRect(handX, wepY, 4, 24);
+        ctx.fillRect(hx - 0.5, hy - 6, 4, 26);
         ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(handX - 1, wepY + 15, 6, 3);
+        ctx.fillRect(hx - 1.5, hy + 10, 6, 3);
       } else if (cat === 'staff' || cat === 'focus') {
-        ctx.fillRect(handX + 0.5, wepY + 1, 3, 24);
+        ctx.fillRect(hx, hy - 4, 3, 26);
         ctx.fillStyle = '#ffe600';
         ctx.beginPath();
-        ctx.arc(handX + 2, wepY + 2, 3.5, 0, Math.PI * 2);
+        ctx.arc(hx + 1.5, hy - 2, 3.5, 0, Math.PI * 2);
         ctx.fill();
       } else if (cat === 'pistol') {
-        ctx.fillRect(handX, wepY + 13, 8, 4);
-        ctx.fillRect(handX + (facingLeft ? 0 : 5), wepY + 11, 3, 6);
+        // Sideways grip — barrel points forward along face
+        ctx.rotate(faceSign * (Math.PI / 2) * 0.85);
+        ctx.fillRect(hx - 1, hy + 6, 10, 4);
+        ctx.fillRect(hx + (facingLeft ? -1 : 6), hy + 4, 3, 6);
       } else if (cat === 'daggers') {
-        ctx.fillRect(handX, wepY + 9, 2.5, 12);
-        ctx.fillRect(handX + (facingLeft ? 4 : -4), wepY + 11, 2.5, 10);
+        ctx.fillRect(hx + 0.5, hy + 2, 2.5, 14);
+        ctx.fillRect(hx + (facingLeft ? 4 : -3), hy + 4, 2.5, 12);
       } else if (cat === 'katana') {
-        ctx.fillRect(handX + 0.5, wepY + 3, 2.5, 20);
+        ctx.fillRect(hx + 0.25, hy - 2, 2.5, 22);
         ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(handX - 0.5, wepY + 17, 4.5, 2);
+        ctx.fillRect(hx - 0.75, hy + 12, 4.5, 2);
       } else {
-        ctx.fillRect(handX, wepY + 5, 3, 18);
+        ctx.fillRect(hx, hy, 3, 20);
         ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(handX - 1, wepY + 16, 5, 2);
+        ctx.fillRect(hx - 1, hy + 12, 5, 2);
       }
       if (weaponRarity && weaponRarity.tierNumber >= 3) {
         ctx.fillStyle = weaponRarity.hex;
-        ctx.fillRect(handX, wepY + 1, 3, 3);
+        ctx.fillRect(hx, hy - 2, 3, 3);
       }
       ctx.restore();
     }
 
-    // --- OFFHAND (opposite side) ---
+    // --- OFFHAND (anchored to opposite hand) ---
     if (eq?.offhand) {
-      const ox = (facingLeft ? px + 24 : px + 2) + lungeX;
       const offCat = eq.offhand.weaponCategory;
+      const ox = offGripX - 3;
+      const oy = offGripY - 4;
       ctx.fillStyle = offHex;
       if (offCat === 'shield') {
         ctx.beginPath();
-        ctx.moveTo(ox + 3, offArmY - 2);
-        ctx.lineTo(ox + 8, offArmY);
-        ctx.lineTo(ox + 8, offArmY + 9);
-        ctx.lineTo(ox + 3, offArmY + 11);
-        ctx.lineTo(ox, offArmY + 5);
+        ctx.moveTo(ox + 3, oy - 2);
+        ctx.lineTo(ox + 8, oy);
+        ctx.lineTo(ox + 8, oy + 9);
+        ctx.lineTo(ox + 3, oy + 11);
+        ctx.lineTo(ox, oy + 5);
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = '#0f172a';
@@ -613,10 +624,10 @@ export class CanvasRenderer {
         ctx.stroke();
       } else if (offCat === 'focus') {
         ctx.beginPath();
-        ctx.arc(ox + 3, offArmY + 3, 4, 0, Math.PI * 2);
+        ctx.arc(offGripX, offGripY, 4, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.fillRect(ox, offArmY, 3, 12);
+        ctx.fillRect(ox + 1, oy, 3, 12);
       }
     }
 
