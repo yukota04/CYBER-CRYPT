@@ -3,7 +3,7 @@ services:
     name: cyber-crypt
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --legacy-peer-deps && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
@@ -12,3 +12,5 @@ services:
         value: production
       - key: CLOUD_SAVE_SECRET
         generateValue: true
+      - key: APP_URL
+        value: https://cyber-crypt.onrender.com
