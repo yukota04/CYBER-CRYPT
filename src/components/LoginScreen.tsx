@@ -1,151 +1,224 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Language, t } from '../game/i18n';
 import { LanguageSelector } from './LanguageSelector';
 import {
   CheckCircle2,
   Download,
+  KeyRound,
   Loader2,
   Maximize2,
   Minimize2,
-  Smartphone,
   User,
   UserCheck,
+  UserPlus,
   XCircle
 } from 'lucide-react';
+
+export interface AuthCredentials {
+  login: string;
+  password: string;
+}
+
+export interface RegisterPayload {
+  login: string;
+  nick: string;
+  password: string;
+  passwordConfirm: string;
+}
 
 interface LoginScreenProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
-  /** Guest ignores the typed name — server assigns a random operative name */
   onGuestLogin: () => void;
-  /** Google requires a validated available operative name */
-  onGoogleLogin: (username: string) => void;
-  isGoogleLoading: boolean;
-  googleNotice: string | null;
+  onPasswordLogin: (creds: AuthCredentials) => void | Promise<void>;
+  onRegister: (payload: RegisterPayload) => void | Promise<void>;
+  isAuthLoading: boolean;
+  authNotice: string | null;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   canInstallPwa?: boolean;
   onInstallPwa?: () => void;
   isInstallBusy?: boolean;
-  /** When Firebase already has a Google session, exclude that account from "taken" checks */
-  excludeUserId?: string | null;
 }
 
-type NameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+type Panel = 'menu' | 'login' | 'register';
+type FieldStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
 function isFormatValid(name: string): boolean {
   return /^[a-zA-Z0-9_-]{3,20}$/.test(name);
+}
+
+function StatusBadge({
+  status,
+  availableLabel,
+  checkingLabel,
+  takenLabel
+}: {
+  status: FieldStatus;
+  availableLabel: string;
+  checkingLabel: string;
+  takenLabel: string;
+}) {
+  if (status === 'checking') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-cyan-300">
+        <Loader2 className="w-3 h-3 animate-spin" /> {checkingLabel}
+      </span>
+    );
+  }
+  if (status === 'available') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300">
+        <CheckCircle2 className="w-3 h-3" /> {availableLabel}
+      </span>
+    );
+  }
+  if (status === 'taken' || status === 'invalid') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-rose-300">
+        <XCircle className="w-3 h-3" /> {takenLabel}
+      </span>
+    );
+  }
+  return null;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   language,
   onLanguageChange,
   onGuestLogin,
-  onGoogleLogin,
-  isGoogleLoading,
-  googleNotice,
+  onPasswordLogin,
+  onRegister,
+  isAuthLoading,
+  authNotice,
   isFullscreen,
   onToggleFullscreen,
   canInstallPwa = false,
   onInstallPwa,
-  isInstallBusy = false,
-  excludeUserId = null
+  isInstallBusy = false
 }) => {
-  const [operativeName, setOperativeName] = useState('');
-  const [nameStatus, setNameStatus] = useState<NameStatus>('idle');
-  const [nameError, setNameError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const checkSeq = useRef(0);
+  const [panel, setPanel] = useState<Panel>('menu');
+  const [loginName, setLoginName] = useState('');
+  const [nick, setNick] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [loginStatus, setLoginStatus] = useState<FieldStatus>('idle');
+  const [nickStatus, setNickStatus] = useState<FieldStatus>('idle');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const loginSeq = useRef(0);
+  const nickSeq = useRef(0);
 
-  const trimmed = operativeName.trim();
-  const hasChosenName = isFormatValid(trimmed);
-  // Both buttons stay disabled until the player types a valid operative name.
-  // Guest still ignores that typed value and receives a random server name.
-  const guestEnabled = hasChosenName && !isGoogleLoading;
-  const googleEnabled = hasChosenName && nameStatus === 'available' && !isGoogleLoading;
-
+  // Live availability — login account
   useEffect(() => {
-    const cleaned = operativeName.trim();
+    if (panel !== 'register') return;
+    const cleaned = loginName.trim();
     if (!cleaned) {
-      setNameStatus('idle');
-      setNameError(null);
+      setLoginStatus('idle');
       return;
     }
     if (!isFormatValid(cleaned)) {
-      setNameStatus('invalid');
-      setNameError(t('loginNameRequiredError', language));
+      setLoginStatus('invalid');
       return;
     }
-
-    setNameStatus('checking');
-    setNameError(null);
-    const seq = ++checkSeq.current;
+    setLoginStatus('checking');
+    const seq = ++loginSeq.current;
     const timer = window.setTimeout(async () => {
       try {
-        const qs = new URLSearchParams({ username: cleaned });
-        if (excludeUserId) qs.set('excludeUserId', excludeUserId);
-        const res = await fetch(`/api/auth/check-username?${qs.toString()}`);
+        const res = await fetch(`/api/auth/check-login?login=${encodeURIComponent(cleaned)}`);
         const data = await res.json();
-        if (seq !== checkSeq.current) return;
-        if (data.available) {
-          setNameStatus('available');
-          setNameError(null);
-        } else {
-          setNameStatus(data.valid === false ? 'invalid' : 'taken');
-          setNameError(
-            data.valid === false
-              ? t('loginNameRequiredError', language)
-              : t('loginNameTakenError', language)
-          );
-        }
+        if (seq !== loginSeq.current) return;
+        setLoginStatus(data.available ? 'available' : data.valid === false ? 'invalid' : 'taken');
       } catch {
-        if (seq !== checkSeq.current) return;
-        setNameStatus('invalid');
-        setNameError(t('loginNameCheckFailed', language));
+        if (seq !== loginSeq.current) return;
+        setLoginStatus('invalid');
       }
     }, 350);
-
     return () => window.clearTimeout(timer);
-  }, [operativeName, language, excludeUserId]);
+  }, [loginName, panel]);
 
-  const statusBadge = useMemo(() => {
-    switch (nameStatus) {
-      case 'checking':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] text-cyan-300">
-            <Loader2 className="w-3 h-3 animate-spin" /> {t('loginNameChecking', language)}
-          </span>
-        );
-      case 'available':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300">
-            <CheckCircle2 className="w-3 h-3" /> {t('loginNameAvailable', language)}
-          </span>
-        );
-      case 'taken':
-        return (
-          <span className="inline-flex items-center gap-1 text-[10px] text-rose-300">
-            <XCircle className="w-3 h-3" /> {t('loginNameTakenError', language)}
-          </span>
-        );
-      default:
-        return null;
-    }
-  }, [nameStatus, language]);
-
-  const handleGuestClick = () => {
-    if (!guestEnabled) return;
-    onGuestLogin();
-  };
-
-  const handleGoogleClick = () => {
-    if (!googleEnabled) {
-      setNameError(t('loginNameRequiredError', language));
-      inputRef.current?.focus();
+  // Live availability — nick
+  useEffect(() => {
+    if (panel !== 'register') return;
+    const cleaned = nick.trim();
+    if (!cleaned) {
+      setNickStatus('idle');
       return;
     }
-    onGoogleLogin(trimmed);
+    if (!isFormatValid(cleaned)) {
+      setNickStatus('invalid');
+      return;
+    }
+    setNickStatus('checking');
+    const seq = ++nickSeq.current;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(cleaned)}`);
+        const data = await res.json();
+        if (seq !== nickSeq.current) return;
+        setNickStatus(data.available ? 'available' : data.valid === false ? 'invalid' : 'taken');
+      } catch {
+        if (seq !== nickSeq.current) return;
+        setNickStatus('invalid');
+      }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [nick, panel]);
+
+  const openPanel = (next: Panel) => {
+    setLocalError(null);
+    setPanel(next);
   };
+
+  const handleLoginSubmit = async () => {
+    setLocalError(null);
+    const cleanLogin = loginName.trim();
+    if (!isFormatValid(cleanLogin) || !password) {
+      setLocalError(t('authFillRequired', language));
+      return;
+    }
+    await onPasswordLogin({ login: cleanLogin, password });
+  };
+
+  const handleRegisterSubmit = async () => {
+    setLocalError(null);
+    const cleanLogin = loginName.trim();
+    const cleanNick = nick.trim();
+    if (!isFormatValid(cleanLogin) || !isFormatValid(cleanNick) || !password) {
+      setLocalError(t('authFillRequired', language));
+      return;
+    }
+    if (password.length < 8) {
+      setLocalError(t('authPasswordTooShort', language));
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setLocalError(t('authPasswordMismatch', language));
+      return;
+    }
+    if (loginStatus === 'taken' || loginStatus === 'invalid') {
+      setLocalError(t('authLoginTaken', language));
+      return;
+    }
+    if (nickStatus === 'taken' || nickStatus === 'invalid') {
+      setLocalError(t('authNickTaken', language));
+      return;
+    }
+    if (loginStatus === 'checking' || nickStatus === 'checking') return;
+    await onRegister({
+      login: cleanLogin,
+      nick: cleanNick,
+      password,
+      passwordConfirm
+    });
+  };
+
+  const notice = localError || authNotice;
+  const registerReady =
+    loginStatus === 'available' &&
+    nickStatus === 'available' &&
+    password.length >= 8 &&
+    password === passwordConfirm &&
+    !isAuthLoading;
 
   return (
     <div
@@ -225,118 +298,220 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </text>
           </svg>
 
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">{t('loginSubtitle', language)}</p>
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-5">{t('loginSubtitle', language)}</p>
 
-          <div className="w-full mb-4 text-left">
-            <div className="flex items-center justify-between mb-1.5">
-              <label
-                htmlFor="operative-name-input"
-                className="block text-[11px] font-bold uppercase tracking-wider text-cyan-300"
-              >
-                {t('loginNameLabel', language)}
-              </label>
-              {statusBadge}
-            </div>
-            <div className="relative">
-              <User className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                ref={inputRef}
-                id="operative-name-input"
-                data-testid="login-name-input"
-                type="text"
-                value={operativeName}
-                maxLength={20}
-                autoComplete="username"
-                onChange={e => setOperativeName(e.target.value.replace(/\s/g, ''))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && googleEnabled) handleGoogleClick();
-                }}
-                placeholder={t('loginNamePlaceholder', language)}
-                className="w-full min-h-[46px] pl-9 pr-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono placeholder:text-slate-500"
-              />
-            </div>
-            <p className="mt-1.5 text-[10px] text-slate-400">{t('loginNameGoogleOnlyHint', language)}</p>
-            {nameError && (
-              <div data-testid="login-name-error" className="mt-1.5 text-[11px] text-rose-300 font-bold">
-                ⚠ {nameError}
-              </div>
-            )}
-          </div>
-
-          <div className="w-full flex flex-col gap-3">
-            <button
-              type="button"
-              data-testid="login-google-btn"
-              disabled={!googleEnabled}
-              onClick={handleGoogleClick}
-              className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-white text-slate-900 font-sans font-semibold text-sm flex items-center justify-center gap-3 shadow-[0_4px_18px_rgba(255,255,255,0.2)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-slate-100 enabled:active:scale-[0.98]"
-            >
-              <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="#4285F4"
-                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"
-                />
-              </svg>
-              <span>{isGoogleLoading ? '...' : t('googleLoginBtn', language)}</span>
-            </button>
-
-            <div className="flex items-center justify-center gap-1.5 text-[10px] text-cyan-300/80">
-              <Smartphone className="w-3 h-3" />
-              <span>{t('googleMobileNote', language)}</span>
-            </div>
-
-            {googleNotice && (
-              <div
-                data-testid="login-google-notice"
-                className="px-3 py-2 rounded-lg bg-amber-950/70 border border-amber-400/50 text-amber-200 text-xs text-left"
-              >
-                {googleNotice}
-              </div>
-            )}
-
-            <div className="flex items-center gap-3 my-1">
-              <div className="flex-1 h-px bg-slate-800" />
-              <span className="text-[10px] text-slate-500 uppercase">OR</span>
-              <div className="flex-1 h-px bg-slate-800" />
-            </div>
-
-            <button
-              type="button"
-              data-testid="login-guest-btn"
-              disabled={!guestEnabled}
-              onClick={handleGuestClick}
-              className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-950/90 to-purple-950/90 border border-cyan-400/60 text-cyan-100 font-bold text-sm flex items-center justify-center gap-2.5 shadow-[0_0_20px_rgba(0,240,255,0.2)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:from-cyan-900 enabled:hover:to-purple-900 enabled:active:scale-[0.98]"
-            >
-              <UserCheck className="w-4 h-4 text-cyan-300" />
-              <span>{t('guestLoginBtn', language)}</span>
-            </button>
-            <p className="text-[10px] text-slate-500 -mt-1">{t('loginGuestRandomHint', language)}</p>
-
-            {canInstallPwa && onInstallPwa && (
+          {panel === 'menu' && (
+            <div className="w-full flex flex-col gap-3">
               <button
                 type="button"
-                data-testid="login-install-btn-main"
-                onClick={onInstallPwa}
-                disabled={isInstallBusy}
-                className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-emerald-100 font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-900 transition cursor-pointer disabled:opacity-60"
+                data-testid="login-signin-btn"
+                disabled={isAuthLoading}
+                onClick={() => openPanel('login')}
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-slate-950 font-bold text-sm flex items-center justify-center gap-2.5 shadow-[0_0_20px_rgba(0,240,255,0.25)] transition cursor-pointer disabled:opacity-50 enabled:hover:brightness-110 enabled:active:scale-[0.98]"
               >
-                <Download className="w-4 h-4" />
-                <span>{isInstallBusy ? '...' : t('installAppBtn', language)}</span>
+                <KeyRound className="w-4 h-4" />
+                {t('authLoginTab', language)}
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                data-testid="login-register-btn"
+                disabled={isAuthLoading}
+                onClick={() => openPanel('register')}
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-white text-slate-900 font-semibold text-sm flex items-center justify-center gap-2.5 transition cursor-pointer disabled:opacity-50 enabled:hover:bg-slate-100 enabled:active:scale-[0.98]"
+              >
+                <UserPlus className="w-4 h-4" />
+                {t('authRegisterTab', language)}
+              </button>
+              <div className="flex items-center gap-3 my-1">
+                <div className="flex-1 h-px bg-slate-800" />
+                <span className="text-[10px] text-slate-500 uppercase">OR</span>
+                <div className="flex-1 h-px bg-slate-800" />
+              </div>
+              <button
+                type="button"
+                data-testid="login-guest-btn"
+                disabled={isAuthLoading}
+                onClick={onGuestLogin}
+                className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-950/90 to-purple-950/90 border border-cyan-400/60 text-cyan-100 font-bold text-sm flex items-center justify-center gap-2.5 shadow-[0_0_20px_rgba(0,240,255,0.2)] transition cursor-pointer disabled:opacity-40 enabled:hover:from-cyan-900 enabled:hover:to-purple-900 enabled:active:scale-[0.98]"
+              >
+                <UserCheck className="w-4 h-4 text-cyan-300" />
+                {t('guestLoginBtn', language)}
+              </button>
+              <p className="text-[10px] text-slate-500 -mt-1">{t('loginGuestRandomHint', language)}</p>
+            </div>
+          )}
+
+          {panel === 'login' && (
+            <div className="w-full flex flex-col gap-3 text-left">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                {t('authLoginLabel', language)}
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  data-testid="login-account-input"
+                  type="text"
+                  value={loginName}
+                  maxLength={20}
+                  autoComplete="username"
+                  onChange={e => setLoginName(e.target.value.replace(/\s/g, ''))}
+                  placeholder={t('authLoginPlaceholder', language)}
+                  className="w-full min-h-[46px] pl-9 pr-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono placeholder:text-slate-500"
+                />
+              </div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                {t('authPasswordLabel', language)}
+              </label>
+              <input
+                data-testid="login-password-input"
+                type="password"
+                value={password}
+                autoComplete="current-password"
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleLoginSubmit();
+                }}
+                className="w-full min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono"
+              />
+              <button
+                type="button"
+                data-testid="login-submit-btn"
+                disabled={isAuthLoading}
+                onClick={handleLoginSubmit}
+                className="w-full min-h-[48px] mt-1 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-slate-950 font-bold text-sm disabled:opacity-50 enabled:hover:brightness-110"
+              >
+                {isAuthLoading ? '...' : t('authSubmitLogin', language)}
+              </button>
+              <button
+                type="button"
+                onClick={() => openPanel('menu')}
+                className="text-[11px] text-slate-400 hover:text-cyan-300 transition"
+              >
+                ← {t('authBackToMenu', language)}
+              </button>
+            </div>
+          )}
+
+          {panel === 'register' && (
+            <div className="w-full flex flex-col gap-3 text-left">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                  {t('authLoginLabel', language)}
+                </label>
+                <StatusBadge
+                  status={loginStatus}
+                  availableLabel={t('authLoginAvailable', language)}
+                  checkingLabel={t('loginNameChecking', language)}
+                  takenLabel={
+                    loginStatus === 'taken' ? t('authLoginTaken', language) : t('loginNameRequiredError', language)
+                  }
+                />
+              </div>
+              <div className="relative">
+                <User className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  data-testid="register-login-input"
+                  type="text"
+                  value={loginName}
+                  maxLength={20}
+                  autoComplete="username"
+                  onChange={e => setLoginName(e.target.value.replace(/\s/g, ''))}
+                  placeholder={t('authLoginPlaceholder', language)}
+                  className="w-full min-h-[46px] pl-9 pr-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                  {t('authNickLabel', language)}
+                </label>
+                <StatusBadge
+                  status={nickStatus}
+                  availableLabel={t('authNickAvailable', language)}
+                  checkingLabel={t('loginNameChecking', language)}
+                  takenLabel={
+                    nickStatus === 'taken' ? t('authNickTaken', language) : t('loginNameRequiredError', language)
+                  }
+                />
+              </div>
+              <input
+                data-testid="register-nick-input"
+                type="text"
+                value={nick}
+                maxLength={20}
+                autoComplete="nickname"
+                onChange={e => setNick(e.target.value.replace(/\s/g, ''))}
+                placeholder={t('authNickPlaceholder', language)}
+                className="w-full min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono placeholder:text-slate-500"
+              />
+
+              <label className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                {t('authPasswordLabel', language)}
+              </label>
+              <input
+                data-testid="register-password-input"
+                type="password"
+                value={password}
+                autoComplete="new-password"
+                onChange={e => setPassword(e.target.value)}
+                className="w-full min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono"
+              />
+
+              <label className="text-[11px] font-bold uppercase tracking-wider text-cyan-300">
+                {t('authPasswordConfirmLabel', language)}
+              </label>
+              <input
+                data-testid="register-password-confirm-input"
+                type="password"
+                value={passwordConfirm}
+                autoComplete="new-password"
+                onChange={e => setPasswordConfirm(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && registerReady) handleRegisterSubmit();
+                }}
+                className="w-full min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono"
+              />
+
+              <button
+                type="button"
+                data-testid="register-submit-btn"
+                disabled={!registerReady}
+                onClick={handleRegisterSubmit}
+                className="w-full min-h-[48px] mt-1 rounded-xl bg-white text-slate-900 font-bold text-sm disabled:opacity-40 enabled:hover:bg-slate-100"
+              >
+                {isAuthLoading ? '...' : t('authSubmitRegister', language)}
+              </button>
+              <button
+                type="button"
+                onClick={() => openPanel('menu')}
+                className="text-[11px] text-slate-400 hover:text-cyan-300 transition"
+              >
+                ← {t('authBackToMenu', language)}
+              </button>
+            </div>
+          )}
+
+          {notice && (
+            <div
+              data-testid="login-auth-notice"
+              className="w-full mt-3 px-3 py-2 rounded-lg bg-amber-950/70 border border-amber-400/50 text-amber-200 text-xs text-left"
+            >
+              {notice}
+            </div>
+          )}
+
+          {canInstallPwa && onInstallPwa && panel === 'menu' && (
+            <button
+              type="button"
+              data-testid="login-install-btn-main"
+              onClick={onInstallPwa}
+              disabled={isInstallBusy}
+              className="w-full mt-3 min-h-[46px] px-4 py-2.5 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-emerald-100 font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-900 transition cursor-pointer disabled:opacity-60"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isInstallBusy ? '...' : t('installAppBtn', language)}</span>
+            </button>
+          )}
         </div>
       </div>
 
