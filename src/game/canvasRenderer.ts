@@ -1,4 +1,4 @@
-import { AttackEffect, CharacterClass, DungeonState, Monster, Player } from './types';
+import { AttackEffect, CharacterClass, DungeonState, GameItem, Monster, Player } from './types';
 import { getRarityStyle } from './rarity';
 
 export interface Particle {
@@ -295,6 +295,16 @@ export class CanvasRenderer {
     }
   }
 
+  private gearColor(item: GameItem | null | undefined, fallback: string): string {
+    if (!item) return fallback;
+    const style = getRarityStyle(item.rarity);
+    return style.tierNumber >= 2 ? style.hex : fallback;
+  }
+
+  /**
+   * Humanoid operative silhouette — distinct from procedural creature shapes.
+   * Layer order: boots → legs → torso → arms/gloves → head/helmet → weapon/offhand.
+   */
   private drawPlayerCharacter(
     ctx: CanvasRenderingContext2D,
     px: number,
@@ -306,20 +316,32 @@ export class CanvasRenderer {
     label?: string,
     movedLockPip?: boolean
   ) {
-    const classColors: Record<string, { body: string; visor: string; glow: string }> = {
-      striker: { body: '#00f0ff', visor: '#ff007f', glow: '#00f0ff' },
-      technomancer: { body: '#bd00ff', visor: '#00f0ff', glow: '#bd00ff' },
-      vanguard: { body: '#ffe600', visor: '#00f0ff', glow: '#ffe600' }
+    const classColors: Record<string, { suit: string; skin: string; visor: string; glow: string }> = {
+      striker: { suit: '#0e7490', skin: '#fcd9b0', visor: '#ff007f', glow: '#00f0ff' },
+      technomancer: { suit: '#6b21a8', skin: '#f5d0c5', visor: '#00f0ff', glow: '#bd00ff' },
+      vanguard: { suit: '#a16207', skin: '#e8c4a0', visor: '#00f0ff', glow: '#ffe600' }
     };
     const c = classColors[characterClass] || classColors.striker;
+    const eq = equipment;
+    const facingLeft = facing === 'left';
+    const facingRight = facing === 'right';
+    const facingUp = facing === 'up';
+    // Mirror helper: x relative to tile when facing left
+    const mx = (x: number, w = 0) => (facingLeft ? px + 32 - x - w : px + x);
 
-    const weaponRarity = equipment?.weapon ? getRarityStyle(equipment.weapon.rarity) : null;
-    const armorRarity = equipment?.chest ? getRarityStyle(equipment.chest.rarity) : null;
+    const weaponRarity = eq?.weapon ? getRarityStyle(eq.weapon.rarity) : null;
+    const chestHex = this.gearColor(eq?.chest, c.suit);
+    const helmHex = this.gearColor(eq?.helmet, '#cbd5e1');
+    const gloveHex = this.gearColor(eq?.gloves, '#94a3b8');
+    const legHex = this.gearColor(eq?.legs, c.suit);
+    const bootHex = this.gearColor(eq?.boots, '#64748b');
+    const wepHex = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.hex : '#e2e8f0';
+    const offHex = this.gearColor(eq?.offhand, '#38bdf8');
 
-    // Ground aura (tinted by weapon rarity if Rare+!)
+    // Ground aura
     ctx.fillStyle = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.glowHex : 'rgba(0, 240, 255, 0.16)';
     ctx.beginPath();
-    ctx.ellipse(px + 16, py + 26, 12, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + 16, py + 30, 13, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     if (weaponRarity && weaponRarity.tierNumber >= 3) {
       ctx.strokeStyle = weaponRarity.hex;
@@ -329,64 +351,172 @@ export class CanvasRenderer {
 
     if (this.enableGlow) {
       ctx.shadowColor = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.hex : c.glow;
-      ctx.shadowBlur = weaponRarity && weaponRarity.tierNumber >= 4 ? 14 : 10;
+      ctx.shadowBlur = weaponRarity && weaponRarity.tierNumber >= 4 ? 12 : 8;
     } else {
       ctx.shadowBlur = 0;
     }
-    ctx.fillStyle = c.body;
 
-    // Helmet crest if helmet equipped
-    if (equipment?.helmet) {
-      const helmRarity = getRarityStyle(equipment.helmet.rarity);
-      ctx.fillStyle = helmRarity.tierNumber >= 2 ? helmRarity.hex : '#e2e8f0';
-      ctx.fillRect(px + 9, py + 4, 14, 4);
-      ctx.fillStyle = c.body;
+    // --- BOOTS ---
+    ctx.fillStyle = eq?.boots ? bootHex : '#475569';
+    ctx.fillRect(mx(9, 6), py + 26, 6, 5);
+    ctx.fillRect(mx(17, 6), py + 26, 6, 5);
+    if (eq?.boots) {
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(mx(9, 6), py + 29, 6, 2);
+      ctx.fillRect(mx(17, 6), py + 29, 6, 2);
     }
 
-    // Torso / armor
-    ctx.fillRect(px + 7, py + 7, 18, 18);
-
-    // Chest armor trim by rarity
-    if (equipment?.chest) {
-      ctx.strokeStyle = armorRarity && armorRarity.tierNumber >= 2 ? armorRarity.hex : '#ffffff';
-      ctx.lineWidth = armorRarity && armorRarity.tierNumber >= 4 ? 1.8 : 1.2;
-      ctx.strokeRect(px + 8, py + 14, 16, 9);
+    // --- LEGS ---
+    ctx.fillStyle = eq?.legs ? legHex : c.suit;
+    ctx.fillRect(mx(10, 5), py + 18, 5, 9);
+    ctx.fillRect(mx(17, 5), py + 18, 5, 9);
+    if (eq?.legs) {
+      ctx.strokeStyle = '#020617';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mx(10, 5) + 0.5, py + 18.5, 4, 8);
+      ctx.strokeRect(mx(17, 5) + 0.5, py + 18.5, 4, 8);
     }
 
-    // Weapon / Offhand silhouette accents tinted by weapon rarity
-    if (equipment?.weapon) {
-      const wepHex = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.hex : '#00f0ff';
-      ctx.fillStyle = wepHex;
-      if (equipment.weapon.weaponCategory === 'greatsword') {
-        ctx.fillRect(px + 25, py + 2, 4, 22);
-      } else if (equipment.weapon.weaponCategory === 'staff') {
-        ctx.fillStyle = wepHex;
-        ctx.fillRect(px + 25, py + 4, 3, 22);
-        ctx.fillStyle = '#ffe600';
-        ctx.fillRect(px + 24, py + 2, 5, 4);
-      } else {
-        ctx.fillRect(px + 25, py + 8, 3, 14);
+    // --- TORSO (undersuit) ---
+    ctx.fillStyle = c.suit;
+    ctx.fillRect(mx(10, 12), py + 10, 12, 9);
+
+    // Chest armor plate — large & readable
+    if (eq?.chest) {
+      ctx.fillStyle = chestHex;
+      ctx.fillRect(mx(9, 14), py + 10, 14, 10);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+      ctx.fillRect(mx(11, 10), py + 12, 10, 3);
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = eq.chest && getRarityStyle(eq.chest.rarity).tierNumber >= 4 ? 1.6 : 1.1;
+      ctx.strokeRect(mx(9, 14) + 0.5, py + 10.5, 13, 9);
+      // Collar / pauldrons
+      ctx.fillStyle = chestHex;
+      ctx.fillRect(mx(7, 4), py + 10, 4, 4);
+      ctx.fillRect(mx(21, 4), py + 10, 4, 4);
+    }
+
+    // --- ARMS ---
+    ctx.fillStyle = c.suit;
+    ctx.fillRect(mx(6, 4), py + 11, 4, 8);
+    ctx.fillRect(mx(22, 4), py + 11, 4, 8);
+
+    // Gloves / hands
+    ctx.fillStyle = eq?.gloves ? gloveHex : c.skin;
+    ctx.fillRect(mx(5, 5), py + 17, 5, 4);
+    ctx.fillRect(mx(22, 5), py + 17, 5, 4);
+    if (eq?.gloves) {
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mx(5, 5) + 0.5, py + 17.5, 4, 3);
+      ctx.strokeRect(mx(22, 5) + 0.5, py + 17.5, 4, 3);
+    }
+
+    // --- HEAD ---
+    ctx.fillStyle = c.skin;
+    ctx.beginPath();
+    ctx.arc(px + 16, py + 6, 5.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Helmet overlays head when equipped
+    if (eq?.helmet) {
+      ctx.fillStyle = helmHex;
+      ctx.beginPath();
+      ctx.ellipse(px + 16, py + 5.5, 6.2, 5.4, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(px + 10, py + 5, 12, 4);
+      // Crest / antenna by rarity
+      const ht = getRarityStyle(eq.helmet.rarity).tierNumber;
+      ctx.fillStyle = ht >= 3 ? helmHex : '#e2e8f0';
+      ctx.fillRect(px + 15, py + 0, 2, 4);
+      if (ht >= 4) {
+        ctx.fillRect(px + 12, py + 1, 2, 3);
+        ctx.fillRect(px + 18, py + 1, 2, 3);
       }
     }
 
-    if (equipment?.offhand) {
-      const offRarity = getRarityStyle(equipment.offhand.rarity);
-      ctx.fillStyle = offRarity.tierNumber >= 2 ? offRarity.hex : '#38bdf8';
-      ctx.fillRect(px + 2, py + 10, 4, 13);
+    // Visor / eyes — always readable on humanoid face
+    ctx.fillStyle = c.visor;
+    if (facingUp) {
+      ctx.fillRect(px + 12, py + 4, 8, 2);
+    } else if (facingLeft) {
+      ctx.fillRect(px + 10, py + 5, 5, 2.5);
+    } else if (facingRight) {
+      ctx.fillRect(px + 17, py + 5, 5, 2.5);
+    } else {
+      ctx.fillRect(px + 11, py + 5, 4, 2.5);
+      ctx.fillRect(px + 17, py + 5, 4, 2.5);
     }
 
-    // Visor
-    ctx.fillStyle = c.visor;
-    if (facing === 'down') ctx.fillRect(px + 9, py + 12, 14, 4);
-    else if (facing === 'up') ctx.fillRect(px + 9, py + 8, 14, 3);
-    else if (facing === 'left') ctx.fillRect(px + 7, py + 12, 6, 4);
-    else ctx.fillRect(px + 19, py + 12, 6, 4);
+    // --- WEAPON (dominant hand side) ---
+    if (eq?.weapon) {
+      const cat = eq.weapon.weaponCategory || 'sword';
+      const handX = facingLeft ? px + 3 : px + 24;
+      ctx.fillStyle = wepHex;
+      if (cat === 'greatsword') {
+        ctx.fillRect(handX, py + 1, 4, 24);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(handX - 1, py + 16, 6, 3);
+      } else if (cat === 'staff' || cat === 'focus') {
+        ctx.fillRect(handX + 0.5, py + 2, 3, 24);
+        ctx.fillStyle = '#ffe600';
+        ctx.beginPath();
+        ctx.arc(handX + 2, py + 3, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (cat === 'pistol') {
+        ctx.fillRect(handX, py + 14, 8, 4);
+        ctx.fillRect(handX + (facingLeft ? 0 : 5), py + 12, 3, 6);
+      } else if (cat === 'daggers') {
+        ctx.fillRect(handX, py + 10, 2.5, 12);
+        ctx.fillRect(handX + (facingLeft ? 4 : -4), py + 12, 2.5, 10);
+      } else if (cat === 'katana') {
+        ctx.fillRect(handX + 0.5, py + 4, 2.5, 20);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(handX - 0.5, py + 18, 4.5, 2);
+      } else {
+        // sword / default blade
+        ctx.fillRect(handX, py + 6, 3, 18);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(handX - 1, py + 17, 5, 2);
+      }
+      // Rarity spark on tip for epic+
+      if (weaponRarity && weaponRarity.tierNumber >= 3) {
+        ctx.fillStyle = weaponRarity.hex;
+        ctx.fillRect(handX, py + 2, 3, 3);
+      }
+    }
+
+    // --- OFFHAND (opposite side) ---
+    if (eq?.offhand) {
+      const ox = facingLeft ? px + 24 : px + 2;
+      const offCat = eq.offhand.weaponCategory;
+      ctx.fillStyle = offHex;
+      if (offCat === 'shield') {
+        ctx.beginPath();
+        ctx.moveTo(ox + 3, py + 9);
+        ctx.lineTo(ox + 8, py + 11);
+        ctx.lineTo(ox + 8, py + 20);
+        ctx.lineTo(ox + 3, py + 22);
+        ctx.lineTo(ox, py + 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else if (offCat === 'focus') {
+        ctx.beginPath();
+        ctx.arc(ox + 3, py + 14, 4, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(ox, py + 11, 3, 12);
+      }
+    }
 
     if (shieldAmount > 0) {
       ctx.strokeStyle = '#00f0ff';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(px + 16, py + 16, 18, 0, Math.PI * 2);
+      ctx.arc(px + 16, py + 16, 17, 0, Math.PI * 2);
       ctx.stroke();
     }
 
