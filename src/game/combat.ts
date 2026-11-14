@@ -254,8 +254,8 @@ export function collectDeathDropBagsAt(
     // Support continuous positions: bag sits on integer tile; player may straddle cells.
     const px0 = Math.floor(player.x);
     const py0 = Math.floor(player.y);
-    const px1 = Math.floor(player.x + 0.82 - 1e-4);
-    const py1 = Math.floor(player.y + 0.82 - 1e-4);
+    const px1 = Math.floor(player.x + 0.72 - 1e-4);
+    const py1 = Math.floor(player.y + 0.72 - 1e-4);
     const matchesPos =
       bag.x >= px0 && bag.x <= px1 && bag.y >= py0 && bag.y <= py1;
     const matchesOwner = !ownerId || bag.ownerId === ownerId;

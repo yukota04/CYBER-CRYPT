@@ -61,7 +61,7 @@ import { CanvasRenderer, CoopRemoteRenderPlayer } from './game/canvasRenderer';
 import { createRealtimeClock, tickRealtime, type RealtimeClock } from './game/realtime';
 import { Language, t } from './game/i18n';
 
-import { LoginScreen } from './components/LoginScreen';
+import { LoginScreen, type AuthCredentials, type RegisterPayload } from './components/LoginScreen';
 import { TitleScreen } from './components/TitleScreen';
 import { GameHUD } from './components/GameHUD';
 import { TouchControls } from './components/TouchControls';
@@ -76,49 +76,7 @@ import { PauseModal } from './components/PauseModal';
 import { Minimap } from './components/Minimap';
 import { ShopModal } from './components/ShopModal';
 import { OptionsModal } from './components/OptionsModal';
-import {
-  auth,
-  checkGoogleRedirectSignIn,
-  googleServerUserId,
-  onAuthStateChanged,
-  signInWithGoogleNativeMobile,
-  signOutFirebaseUser,
-  syncFirebaseUserProfile,
-  testFirestoreConnection,
-  waitForFirebaseUser
-} from './firebase';
-import type { User as FirebaseUser } from 'firebase/auth';
-
-const PENDING_GOOGLE_USERNAME_KEY = 'cc_pending_google_username';
-
-function readPendingGoogleUsername(): string | null {
-  try {
-    return (
-      sessionStorage.getItem(PENDING_GOOGLE_USERNAME_KEY) ||
-      localStorage.getItem(PENDING_GOOGLE_USERNAME_KEY)
-    );
-  } catch {
-    return null;
-  }
-}
-
-function writePendingGoogleUsername(name: string): void {
-  try {
-    sessionStorage.setItem(PENDING_GOOGLE_USERNAME_KEY, name);
-  } catch {}
-  try {
-    localStorage.setItem(PENDING_GOOGLE_USERNAME_KEY, name);
-  } catch {}
-}
-
-function clearPendingGoogleUsername(): void {
-  try {
-    sessionStorage.removeItem(PENDING_GOOGLE_USERNAME_KEY);
-  } catch {}
-  try {
-    localStorage.removeItem(PENDING_GOOGLE_USERNAME_KEY);
-  } catch {}
-}
+import { testFirestoreConnection } from './firebase';
 
 const DEFAULT_ACHIEVEMENTS: Achievement[] = [
   { id: 'first_blood', title: 'First Breach', description: 'Eliminate your first rogue AI matrix', icon: '⚡', unlocked: false },
@@ -138,15 +96,12 @@ export default function App() {
       return true;
     }
   });
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [googleNotice, setGoogleNotice] = useState<string | null>(null);
-  const [firebaseUid, setFirebaseUid] = useState<string | null>(() => auth.currentUser?.uid ?? null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canInstallPwa, setCanInstallPwa] = useState(false);
   const [isInstallBusy, setIsInstallBusy] = useState(false);
   const deferredInstallPromptRef = useRef<any>(null);
-  const pendingGoogleUsernameRef = useRef<string | null>(null);
-  const googleFinalizeInFlightRef = useRef<Promise<boolean> | null>(null);
 
   const [appSettings, setAppSettings] = useState<AppSettings>(() => loadAppSettings());
   const [selectedClass, setSelectedClass] = useState<CharacterClass>('striker');
@@ -481,10 +436,23 @@ export default function App() {
     } catch {}
   }, [requestNativeFullscreen]);
 
+  const applyAuthSuccess = useCallback(
+    (token: string, user: { id: string; username: string; role: 'player' | 'moderator' | 'admin' }) => {
+      setUserToken(token);
+      setUserProfile(user);
+      setCloudSyncStatus('Encrypted Cloud Synced');
+      setAuthNotice(null);
+      setAuthScreenVisible(false);
+    },
+    []
+  );
+
   const handleGuestLogin = useCallback(async () => {
     if (window.innerWidth < 768 || 'ontouchstart' in window) {
       requestNativeFullscreen();
     }
+    setIsAuthLoading(true);
+    setAuthNotice(null);
     try {
       const res = await fetch('/api/auth/guest', {
         method: 'POST',
@@ -494,146 +462,86 @@ export default function App() {
         })
       });
       const data = await res.json();
-      if (data.token) {
-        setUserToken(data.token);
-        setUserProfile(data.user);
-        setCloudSyncStatus('Encrypted Cloud Synced');
-        setAuthScreenVisible(false);
+      if (data.token && data.user) {
+        applyAuthSuccess(data.token, data.user);
         return;
       }
-      setGoogleNotice(data.error || 'Guest login failed.');
+      setAuthNotice(data.error || 'Guest login failed.');
     } catch {
       setCloudSyncStatus('Local Storage Only');
-      setGoogleNotice('Guest login failed (offline).');
+      setAuthNotice('Guest login failed (offline).');
+    } finally {
+      setIsAuthLoading(false);
     }
-  }, [requestNativeFullscreen]);
+  }, [requestNativeFullscreen, applyAuthSuccess]);
 
-  const finalizeFirebaseUserSession = useCallback(
-    async (fbUser: NonNullable<typeof auth.currentUser>, chosenUsername?: string | null) => {
-      // Serialize finalization — popup + onAuthStateChanged often race after account pick.
-      if (googleFinalizeInFlightRef.current) {
-        return googleFinalizeInFlightRef.current;
-      }
-
-      const run = (async () => {
-        try {
-          const stored =
-            (chosenUsername && chosenUsername.trim()) ||
-            pendingGoogleUsernameRef.current ||
-            readPendingGoogleUsername();
-          const idToken = await fbUser.getIdToken();
-          const res = await fetch('/api/auth/google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              idToken,
-              username: stored || undefined,
-              platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
-            })
-          });
-          let data: any = {};
-          try {
-            data = await res.json();
-          } catch {
-            data = {};
-          }
-          if (res.ok && data.token) {
-            setUserToken(data.token);
-            setUserProfile(data.user);
-            setCloudSyncStatus('Google Cloud Synced');
-            syncFirebaseUserProfile(fbUser, userStats.highestFloor, userStats.bestScore).catch(() => {});
-            pendingGoogleUsernameRef.current = null;
-            clearPendingGoogleUsername();
-            setGoogleNotice(null);
-            setAuthScreenVisible(false);
-            return true;
-          }
-          const errMsg =
-            data.code === 'USERNAME_TAKEN'
-              ? t('loginNameTakenError', language)
-              : data.code === 'USERNAME_REQUIRED'
-                ? t('loginNameRequiredError', language)
-                : data.error || `Google authentication failed (${res.status}).`;
-          setGoogleNotice(errMsg);
-          return false;
-        } catch {
-          setGoogleNotice('Could not complete Google Sign-In sync.');
-          return false;
-        } finally {
-          googleFinalizeInFlightRef.current = null;
+  const handlePasswordLogin = useCallback(
+    async (creds: AuthCredentials) => {
+      setIsAuthLoading(true);
+      setAuthNotice(null);
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            login: creds.login,
+            password: creds.password,
+            platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.token && data.user) {
+          applyAuthSuccess(data.token, data.user);
+          return;
         }
-      })();
-
-      googleFinalizeInFlightRef.current = run;
-      return run;
+        setAuthNotice(data.error || t('authLoginFailed', language));
+      } catch {
+        setAuthNotice(t('authLoginFailed', language));
+      } finally {
+        setIsAuthLoading(false);
+      }
     },
-    [userStats.bestScore, userStats.highestFloor, language]
+    [applyAuthSuccess, language]
   );
 
-  const handleGoogleLogin = useCallback(
-    async (username: string) => {
-      const clean = username.trim();
-      if (!/^[a-zA-Z0-9_-]{3,20}$/.test(clean)) {
-        setGoogleNotice(t('loginNameRequiredError', language));
-        return;
-      }
-      setIsGoogleLoading(true);
-      setGoogleNotice(null);
-      pendingGoogleUsernameRef.current = clean;
-      writePendingGoogleUsername(clean);
-      if (window.innerWidth < 768 || 'ontouchstart' in window) {
-        requestNativeFullscreen();
-      }
+  const handleRegister = useCallback(
+    async (payload: RegisterPayload) => {
+      setIsAuthLoading(true);
+      setAuthNotice(null);
       try {
-        // Returning devices often already have Firebase persistence. Opening the
-        // account picker again can hang after email selection without resolving the
-        // popup promise — and onAuthStateChanged will not re-fire for the same uid.
-        if (auth.currentUser) {
-          await finalizeFirebaseUserSession(auth.currentUser, clean);
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            login: payload.login,
+            nick: payload.nick,
+            password: payload.password,
+            passwordConfirm: payload.passwordConfirm,
+            platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.token && data.user) {
+          applyAuthSuccess(data.token, data.user);
           return;
         }
-
-        let fbUser: FirebaseUser | null = null;
-        let signInError: any = null;
-        try {
-          fbUser = await signInWithGoogleNativeMobile();
-        } catch (err: any) {
-          signInError = err;
-          // Popup may close/hang after Firebase already applied the session.
-          fbUser = auth.currentUser ?? (await waitForFirebaseUser(8000));
-        }
-
-        // Redirect in progress returns null — page reloads and resumes from storage.
-        // Hung popup: wait until auth state appears.
-        if (!fbUser) {
-          fbUser = auth.currentUser ?? (await waitForFirebaseUser(90000));
-        }
-
-        if (fbUser) {
-          await finalizeFirebaseUserSession(fbUser, clean);
-          return;
-        }
-
-        if (signInError) {
-          throw signInError;
-        }
-      } catch (err: any) {
-        const msg =
-          err?.code === 'auth/popup-closed-by-user'
-            ? 'Google sign-in popup was closed before finishing.'
-            : err?.message || 'Google sign-in failed.';
-        setGoogleNotice(msg);
+        if (data.code === 'LOGIN_TAKEN') setAuthNotice(t('authLoginTaken', language));
+        else if (data.code === 'NICK_TAKEN') setAuthNotice(t('authNickTaken', language));
+        else if (data.code === 'PASSWORD_MISMATCH') setAuthNotice(t('authPasswordMismatch', language));
+        else setAuthNotice(data.error || t('authRegisterFailed', language));
+      } catch {
+        setAuthNotice(t('authRegisterFailed', language));
       } finally {
-        setIsGoogleLoading(false);
+        setIsAuthLoading(false);
       }
     },
-    [finalizeFirebaseUserSession, requestNativeFullscreen, language]
+    [applyAuthSuccess, language]
   );
 
   const handleInstallPwa = useCallback(async () => {
     const promptEvent = deferredInstallPromptRef.current;
     if (!promptEvent) {
-      setGoogleNotice(t('installAppManualHint', language));
+      setAuthNotice(t('installAppManualHint', language));
       return;
     }
     setIsInstallBusy(true);
@@ -643,7 +551,7 @@ export default function App() {
       deferredInstallPromptRef.current = null;
       setCanInstallPwa(false);
     } catch {
-      setGoogleNotice(t('installAppManualHint', language));
+      setAuthNotice(t('installAppManualHint', language));
     } finally {
       setIsInstallBusy(false);
     }
@@ -673,54 +581,17 @@ export default function App() {
     };
   }, []);
 
-  // Firebase redirect / hung-popup resume when a pending operative name exists
+  // Autostart + Firestore connectivity probe (no Google auth)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const autostart = params.get('autostart') === '1';
-
     testFirestoreConnection();
-
-    let handledFirebase = false;
-    const resumeGoogle = async (fbUser: NonNullable<typeof auth.currentUser>) => {
-      if (handledFirebase) return;
-      const pending = pendingGoogleUsernameRef.current || readPendingGoogleUsername();
-      // Only auto-enter when the player explicitly started Google with a name
-      // (or returning redirect still has the pending name in storage).
-      if (!pending) return;
-      handledFirebase = true;
-      pendingGoogleUsernameRef.current = pending;
-      setIsGoogleLoading(true);
-      await finalizeFirebaseUserSession(fbUser, pending);
-      setIsGoogleLoading(false);
-    };
-
-    checkGoogleRedirectSignIn().then(fbUser => {
-      if (fbUser) resumeGoogle(fbUser);
-    });
-
-    const unsubAuth = onAuthStateChanged(auth, fbUser => {
-      setFirebaseUid(fbUser?.uid ?? null);
-      if (!fbUser || handledFirebase) return;
-      resumeGoogle(fbUser);
-    });
-
-    // If storage still has a pending name and Firebase already restored the session,
-    // finalize even when auth listeners are quiet (common after account-picker hang).
-    const bootPending = readPendingGoogleUsername();
-    if (bootPending) {
-      pendingGoogleUsernameRef.current = bootPending;
-      if (auth.currentUser) {
-        resumeGoogle(auth.currentUser);
-      }
-    }
-
     if (autostart) {
       setAuthScreenVisible(false);
       handleStartGame();
     }
-
-    return () => unsubAuth();
-  }, [finalizeFirebaseUserSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Initialize Canvas Renderer and configurable 60/30 FPS render loop
   useEffect(() => {
@@ -984,12 +855,9 @@ export default function App() {
       setCoopConnected(false);
       setPlayMode('offline');
     }
-    await signOutFirebaseUser();
-    setFirebaseUid(null);
-    pendingGoogleUsernameRef.current = null;
-    clearPendingGoogleUsername();
     setUserToken('');
     setUserProfile(null);
+    setAuthNotice(null);
     setOnlineStashes({});
     setCloudSyncStatus('Local Device Save');
     setShowOptions(false);
@@ -2329,15 +2197,15 @@ export default function App() {
           language={language}
           onLanguageChange={handleLanguageChange}
           onGuestLogin={handleGuestLogin}
-          onGoogleLogin={handleGoogleLogin}
-          isGoogleLoading={isGoogleLoading}
-          googleNotice={googleNotice}
+          onPasswordLogin={handlePasswordLogin}
+          onRegister={handleRegister}
+          isAuthLoading={isAuthLoading}
+          authNotice={authNotice}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
           canInstallPwa={canInstallPwa}
           onInstallPwa={handleInstallPwa}
           isInstallBusy={isInstallBusy}
-          excludeUserId={firebaseUid ? googleServerUserId(firebaseUid) : null}
         />
       )}
 
