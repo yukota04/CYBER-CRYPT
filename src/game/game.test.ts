@@ -14,7 +14,8 @@ import {
   resolveMonsterTurns,
   useConsumableItem,
   dropPlayerLoadoutOnDeath,
-  collectDeathDropBagsAt
+  collectDeathDropBagsAt,
+  emptyEquipmentSnapshot
 } from './combat';
 import { canUnlockSkill, getSkillTreesForClass } from './skills';
 import {
@@ -746,6 +747,58 @@ test('rarity visual styles cover all 6 tiers with ascending star rank and distin
     seenHex.add(style.hex);
   });
   assert.equal(seenHex.size, 6, 'All 6 rarity tiers should have distinct accent hex colors');
+});
+
+test('Floating Skull snaps continuous free-move death coords to integer tiles so loot stays visible and recoverable', () => {
+  const dungeon = generateDungeon(2, 91);
+  const player = createInitialPlayer('striker', 6, 6);
+  // Free-move / sub-tile position (the bug: float y made tiles[8.7] undefined)
+  player.x = 8.72;
+  player.y = 11.41;
+  for (const [tx, ty] of [
+    [8, 11],
+    [9, 11]
+  ] as const) {
+    dungeon.tiles[ty][tx].walkable = true;
+    dungeon.tiles[ty][tx].type = 'floor';
+    dungeon.tiles[ty][tx].explored = true;
+  }
+  player.stats.coins = 333;
+  player.inventory.push(createItem('dual_elixir', 'float_loot_pot'));
+
+  const bag = dropPlayerLoadoutOnDeath(player, dungeon, 'solo', 'Operative', 3);
+  assert.ok(bag);
+  assert.equal(bag!.x, 9, 'Death bag x must be floored (8.72+0.36 → 9)');
+  assert.equal(bag!.y, 11, 'Death bag y must be floored (11.41+0.36 → 11)');
+  assert.equal(Number.isInteger(bag!.x) && Number.isInteger(bag!.y), true);
+  assert.ok(dungeon.tiles[bag!.y]?.[bag!.x], 'Bag tile must exist for skull render/lookup');
+
+  player.x = 9.1;
+  player.y = 11.05;
+  const rec = collectDeathDropBagsAt(player, dungeon, 'solo');
+  assert.equal(rec.recoveredBags, 1, 'Should recover skull on floored death tile');
+  assert.equal(player.stats.coins, 333, 'Recovered floored death bag coins');
+  assert.ok(player.inventory.some(i => i.id === 'float_loot_pot'));
+
+  // Legacy float bag still recoverable after flooring on collect
+  dungeon.deathDrops.push({
+    id: 'legacy_float_skull',
+    ownerId: 'solo',
+    ownerName: 'Operative',
+    x: 8.9,
+    y: 11.2,
+    items: [createItem('dual_elixir', 'legacy_pot')],
+    equipment: emptyEquipmentSnapshot(),
+    coins: 50,
+    probabilityStones: 0,
+    droppedAtTurn: 1
+  });
+  player.x = 8.15;
+  player.y = 11.1;
+  const legacyRec = collectDeathDropBagsAt(player, dungeon, 'solo');
+  assert.equal(legacyRec.recoveredBags, 1, 'Legacy float bag should collect via Math.floor');
+  assert.equal(player.stats.coins, 383);
+  assert.ok(player.inventory.some(i => i.id === 'legacy_pot'));
 });
 
 test('death drops all equipped gear, backpack items, coins, and stones into a Floating Skull bag and stepping recovers everything', () => {
