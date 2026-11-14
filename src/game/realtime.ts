@@ -27,13 +27,17 @@ import { SoundEventType } from './audio';
 import { updateFOV } from './dungeon';
 
 /** Footprint in tiles — < 1 so an entity can straddle two cells. */
-export const ENTITY_BODY = 0.82;
+export const ENTITY_BODY = 0.72;
 /** Soft collision radius for entity-vs-entity (center-to-center). */
 export const ENTITY_RADIUS = ENTITY_BODY * 0.5;
 
 export const PLAYER_SPEED = 5.4; // tiles / second
+/** Generous reach so glancing / off-angle contacts still hit. */
 export const PLAYER_MELEE_RANGE = 1.55;
+/** Half-angle (radians) of the forward attack cone — ~75° each side. */
+export const PLAYER_MELEE_CONE = (75 * Math.PI) / 180;
 export const PLAYER_ATTACK_COOLDOWN = 0.34;
+/** Lateral nudge distance when scraping a corner into a corridor. */
 export const CORNER_SLIDE_MAX = 0.42;
 
 /** Status / cooldown "turn" pulse while moving freely */
@@ -42,7 +46,7 @@ export const STATUS_TICK_INTERVAL = 0.55;
 export interface MoveInput {
   dx: number;
   dy: number;
-  /** Optional aim vector (e.g. toward mouse). When set, melee uses this over move/facing. */
+  /** Optional aim vector (e. g. toward mouse). When set, facing + melee use this. */
   aimDx?: number;
   aimDy?: number;
 }
@@ -123,7 +127,7 @@ function centersOverlap(
   ay: number,
   bx: number,
   by: number,
-  minDist = ENTITY_BODY * 0.72
+  minDist = ENTITY_BODY * 0.55
 ): boolean {
   const a = entityCenter(ax, ay);
   const b = entityCenter(bx, by);
@@ -136,6 +140,51 @@ function distanceCenters(ax: number, ay: number, bx: number, by: number): number
   const a = entityCenter(ax, ay);
   const b = entityCenter(bx, by);
   return Math.hypot(a.cx - b.cx, a.cy - b.cy);
+}
+
+function facingVector(facing: Player['facing']): { fx: number; fy: number } {
+  switch (facing) {
+    case 'up':
+      return { fx: 0, fy: -1 };
+    case 'down':
+      return { fx: 0, fy: 1 };
+    case 'left':
+      return { fx: -1, fy: 0 };
+    default:
+      return { fx: 1, fy: 0 };
+  }
+}
+
+/** True if target is inside the forward attack cone (or very close / overlapping). */
+function inMeleeArc(player: Player, mx: number, my: number, moveDx = 0, moveDy = 0): boolean {
+  const dist = distanceCenters(player.x, player.y, mx, my);
+  if (dist <= ENTITY_BODY * 0.95) return true; // overlapping / bumping always hits
+  if (dist > PLAYER_MELEE_RANGE) return false;
+
+  let fx = moveDx;
+  let fy = moveDy;
+  if (Math.hypot(fx, fy) < 1e-4) {
+    const f = facingVector(player.facing);
+    fx = f.fx;
+    fy = f.fy;
+  } else {
+    const len = Math.hypot(fx, fy) || 1;
+    fx /= len;
+    fy /= len;
+  }
+
+  const a = entityCenter(player.x, player.y);
+  const b = entityCenter(mx, my);
+  let tx = b.cx - a.cx;
+  let ty = b.cy - a.cy;
+  const tLen = Math.hypot(tx, ty) || 1;
+  tx /= tLen;
+  ty /= tLen;
+  const dot = fx * tx + fy * ty;
+  // Cosine of cone half-angle; also allow wide side hits when fairly close
+  const cosCone = Math.cos(PLAYER_MELEE_CONE);
+  if (dot >= cosCone) return true;
+  return dist <= PLAYER_MELEE_RANGE * 0.72 && dot >= -0.15;
 }
 
 function monsterSpeed(m: Monster): number {
@@ -199,7 +248,9 @@ export function moveWithCollision(
   const blockedByEntity = (px: number, py: number) =>
     blockers.some(b => b.id !== selfId && centersOverlap(px, py, b.x, b.y, ENTITY_BODY * 0.5));
 
-  const tryPos = (px: number, py: number) => canOccupy(dungeon, px, py) && !blockedByEntity(px, py);
+  const tryPos = (px: number, py: number) =>
+    canOccupy(dungeon, px, py) && !blockedByEntity(px, py);
+
   const clamp = (px: number, py: number) => ({
     x: Math.max(0, Math.min(dungeon.width - ENTITY_BODY, px)),
     y: Math.max(0, Math.min(dungeon.height - ENTITY_BODY, py))
@@ -207,11 +258,14 @@ export function moveWithCollision(
 
   const wantX = x + vx * dt;
   const wantY = y + vy * dt;
+
+  // Free move
   if (tryPos(wantX, wantY)) {
     const c = clamp(wantX, wantY);
     return { x: c.x, y: c.y, hitWall: false };
   }
 
+  // Axis-separated wall slide
   let nx = x;
   let ny = y;
   let hitWall = false;
@@ -222,12 +276,18 @@ export function moveWithCollision(
 
   const moved = Math.abs(nx - x) + Math.abs(ny - y);
   const speed = Math.hypot(vx, vy);
+
+  // Corner slide: when stuck (or barely moving) against a corner, nudge
+  // perpendicular to the dominant travel axis so the body slips into the gap.
   if (speed > 0.1 && moved < Math.abs(vx * dt) * 0.35 + Math.abs(vy * dt) * 0.35 + 1e-4) {
     const steps = [0.06, 0.12, 0.18, 0.26, 0.34, CORNER_SLIDE_MAX];
-    if (Math.abs(vx) >= Math.abs(vy) && Math.abs(vx) > 0.05) {
+    const horizDominant = Math.abs(vx) >= Math.abs(vy);
+
+    if (horizDominant && Math.abs(vx) > 0.05) {
       for (const s of steps) {
         for (const sign of [-1, 1] as const) {
           const slideY = y + sign * s;
+          // Prefer full forward + slide; fall back to partial forward
           if (tryPos(wantX, slideY)) {
             const c = clamp(wantX, slideY);
             return { x: c.x, y: c.y, hitWall: false };
@@ -366,38 +426,22 @@ function tryPlayerMelee(
   soundEvents: SoundEventType[],
   floatingTexts: RealtimeTickResult['floatingTexts'],
   attackEffects: AttackEffect[],
-  aimDx = 0,
-  aimDy = 0
+  moveDx = 0,
+  moveDy = 0
 ): { screenShake: number; hitstopSeconds: number; kills: number } {
   let screenShake = 0;
   let hitstopSeconds = 0;
   let kills = 0;
   if (clock.playerAttackCd > 0) return { screenShake, hitstopSeconds, kills };
 
-  const aimLen = Math.hypot(aimDx, aimDy);
-  const hasAim = aimLen > 0.05;
-  const ax = hasAim ? aimDx / aimLen : 0;
-  const ay = hasAim ? aimDy / aimLen : 0;
-
   let best: Monster | null = null;
   let bestScore = Infinity;
   for (const m of dungeon.monsters) {
     const d = distanceCenters(player.x, player.y, m.x, m.y);
     if (d > PLAYER_MELEE_RANGE) continue;
-    let score = d;
-    if (hasAim) {
-      const a = entityCenter(player.x, player.y);
-      const b = entityCenter(m.x, m.y);
-      let tx = b.cx - a.cx;
-      let ty = b.cy - a.cy;
-      const tLen = Math.hypot(tx, ty) || 1;
-      tx /= tLen;
-      ty /= tLen;
-      const dot = ax * tx + ay * ty;
-      // Prefer targets in aim direction; still allow side hits when close
-      if (dot < -0.2 && d > ENTITY_BODY * 0.95) continue;
-      score = d - dot * 0.55;
-    }
+    if (!inMeleeArc(player, m.x, m.y, moveDx, moveDy)) continue;
+    // Prefer closer targets; slight bias toward those more in front
+    const score = d;
     if (score < bestScore) {
       bestScore = score;
       best = m;
@@ -770,9 +814,8 @@ export function tickRealtime(
     }
   }
 
-  const nearEnemy = dungeon.monsters.some(
-    m => distanceCenters(player.x, player.y, m.x, m.y) <= PLAYER_MELEE_RANGE
-  );
+  // Auto-melee toward aim (PC mouse) or move/facing cone
+  const nearEnemy = dungeon.monsters.some(m => inMeleeArc(player, m.x, m.y, atkDx, atkDy));
   if (nearEnemy) {
     const melee = tryPlayerMelee(
       player,

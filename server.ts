@@ -65,6 +65,9 @@ app.use('/api/', globalApiLimiter);
 
 interface ServerUser {
   id: string;
+  /** Account login name (unique, used to sign in) */
+  login: string;
+  /** Public operative nick (unique, shown in-game) */
   username: string;
   role: 'player' | 'moderator' | 'admin';
   passwordHash: string;
@@ -72,6 +75,20 @@ interface ServerUser {
   email: string;
   devices: { deviceId: string; platform: string; lastSeen: number }[];
   createdAt: number;
+}
+
+function normalizeLogin(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  return raw.trim().toLowerCase();
+}
+
+function ensureUserLoginField(u: ServerUser): ServerUser {
+  if (!u.login || typeof u.login !== 'string') {
+    u.login = normalizeLogin(u.username) || u.id;
+  } else {
+    u.login = normalizeLogin(u.login);
+  }
+  return u;
 }
 
 interface CloudSavePayload {
@@ -181,7 +198,7 @@ function loadDatabaseOrSeed() {
     try {
       const raw = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
       if (Array.isArray(raw.users)) {
-        for (const u of raw.users) users.set(u.id, u);
+        for (const u of raw.users) users.set(u.id, ensureUserLoginField(u));
       }
       if (Array.isArray(raw.cloudSaves)) {
         for (const s of raw.cloudSaves) cloudSaves.set(s.userId, s);
@@ -219,6 +236,7 @@ function loadDatabaseOrSeed() {
 
   const adminUser: ServerUser = {
     id: 'usr_admin',
+    login: 'admin',
     username: 'AdminOverlord',
     role: 'admin',
     passwordHash: hashPassword(adminPwd),
@@ -230,6 +248,7 @@ function loadDatabaseOrSeed() {
 
   const demoUser: ServerUser = {
     id: 'usr_demo',
+    login: 'neonvalkyrie',
     username: 'NeonValkyrie',
     role: 'player',
     passwordHash: hashPassword(demoPwd),
@@ -326,14 +345,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Username availability (case-insensitive). Optional excludeUserId for own Google account re-login.
+// Nick (display username) availability — case-insensitive
 app.get('/api/auth/check-username', authLimiter, (req, res) => {
   const raw = typeof req.query.username === 'string' ? req.query.username : '';
   const excludeUserId =
     typeof req.query.excludeUserId === 'string' ? sanitizeText(req.query.excludeUserId, 80) : '';
   const uCheck = validateUsername(raw);
   if (!uCheck.valid) {
-    return res.json({ available: false, valid: false, error: uCheck.error || 'Invalid username', clean: uCheck.clean });
+    return res.json({ available: false, valid: false, error: uCheck.error || 'Invalid nick', clean: uCheck.clean });
   }
   const takenBy = Array.from(users.values()).find(
     u => u.username.toLowerCase() === uCheck.clean.toLowerCase() && (!excludeUserId || u.id !== excludeUserId)
@@ -342,7 +361,36 @@ app.get('/api/auth/check-username', authLimiter, (req, res) => {
     return res.json({
       available: false,
       valid: true,
-      error: 'Username already taken',
+      error: 'Nick already taken',
+      clean: uCheck.clean
+    });
+  }
+  return res.json({ available: true, valid: true, clean: uCheck.clean });
+});
+
+// Account login name availability — case-insensitive
+app.get('/api/auth/check-login', authLimiter, (req, res) => {
+  const raw = typeof req.query.login === 'string' ? req.query.login : '';
+  const excludeUserId =
+    typeof req.query.excludeUserId === 'string' ? sanitizeText(req.query.excludeUserId, 80) : '';
+  const uCheck = validateUsername(raw);
+  if (!uCheck.valid) {
+    return res.json({
+      available: false,
+      valid: false,
+      error: uCheck.error || 'Invalid login',
+      clean: uCheck.clean
+    });
+  }
+  const cleanLogin = uCheck.clean.toLowerCase();
+  const takenBy = Array.from(users.values()).find(
+    u => ensureUserLoginField(u).login === cleanLogin && (!excludeUserId || u.id !== excludeUserId)
+  );
+  if (takenBy) {
+    return res.json({
+      available: false,
+      valid: true,
+      error: 'Login already taken',
       clean: uCheck.clean
     });
   }
@@ -364,6 +412,7 @@ app.post('/api/auth/guest', authLimiter, (req, res) => {
 
   const guestUser: ServerUser = {
     id: guestId,
+    login: guestId,
     username: guestName,
     role: 'player',
     passwordHash: '',
@@ -384,34 +433,56 @@ app.post('/api/auth/guest', authLimiter, (req, res) => {
   });
 });
 
-// Auth: Register
+// Auth: Register — login (account) + nick + password (+ confirm on client)
 app.post('/api/auth/register', authLimiter, (req, res) => {
-  const { username, password, email = '', platform = 'web' } = req.body || {};
+  const {
+    login,
+    nick,
+    username, // legacy alias for nick
+    password,
+    passwordConfirm,
+    email = '',
+    platform = 'web'
+  } = req.body || {};
 
-  const uCheck = validateUsername(username);
-  if (!uCheck.valid) {
-    return res.status(400).json({ error: uCheck.error });
+  const loginCheck = validateUsername(login);
+  if (!loginCheck.valid) {
+    return res.status(400).json({ error: loginCheck.error || 'Invalid login', code: 'LOGIN_INVALID' });
+  }
+  const nickRaw = typeof nick === 'string' && nick.trim() ? nick : username;
+  const nickCheck = validateUsername(nickRaw);
+  if (!nickCheck.valid) {
+    return res.status(400).json({ error: nickCheck.error || 'Invalid nick', code: 'NICK_INVALID' });
   }
   const pCheck = validatePassword(password);
   if (!pCheck.valid) {
-    return res.status(400).json({ error: pCheck.error });
+    return res.status(400).json({ error: pCheck.error, code: 'PASSWORD_INVALID' });
+  }
+  if (typeof passwordConfirm === 'string' && passwordConfirm !== password) {
+    return res.status(400).json({ error: 'Passwords do not match', code: 'PASSWORD_MISMATCH' });
   }
   if (email && !validateEmail(email)) {
     return res.status(400).json({ error: 'Invalid email address format' });
   }
 
+  const cleanLogin = loginCheck.clean.toLowerCase();
   for (const u of users.values()) {
-    if (u.username.toLowerCase() === uCheck.clean.toLowerCase()) {
-      return res.status(409).json({ error: 'Username already registered' });
+    ensureUserLoginField(u);
+    if (u.login === cleanLogin) {
+      return res.status(409).json({ error: 'Login already registered', code: 'LOGIN_TAKEN' });
+    }
+    if (u.username.toLowerCase() === nickCheck.clean.toLowerCase()) {
+      return res.status(409).json({ error: 'Nick already registered', code: 'NICK_TAKEN' });
     }
   }
 
   const id = `usr_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
   const token = generateSessionToken('tok_usr');
-  const cleanEmail = email ? sanitizeText(email, 120) : `${uCheck.clean.toLowerCase()}@cybercrypt.io`;
+  const cleanEmail = email ? sanitizeText(email, 120) : `${cleanLogin}@cybercrypt.io`;
   const newUser: ServerUser = {
     id,
-    username: uCheck.clean,
+    login: cleanLogin,
+    username: nickCheck.clean,
     role: 'player',
     passwordHash: hashPassword(password),
     token,
@@ -422,43 +493,48 @@ app.post('/api/auth/register', authLimiter, (req, res) => {
 
   users.set(id, newUser);
   friends.set(id, new Set());
-  logAudit(id, uCheck.clean, 'USER_REGISTERED', req.ip || '127.0.0.1', 'low', 'New account provisioned with role: player');
+  schedulePersist();
+  logAudit(id, nickCheck.clean, 'USER_REGISTERED', req.ip || '127.0.0.1', 'low', `Account login=${cleanLogin}`);
 
   res.json({
-    user: { id, username: newUser.username, role: 'player', email: newUser.email },
+    user: { id, login: newUser.login, username: newUser.username, role: 'player', email: newUser.email },
     token
   });
 });
 
-// Auth: Login
+// Auth: Login — by account login name (also accepts nick for backwards compatibility)
 app.post('/api/auth/login', authLimiter, (req, res) => {
-  const { username, password, platform = 'web' } = req.body || {};
-  if (typeof username !== 'string' || typeof password !== 'string' || !username.trim() || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
+  const { login, username, password, platform = 'web' } = req.body || {};
+  const accountRaw = typeof login === 'string' && login.trim() ? login : username;
+  if (typeof accountRaw !== 'string' || typeof password !== 'string' || !accountRaw.trim() || !password) {
+    return res.status(400).json({ error: 'Login and password are required' });
   }
 
-  const cleanUsername = username.trim().toLowerCase();
+  const cleanAccount = accountRaw.trim().toLowerCase();
 
   for (const u of users.values()) {
-    if (u.username.toLowerCase() === cleanUsername) {
-      if (u.passwordHash && verifyPassword(password, u.passwordHash)) {
-        u.token = generateSessionToken('tok_usr');
-        u.devices.push({ deviceId: `dev_${Date.now()}`, platform: sanitizeText(platform, 40), lastSeen: Date.now() });
-        if (u.devices.length > 10) u.devices.shift();
-        logAudit(u.id, u.username, 'LOGIN_SUCCESS', req.ip || '127.0.0.1', 'low', `Successful authentication from ${platform}`);
-        return res.json({
-          user: { id: u.id, username: u.username, role: u.role, email: u.email },
-          token: u.token
-        });
-      } else {
-        logAudit(u.id, u.username, 'LOGIN_FAILED_PASSWORD', req.ip || '127.0.0.1', 'medium', 'Invalid credentials attempt');
-        return res.status(401).json({ error: 'Invalid username or password' });
-      }
+    ensureUserLoginField(u);
+    const matchLogin = u.login === cleanAccount;
+    const matchNick = u.username.toLowerCase() === cleanAccount;
+    if (!matchLogin && !matchNick) continue;
+
+    if (u.passwordHash && verifyPassword(password, u.passwordHash)) {
+      u.token = generateSessionToken('tok_usr');
+      u.devices.push({ deviceId: `dev_${Date.now()}`, platform: sanitizeText(platform, 40), lastSeen: Date.now() });
+      if (u.devices.length > 10) u.devices.shift();
+      schedulePersist();
+      logAudit(u.id, u.username, 'LOGIN_SUCCESS', req.ip || '127.0.0.1', 'low', `Successful authentication from ${platform}`);
+      return res.json({
+        user: { id: u.id, login: u.login, username: u.username, role: u.role, email: u.email },
+        token: u.token
+      });
     }
+    logAudit(u.id, u.username, 'LOGIN_FAILED_PASSWORD', req.ip || '127.0.0.1', 'medium', 'Invalid credentials attempt');
+    return res.status(401).json({ error: 'Invalid login or password' });
   }
 
-  logAudit('unknown', sanitizeText(username, 32), 'LOGIN_FAILED_UNKNOWN_USER', req.ip || '127.0.0.1', 'medium', 'Non-existent account login attempt');
-  res.status(401).json({ error: 'Invalid username or password' });
+  logAudit('unknown', sanitizeText(accountRaw, 32), 'LOGIN_FAILED_UNKNOWN_USER', req.ip || '127.0.0.1', 'medium', 'Non-existent account login attempt');
+  res.status(401).json({ error: 'Invalid login or password' });
 });
 
 // OAuth2 Integration Endpoint
@@ -530,6 +606,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
 
     // Returning Google user may omit username and keep their existing operative name
     if (existingUser && !uCheck.valid) {
+      ensureUserLoginField(existingUser);
       existingUser.token = token;
       existingUser.email = cleanEmail;
       existingUser.devices.push({ deviceId: `dev_${Date.now()}`, platform: safePlatform, lastSeen: Date.now() });
@@ -561,6 +638,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
     }
 
     if (existingUser) {
+      ensureUserLoginField(existingUser);
       existingUser.token = token;
       existingUser.username = cleanName;
       existingUser.email = cleanEmail;
@@ -571,6 +649,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
     } else {
       existingUser = {
         id: userId,
+        login: userId.toLowerCase(),
         username: cleanName,
         role: 'player',
         passwordHash: '',
