@@ -25,43 +25,61 @@ export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
   const [matchId, setMatchId] = useState<string | null>(null);
   const [duelTimeLeft, setDuelTimeLeft] = useState(60);
 
-  const startMatchmaking = () => {
-    setStatus('searching');
+  // Track timeouts safely for unmount cleanup
+  useEffect(() => {
+    if (status !== 'searching') return;
+    const controller = new AbortController();
+    let botTimer: ReturnType<typeof setTimeout> | null = null;
+    let enterTimer: ReturnType<typeof setTimeout> | null = null;
 
     fetch('/api/matchmaking/join', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${userToken}`
-      }
+      },
+      signal: controller.signal
     })
       .then(res => res.json())
       .then(data => {
         if (data.matchFound) {
           setStatus('matched');
           setMatchId(data.matchId);
-          setOpponent({ username: data.opponent.username, score: 1200, floor: 1 });
-          setTimeout(() => setStatus('in_duel'), 2000);
+          setOpponent({ username: data.opponent.username, score: 0, floor: 1 });
+          enterTimer = setTimeout(() => setStatus('in_duel'), 1500);
         } else {
-          // Simulated opponent discovery after 3 seconds for immediate fun testing
-          setTimeout(() => {
+          // Simulated opponent discovery fallback when no second live operative is queued
+          botTimer = setTimeout(() => {
             const bots = ['ViperMatrix', 'CyberNova', 'GlitchSpecter', 'CircuitQueen'];
             const botName = bots[Math.floor(Math.random() * bots.length)];
             setStatus('matched');
             setMatchId(`sim_match_${Date.now()}`);
             setOpponent({ username: botName, score: 850, floor: 1 });
-            setTimeout(() => setStatus('in_duel'), 2000);
-          }, 2500);
+            enterTimer = setTimeout(() => setStatus('in_duel'), 1500);
+          }, 2000);
         }
       })
-      .catch(() => {
-        setStatus('idle');
+      .catch(err => {
+        if (err.name !== 'AbortError') setStatus('idle');
       });
+
+    return () => {
+      controller.abort();
+      if (botTimer) clearTimeout(botTimer);
+      if (enterTimer) clearTimeout(enterTimer);
+    };
+  }, [status, userToken]);
+
+  const startMatchmaking = () => {
+    setDuelTimeLeft(60);
+    setStatus('searching');
   };
 
-  // Live simulation of duel opponent score increments
+  // Live duel synchronization (real backend polling + score submission or bot simulation fallback)
   useEffect(() => {
     if (status !== 'in_duel') return;
+
+    const isServerMatch = Boolean(matchId && !matchId.startsWith('sim_match_'));
 
     const interval = setInterval(() => {
       setDuelTimeLeft(prev => {
@@ -72,18 +90,42 @@ export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
         return prev - 1;
       });
 
-      setOpponent(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          score: prev.score + Math.floor(Math.random() * 90 + 30),
-          floor: Math.min(6, prev.floor + (Math.random() > 0.85 ? 1 : 0))
-        };
-      });
+      if (isServerMatch && matchId) {
+        fetch('/api/matchmaking/score', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${userToken}`
+          },
+          body: JSON.stringify({ matchId, score: playerScore, floor: playerFloor })
+        }).catch(() => {});
+
+        fetch(`/api/matchmaking/status/${matchId}`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        })
+          .then(res => res.json())
+          .then(data => {
+            const s = data.session;
+            if (s && s.player1 && s.player2) {
+              const other = s.player1.username === username ? s.player2 : s.player1;
+              setOpponent({ username: other.username, score: other.score, floor: other.floor });
+            }
+          })
+          .catch(() => {});
+      } else {
+        setOpponent(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            score: prev.score + Math.floor(Math.random() * 90 + 30),
+            floor: Math.min(6, prev.floor + (Math.random() > 0.85 ? 1 : 0))
+          };
+        });
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [status]);
+  }, [status, matchId, userToken, username, playerScore, playerFloor]);
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none font-mono">
@@ -97,11 +139,13 @@ export const MultiplayerModal: React.FC<MultiplayerModalProps> = ({
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="flex items-center justify-center gap-1.5 min-w-[44px] h-10 sm:h-11 px-3 sm:px-3.5 rounded-lg bg-rose-950/90 hover:bg-rose-600 text-rose-100 hover:text-white border-2 border-rose-400/85 shadow-[0_0_14px_rgba(244,63,94,0.45)] font-bold text-xs uppercase tracking-wider transition cursor-pointer flex-shrink-0"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 stroke-[2.75]" />
+            <span>{t('closeBtn', language)}</span>
           </button>
         </div>
 

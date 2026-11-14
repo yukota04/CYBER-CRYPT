@@ -1,16 +1,20 @@
 export type CharacterClass = 'striker' | 'technomancer' | 'vanguard';
 
-export type TileType = 
-  | 'wall' 
-  | 'floor' 
-  | 'corridor' 
-  | 'door_closed' 
-  | 'door_open' 
-  | 'stairs_down' 
-  | 'chest' 
-  | 'shrine' 
+export type PlayMode = 'offline' | 'online';
+export type DifficultyMode = 'normal' | 'hard';
+
+export type TileType =
+  | 'wall'
+  | 'floor'
+  | 'corridor'
+  | 'door_closed'
+  | 'door_open'
+  | 'stairs_down'
+  | 'chest'
+  | 'shrine'
   | 'shop'
-  | 'trap_hidden' 
+  | 'checkpoint'
+  | 'trap_hidden'
   | 'trap_revealed';
 
 export interface Tile {
@@ -23,11 +27,44 @@ export interface Tile {
   visible: boolean;
   hazard?: 'spikes' | 'glitch_wire' | 'acid_leak';
   item?: GameItem;
+  checkpointActivated?: boolean;
 }
 
-export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'cyber-relic';
+export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'cyber-relic';
 
-export type ItemType = 'weapon' | 'armor' | 'accessory' | 'consumable';
+export type ItemType =
+  | 'weapon'
+  | 'offhand'
+  | 'helmet'
+  | 'chest'
+  | 'gloves'
+  | 'legs'
+  | 'boots'
+  | 'ring'
+  | 'earrings'
+  | 'consumable';
+
+export type EquipSlot =
+  | 'weapon'
+  | 'offhand'
+  | 'helmet'
+  | 'chest'
+  | 'gloves'
+  | 'legs'
+  | 'boots'
+  | 'ring1'
+  | 'ring2'
+  | 'earrings';
+
+export type WeaponCategory =
+  | 'sword'
+  | 'greatsword'
+  | 'shield'
+  | 'staff'
+  | 'focus'
+  | 'katana'
+  | 'daggers'
+  | 'pistol';
 
 export interface GameItem {
   id: string;
@@ -42,15 +79,84 @@ export interface GameItem {
   energyBonus?: number;
   healAmount?: number;
   energyAmount?: number;
-  effectType?: 'heal' | 'energy' | 'teleport' | 'buff_overclock' | 'cleanse';
+  regenTurns?: number;
+  regenHpPerTurn?: number;
+  regenEnergyPerTurn?: number;
+  burnTurns?: number;
+  burnDamage?: number;
+  burnRadius?: number;
+  shieldGrant?: number;
+  currency?: 'coins' | 'shards';
+  effectType?:
+    | 'heal'
+    | 'energy'
+    | 'dual'
+    | 'regen'
+    | 'igneous'
+    | 'shield'
+    | 'cooldown_reset'
+    | 'teleport'
+    | 'buff_overclock'
+    | 'cleanse'
+    | 'stone';
   value: number;
   icon: string;
+  weaponCategory?: WeaponCategory;
+  twoHanded?: boolean;
+  allowedClasses?: CharacterClass[];
+  upgradeLevel?: number;
+  attackRange?: number;
+}
+
+export type SkillActionType =
+  | 'emp_blast'
+  | 'phase_dash'
+  | 'plasma_cleave'
+  | 'nanite_heal'
+  | 'aegis_barrier'
+  | 'glitch_overcharge'
+  | 'shadow_strike'
+  | 'blade_tempest'
+  | 'meteor_strike'
+  | 'plasma_beam'
+  | 'chain_lightning'
+  | 'earthshatter'
+  | 'whirlwind'
+  | 'vampiric_drain'
+  | 'frost_nova'
+  | 'fortify_stance'
+  | 'orbital_strike'
+  | 'arcane_cataclysm';
+
+export type AttackVfxType =
+  | 'slash'
+  | 'crit_slash'
+  | 'emp_ring'
+  | 'nova'
+  | 'beam'
+  | 'heal'
+  | 'shield'
+  | 'smash'
+  | 'meteor'
+  | 'lightning';
+
+export interface AttackEffect {
+  id?: string;
+  type: AttackVfxType;
+  x: number;
+  y: number;
+  targetX?: number;
+  targetY?: number;
+  color: string;
+  radius?: number;
 }
 
 export interface SkillNode {
   id: string;
   name: string;
   branch: CharacterClass;
+  treeIndex: 1 | 2 | 3 | 4 | 5;
+  subTreeName: string;
   tier: 1 | 2 | 3 | 4;
   type: 'active' | 'passive';
   pointCost: number; // skill points to unlock (1 or 2)
@@ -60,9 +166,10 @@ export interface SkillNode {
   prerequisites: string[]; // skill IDs needed
   unlocked: boolean;
   icon: string;
+  vfxType?: AttackVfxType;
   effect: {
     statBoost?: Partial<Record<'attack' | 'defense' | 'critRate' | 'maxHp' | 'maxEnergy', number>>;
-    actionType?: 'emp_blast' | 'phase_dash' | 'plasma_cleave' | 'nanite_heal' | 'glitch_overcharge';
+    actionType?: SkillActionType;
     power?: number;
     range?: number;
   };
@@ -81,18 +188,34 @@ export interface Stats {
   expToNext: number;
   skillPoints: number;
   soulShards: number;
+  coins: number;
+  probabilityStones: number;
 }
 
-export type MonsterArchetype = 
-  | 'glitch_swarmer' 
-  | 'neon_stalker' 
-  | 'cyber_behemoth' 
-  | 'circuit_disruptor' 
+export type MonsterArchetype =
+  | 'glitch_swarmer'
+  | 'neon_stalker'
+  | 'cyber_behemoth'
+  | 'circuit_disruptor'
   | 'core_synthesizer'; // Boss
+
+export interface MonsterVisualVariant {
+  seed: number;
+  tier: number;
+  hueShift: number;
+  bodyShape: 'diamond' | 'hex' | 'octo' | 'spiked' | 'serpent' | 'titan' | 'core';
+  plates: number;
+  spikes: number;
+  eyeStyle: 'single' | 'twin' | 'tri' | 'visor' | 'halo';
+  auraColor: string;
+  secondaryColor: string;
+  crown: boolean;
+}
 
 export interface Monster {
   id: string;
   name: string;
+  level: number;
   archetype: MonsterArchetype;
   x: number;
   y: number;
@@ -105,8 +228,24 @@ export interface Monster {
   alerted: boolean;
   windupTurn?: boolean; // telegraph flag
   telegraphDirection?: { dx: number; dy: number };
+  burnTurns?: number;
+  burnDamage?: number;
   color: string;
   symbol: string;
+  visualVariant?: MonsterVisualVariant;
+}
+
+export interface PlayerEquipment {
+  weapon: GameItem | null;
+  offhand: GameItem | null;
+  helmet: GameItem | null;
+  chest: GameItem | null;
+  gloves: GameItem | null;
+  legs: GameItem | null;
+  boots: GameItem | null;
+  ring1: GameItem | null;
+  ring2: GameItem | null;
+  earrings: GameItem | null;
 }
 
 export interface Player {
@@ -114,20 +253,53 @@ export interface Player {
   y: number;
   characterClass: CharacterClass;
   stats: Stats;
-  equipment: {
-    weapon: GameItem | null;
-    armor: GameItem | null;
-    accessory: GameItem | null;
-  };
+  equipment: PlayerEquipment;
   inventory: GameItem[];
   maxInventory: number;
   activeCooldowns: Record<string, number>; // skillId -> remaining turns
   unlockedSkills: string[];
   facing: 'up' | 'down' | 'left' | 'right';
+  lastCheckpoint?: { floor: number; x: number; y: number };
   buffs: {
     overclockTurns: number;
     shieldAmount: number;
+    regenTurns: number;
+    regenHpPerTurn: number;
+    regenEnergyPerTurn: number;
   };
+}
+
+export interface DeathDropBag {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  x: number;
+  y: number;
+  items: GameItem[];
+  equipment: PlayerEquipment;
+  coins: number;
+  probabilityStones: number;
+  droppedAtTurn: number;
+}
+
+export interface SavedPlayerLoadout {
+  playerId: string;
+  username: string;
+  characterClass: CharacterClass | null;
+  inventory: GameItem[];
+  equipment: PlayerEquipment;
+  coins: number;
+  probabilityStones: number;
+  soulShards: number;
+  savedAt: number;
+}
+
+export interface GroundCoin {
+  id: string;
+  x: number;
+  y: number;
+  value: number;
+  tier: 'bronze' | 'silver' | 'gold' | 'quantum';
 }
 
 export interface Room {
@@ -139,11 +311,11 @@ export interface Room {
   centerY: number;
 }
 
-export type EnvironmentalEventType = 
-  | 'glitch_storm' 
-  | 'gravity_shift' 
-  | 'black_market' 
-  | 'emp_surge' 
+export type EnvironmentalEventType =
+  | 'glitch_storm'
+  | 'gravity_shift'
+  | 'black_market'
+  | 'emp_surge'
   | 'shadow_veil';
 
 export interface EnvironmentalEvent {
@@ -166,6 +338,45 @@ export interface DungeonState {
   stairsPos: { x: number; y: number };
   activeEvent?: EnvironmentalEvent | null;
   shopItems?: GameItem[];
+  groundCoins: GroundCoin[];
+  checkpoints: { x: number; y: number; activated: boolean }[];
+  deathDrops: DeathDropBag[];
+}
+
+export interface CheckpointSnapshot {
+  floor: number;
+  x: number;
+  y: number;
+  player: Player;
+  dungeon: DungeonState;
+  score: number;
+  monstersSlain: number;
+  turn: number;
+  timestamp: number;
+}
+
+export interface CoopPlayerSlot {
+  playerId: string;
+  accountId?: string;
+  username: string;
+  characterClass: CharacterClass | null;
+  ready: boolean;
+  movedThisTurn: boolean;
+  player?: Player;
+  alive: boolean;
+  lastCheckpoint?: { floor: number; x: number; y: number };
+  preDeathLoadout?: SavedPlayerLoadout;
+}
+
+export interface CoopRoomState {
+  roomId: string;
+  status: 'lobby' | 'playing' | 'gameover';
+  turn: number;
+  players: CoopPlayerSlot[];
+  dungeon: DungeonState | null;
+  logs: CombatLogEntry[];
+  score: number;
+  monstersSlain: number;
 }
 
 export interface CombatLogEntry {
@@ -181,6 +392,7 @@ export interface RunSnapshot {
   turns: number;
   monstersSlain: number;
   soulShards: number;
+  coins?: number;
   characterClass: CharacterClass;
   level: number;
   seed: number;

@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { soundEngine } from '../game/audio';
 
 export type CanvasButtonTheme = 'cyan' | 'pink' | 'amber' | 'purple' | 'emerald';
 
@@ -14,6 +15,7 @@ interface CanvasButtonProps {
   width?: number; // base CSS width
   height?: number; // base CSS height
   'data-start'?: string;
+  'data-testid'?: string;
   'aria-label'?: string;
 }
 
@@ -79,6 +81,7 @@ export const CanvasButton: React.FC<CanvasButtonProps> = ({
   width = 240,
   height = 54,
   'data-start': dataStart,
+  'data-testid': dataTestId,
   'aria-label': ariaLabel,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -261,6 +264,7 @@ export const CanvasButton: React.FC<CanvasButtonProps> = ({
     if (disabled) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      soundEngine.playUI('click');
       onClick?.();
     }
   };
@@ -271,9 +275,18 @@ export const CanvasButton: React.FC<CanvasButtonProps> = ({
       role="button"
       tabIndex={disabled ? -1 : 0}
       data-start={dataStart}
+      data-testid={dataTestId}
+      data-no-ui-sfx="true"
       aria-label={ariaLabel || label}
       aria-disabled={disabled}
-      onClick={() => !disabled && onClick?.()}
+      onClick={() => {
+        if (disabled) {
+          soundEngine.playUI('error');
+          return;
+        }
+        soundEngine.playUI('click');
+        onClick?.();
+      }}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {

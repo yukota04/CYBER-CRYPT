@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Language, t } from '../game/i18n';
-import { X, Activity, Server, ShieldAlert, Cpu, HardDrive, Send, AlertTriangle } from 'lucide-react';
+import { X, Activity, Server, Cpu, HardDrive, Send, AlertTriangle } from 'lucide-react';
 
 interface AdminDashboardModalProps {
   onClose: () => void;
@@ -46,9 +46,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [alertTitle, setAlertTitle] = useState('');
   const [alertDetails, setAlertDetails] = useState('');
   const [alertRecipient, setAlertRecipient] = useState('security-team@cybercrypt.io');
-  const [dispatchStatus, setDispatchStatus] = useState('');
+  const [dispatchStatus, setDispatchStatus] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  useEffect(() => {
+  const fetchTelemetry = useCallback(() => {
     if (!userToken) return;
     fetch('/api/admin/metrics', { headers: { Authorization: `Bearer ${userToken}` } })
       .then(res => res.json())
@@ -59,7 +59,13 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       .then(res => res.json())
       .then(data => { if (data.logs) setLogs(data.logs); })
       .catch(() => {});
-  }, [userToken, userRole]);
+  }, [userToken]);
+
+  useEffect(() => {
+    fetchTelemetry();
+    const timer = setInterval(fetchTelemetry, 3000);
+    return () => clearInterval(timer);
+  }, [fetchTelemetry, userRole]);
 
   const handleRoleChange = (newRole: 'player' | 'moderator' | 'admin') => {
     onUpdateRole(newRole);
@@ -72,19 +78,14 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       body: JSON.stringify({ role: newRole })
     })
       .then(res => res.json())
-      .then(() => {
-        fetch('/api/admin/metrics', { headers: { Authorization: `Bearer ${userToken}` } })
-          .then(res => res.json())
-          .then(data => { if (data.metrics) setMetrics(data.metrics); });
-        fetch('/api/admin/audit-logs', { headers: { Authorization: `Bearer ${userToken}` } })
-          .then(res => res.json())
-          .then(data => { if (data.logs) setLogs(data.logs); });
-      });
+      .then(() => fetchTelemetry())
+      .catch(() => {});
   };
 
   const handleDispatchAlert = (e: React.FormEvent) => {
     e.preventDefault();
     if (!alertTitle.trim()) return;
+    setDispatchStatus(null);
 
     fetch('/api/admin/dispatch-alert', {
       method: 'POST',
@@ -98,15 +99,23 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
         recipient: alertRecipient
       })
     })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setDispatchStatus(`Automated email transmitted to ${alertRecipient}`);
+      .then(async res => {
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setDispatchStatus({ ok: true, msg: `Automated email transmitted to ${alertRecipient}` });
           setAlertTitle('');
           setAlertDetails('');
+          fetchTelemetry();
+        } else {
+          setDispatchStatus({ ok: false, msg: data.error || 'Dispatch failed' });
         }
-      });
+      })
+      .catch(() => setDispatchStatus({ ok: false, msg: 'Network error dispatching alert' }));
   };
+
+  const totalFleetCount = metrics?.connectedFleet
+    ? metrics.connectedFleet.reduce((acc, item) => acc + item.count, 0)
+    : metrics?.activeConnections || 0;
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm select-none font-mono">
@@ -116,16 +125,19 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-red-400" />
             <h2 className="text-base font-bold text-white tracking-wider">
-              ADMINISTRATIVE MONITORING & TELEMETRY
+              {t('adminTitle', language)}
             </h2>
+            <span className="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-400 text-[9px] font-bold">
+              ● {t('liveStreamBadge', language)}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             {/* RBAC Role Switcher */}
             <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2 py-1 rounded text-[11px]">
-              <span className="text-slate-400">ROLE:</span>
+              <span className="text-slate-300">{t('selectRole', language)}:</span>
               <select
                 value={userRole}
-                onChange={e => handleRoleChange(e.target.value as any)}
+                onChange={e => handleRoleChange(e.target.value as 'player' | 'moderator' | 'admin')}
                 className="bg-transparent text-cyan-300 font-bold focus:outline-none cursor-pointer uppercase"
               >
                 <option value="admin" className="bg-slate-900 text-red-400">Admin</option>
@@ -135,40 +147,42 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="flex items-center justify-center gap-1.5 min-w-[44px] h-10 sm:h-11 px-3 sm:px-3.5 rounded-lg bg-rose-950/90 hover:bg-rose-600 text-rose-100 hover:text-white border-2 border-rose-400/85 shadow-[0_0_14px_rgba(244,63,94,0.45)] font-bold text-xs uppercase tracking-wider transition cursor-pointer flex-shrink-0"
               aria-label="Close Admin Dashboard"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 stroke-[2.75]" />
+              <span>{t('closeBtn', language)}</span>
             </button>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex gap-2 my-4 border-b border-slate-800 pb-2">
+        <div className="flex flex-wrap gap-2 my-4 border-b border-slate-800 pb-2">
           <button
             onClick={() => setTab('metrics')}
             className={`px-3 py-1.5 rounded text-xs font-bold transition cursor-pointer ${
-              tab === 'metrics' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+              tab === 'metrics' ? 'bg-red-600 text-white' : 'text-slate-300 hover:bg-slate-800'
             }`}
           >
-            SYSTEM TELEMETRY
+            {t('telemetryTab', language)}
           </button>
           <button
             onClick={() => setTab('audit')}
             className={`px-3 py-1.5 rounded text-xs font-bold transition cursor-pointer ${
-              tab === 'audit' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+              tab === 'audit' ? 'bg-red-600 text-white' : 'text-slate-300 hover:bg-slate-800'
             }`}
           >
-            SECURITY AUDIT LOGS ({logs.length})
+            {t('auditTab', language)} ({logs.length})
           </button>
           <button
             onClick={() => setTab('dispatcher')}
             className={`px-3 py-1.5 rounded text-xs font-bold transition cursor-pointer ${
-              tab === 'dispatcher' ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+              tab === 'dispatcher' ? 'bg-red-600 text-white' : 'text-slate-300 hover:bg-slate-800'
             }`}
           >
-            SECURITY ALERT DISPATCHER
+            {t('dispatcherTab', language)}
           </button>
         </div>
 
@@ -178,45 +192,49 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             {/* 4 Metric Tiles */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3 rounded bg-[#0d0822] border border-cyan-500/20">
-                <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                  <span>UPTIME</span>
+                <div className="flex items-center justify-between text-slate-300 text-[10px]">
+                  <span>{t('uptime', language)}</span>
                   <Server className="w-3.5 h-3.5 text-cyan-400" />
                 </div>
                 <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                  {metrics ? `${Math.floor(metrics.uptimeSeconds / 60)}m ${metrics.uptimeSeconds % 60}s` : '18m 42s'}
+                  {metrics ? `${Math.floor(metrics.uptimeSeconds / 60)}m ${metrics.uptimeSeconds % 60}s` : '...'}
                 </div>
                 <div className="text-[10px] text-emerald-400 mt-1">● 99.99% Availability</div>
               </div>
 
               <div className="p-3 rounded bg-[#0d0822] border border-pink-500/20">
-                <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                  <span>HEAP MEMORY</span>
+                <div className="flex items-center justify-between text-slate-300 text-[10px]">
+                  <span>{t('heapMem', language)}</span>
                   <Cpu className="w-3.5 h-3.5 text-pink-400" />
                 </div>
                 <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                  {metrics ? `${metrics.heapUsedMb} MB` : '42.8 MB'}
+                  {metrics ? `${metrics.heapUsedMb} MB` : '...'}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-1">Limit: 512 MB Node Pool</div>
+                <div className="text-[10px] text-slate-300 mt-1">
+                  {metrics ? `Allocated: ${metrics.heapTotalMb} MB` : 'Limit: 512 MB Node Pool'}
+                </div>
               </div>
 
               <div className="p-3 rounded bg-[#0d0822] border border-amber-500/20">
-                <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                  <span>THROUGHPUT</span>
+                <div className="flex items-center justify-between text-slate-300 text-[10px]">
+                  <span>{t('throughput', language)}</span>
                   <HardDrive className="w-3.5 h-3.5 text-amber-400" />
                 </div>
                 <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                  {metrics?.databaseThroughput || '1,420 ops/s'}
+                  {metrics?.databaseThroughput || '...'}
                 </div>
-                <div className="text-[10px] text-emerald-400 mt-1">Latency: 1.4ms (p99)</div>
+                <div className="text-[10px] text-emerald-400 mt-1">
+                  Latency: {metrics?.avgLatencyMs ?? 1.4}ms (p99)
+                </div>
               </div>
 
               <div className="p-3 rounded bg-[#0d0822] border border-purple-500/20">
-                <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                  <span>ACTIVE FLEET</span>
+                <div className="flex items-center justify-between text-slate-300 text-[10px]">
+                  <span>{t('activeFleet', language)}</span>
                   <Server className="w-3.5 h-3.5 text-purple-400" />
                 </div>
                 <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                  66 Devices
+                  {totalFleetCount} Devices
                 </div>
                 <div className="text-xs text-purple-300 mt-1">Cross-Platform Sync</div>
               </div>
@@ -225,17 +243,12 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             {/* Connected Device Fleet Breakdown */}
             <div className="p-4 rounded-lg bg-[#0d0822] border border-slate-800">
               <h3 className="text-xs font-bold text-cyan-400 mb-3 uppercase tracking-wider">
-                CONNECTED FLEET BREAKDOWN (CROSS-PLATFORM)
+                {t('fleetBreakdown', language)}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                {(metrics?.connectedFleet || [
-                  { platform: 'Desktop Chrome / Linux', count: 18 },
-                  { platform: 'Mobile Safari / iOS', count: 24 },
-                  { platform: 'Mobile Chrome / Android', count: 15 },
-                  { platform: 'Desktop Firefox / Windows', count: 9 }
-                ]).map((dev, idx) => (
+                {(metrics?.connectedFleet || []).map((dev, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 rounded bg-slate-900/60 border border-slate-800">
-                    <span className="text-slate-300">{dev.platform}</span>
+                    <span className="text-slate-200">{dev.platform}</span>
                     <span className="font-bold text-cyan-300 tabular-nums">{dev.count} sessions</span>
                   </div>
                 ))}
@@ -249,7 +262,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                <tr className="border-b border-slate-800 text-slate-300 text-[10px] uppercase">
                   <th className="py-2 px-3">Timestamp</th>
                   <th className="py-2 px-3">Severity</th>
                   <th className="py-2 px-3">Operative</th>
@@ -260,7 +273,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               <tbody>
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-500 text-xs">
+                    <td colSpan={5} className="text-center py-8 text-slate-400 text-xs">
                       No security audit events recorded.
                     </td>
                   </tr>
@@ -273,7 +286,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
                     return (
                       <tr key={log.id} className="border-b border-slate-900/60 hover:bg-slate-900/40">
-                        <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                        <td className="py-2 px-3 text-slate-400 whitespace-nowrap">
                           {new Date(log.timestamp).toLocaleTimeString()}
                         </td>
                         <td className="py-2 px-3">
@@ -298,14 +311,14 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
           <form onSubmit={handleDispatchAlert} className="flex flex-col gap-3 p-4 rounded-lg bg-[#0d0822] border border-red-500/20">
             <div className="flex items-center gap-2 text-red-400 font-bold text-xs mb-1">
               <AlertTriangle className="w-4 h-4" />
-              <span>AUTOMATED EMAIL SECURITY NOTIFICATION DISPATCHER</span>
+              <span>{t('dispatcherTab', language)}</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">
               Dispatch high-priority automated alerts directly to administrator emails and registered on-call devices during security incidents.
             </p>
 
             <div>
-              <label className="text-[11px] text-slate-400 font-bold block mb-1">RECIPIENT EMAIL</label>
+              <label className="text-[11px] text-slate-300 font-bold block mb-1">{t('recipientEmail', language)}</label>
               <input
                 type="email"
                 value={alertRecipient}
@@ -315,7 +328,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 font-bold block mb-1">INCIDENT TITLE</label>
+              <label className="text-[11px] text-slate-300 font-bold block mb-1">{t('incidentTitle', language)}</label>
               <input
                 type="text"
                 value={alertTitle}
@@ -326,7 +339,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[11px] text-slate-400 font-bold block mb-1">INCIDENT DETAILS</label>
+              <label className="text-[11px] text-slate-300 font-bold block mb-1">{t('incidentDetails', language)}</label>
               <textarea
                 value={alertDetails}
                 onChange={e => setAlertDetails(e.target.value)}
@@ -341,12 +354,12 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               className="mt-2 py-2.5 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase flex items-center justify-center gap-2 tracking-wider transition cursor-pointer"
             >
               <Send className="w-3.5 h-3.5" />
-              DISPATCH AUTOMATED EMAIL ALERT
+              {t('dispatchAlertBtn', language)}
             </button>
 
             {dispatchStatus && (
-              <div className="text-xs text-emerald-400 text-center font-bold mt-2">
-                ✓ {dispatchStatus}
+              <div className={`text-xs text-center font-bold mt-2 ${dispatchStatus.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                {dispatchStatus.ok ? '✓' : '⚠'} {dispatchStatus.msg}
               </div>
             )}
           </form>
@@ -355,3 +368,4 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     </div>
   );
 };
+
