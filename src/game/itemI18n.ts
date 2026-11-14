@@ -476,6 +476,109 @@ function stripDynamicSuffixes(name: string): string {
     .trim();
 }
 
+const ROLE_LABEL: Record<Language, Record<string, string>> = {
+  en: { striker: 'Striker', technomancer: 'Technomancer', vanguard: 'Vanguard', shared: 'Ops' },
+  es: { striker: 'Striker', technomancer: 'Tecnómancer', vanguard: 'Vanguard', shared: 'Ops' },
+  fr: { striker: 'Striker', technomancer: 'Technomancien', vanguard: 'Vanguard', shared: 'Ops' },
+  de: { striker: 'Striker', technomancer: 'Technomancer', vanguard: 'Vanguard', shared: 'Ops' },
+  ja: { striker: 'ストライカー', technomancer: 'テクノマンサー', vanguard: 'ヴァンガード', shared: '作戦' }
+};
+
+const SLOT_LABEL: Record<Language, Record<string, string>> = {
+  en: {
+    weapon: 'Weapon',
+    offhand: 'Off-hand',
+    helmet: 'Helm',
+    chest: 'Chest',
+    gloves: 'Gloves',
+    legs: 'Legs',
+    boots: 'Boots',
+    ring: 'Ring',
+    earrings: 'Earrings',
+    consumable: 'Consumable'
+  },
+  es: {
+    weapon: 'Arma',
+    offhand: 'Secundaria',
+    helmet: 'Casco',
+    chest: 'Pechera',
+    gloves: 'Guantes',
+    legs: 'Pantalones',
+    boots: 'Botas',
+    ring: 'Anillo',
+    earrings: 'Pendientes',
+    consumable: 'Consumible'
+  },
+  fr: {
+    weapon: 'Arme',
+    offhand: 'Main secondaire',
+    helmet: 'Casque',
+    chest: 'Plastron',
+    gloves: 'Gants',
+    legs: 'Jambières',
+    boots: 'Bottes',
+    ring: 'Anneau',
+    earrings: 'Boucles',
+    consumable: 'Consommable'
+  },
+  de: {
+    weapon: 'Waffe',
+    offhand: 'Nebenhand',
+    helmet: 'Helm',
+    chest: 'Brust',
+    gloves: 'Handschuhe',
+    legs: 'Beine',
+    boots: 'Stiefel',
+    ring: 'Ring',
+    earrings: 'Ohrringe',
+    consumable: 'Verbrauchsgut'
+  },
+  ja: {
+    weapon: '武器',
+    offhand: '副装備',
+    helmet: '兜',
+    chest: '胴',
+    gloves: '手袋',
+    legs: '脚',
+    boots: '靴',
+    ring: '指輪',
+    earrings: '耳飾り',
+    consumable: '消耗品'
+  }
+};
+
+const DESC_TMPL: Record<Language, string> = {
+  en: 'Mk-{n} {role} {slot} forged for deep-crypt pressure.',
+  es: '{slot} {role} Mk-{n} forjada para la presión de pisos profundos.',
+  fr: '{slot} {role} Mk-{n} forgé(e) pour la pression des étages profonds.',
+  de: '{role}-{slot} Mk-{n} für tiefen Crypt-Druck geschmiedet.',
+  ja: '深層フロア向けの{role}{slot} Mk-{n}。'
+};
+
+function localizeGeneratedKey(key: string, language: Language, fallbackName: string): {
+  name: string;
+  description: string;
+} | null {
+  // gen_striker_weapon_07 | gen_shared_ring_05 | gen_shared_consumable_16
+  const m = /^gen_([a-z]+)_([a-z]+)_(\d+)$/.exec(key);
+  if (!m) return null;
+  const role = m[1];
+  const slot = m[2];
+  const n = String(Number(m[3]) + 1).padStart(2, '0');
+  const roleLabel = ROLE_LABEL[language][role] || role;
+  const slotLabel = SLOT_LABEL[language][slot] || slot;
+  // Prefer unique English base name for identity; prefix with localized role/slot tag
+  const name =
+    language === 'en'
+      ? fallbackName
+      : `${fallbackName} · ${roleLabel} ${slotLabel}`;
+  const description = DESC_TMPL[language]
+    .replace('{n}', n)
+    .replace('{role}', roleLabel)
+    .replace('{slot}', slotLabel);
+  return { name, description };
+}
+
 export function getLocalizedItemName(
   item: GameItem,
   language: Language,
@@ -485,7 +588,8 @@ export function getLocalizedItemName(
   const includeUpgrade = opts.includeUpgrade !== false;
   const key = item.baseKey;
   const localized = key ? ITEM_I18N[key]?.[language]?.name : undefined;
-  let base = localized || stripDynamicSuffixes(item.name) || item.name;
+  const generated = key && !localized ? localizeGeneratedKey(key, language, stripDynamicSuffixes(item.name)) : null;
+  let base = localized || generated?.name || stripDynamicSuffixes(item.name) || item.name;
   if (includeLevel && item.itemLevel && item.itemLevel > 1) base = `${base} [Lv.${item.itemLevel}]`;
   if (includeUpgrade && item.upgradeLevel && item.upgradeLevel > 0) base = `${base} +${item.upgradeLevel}`;
   return base;
@@ -493,5 +597,10 @@ export function getLocalizedItemName(
 
 export function getLocalizedItemDescription(item: GameItem, language: Language): string {
   const key = item.baseKey;
-  return (key && ITEM_I18N[key]?.[language]?.description) || item.description;
+  if (key && ITEM_I18N[key]?.[language]?.description) return ITEM_I18N[key]![language]!.description;
+  if (key) {
+    const generated = localizeGeneratedKey(key, language, stripDynamicSuffixes(item.name));
+    if (generated) return generated.description;
+  }
+  return item.description;
 }
