@@ -7,11 +7,17 @@ export interface AppSettings {
   enableScanlines: boolean;
   enableGlow: boolean;
   enableParticles: boolean;
+  /** Heavy post-FX (damage vignette radial, CRT vignette). */
+  enablePostFx: boolean;
+  /** Simplify monster/player draw calls. */
+  simpleEntities: boolean;
+  /** Internal render resolution multiplier (CSS upscales). */
+  canvasScale: 1 | 0.75 | 0.5;
   targetFps: 60 | 30;
   audio: AudioConfig;
 }
 
-export const APP_SETTINGS_STORAGE_KEY = 'cyber_crypt_settings_v4';
+export const APP_SETTINGS_STORAGE_KEY = 'cyber_crypt_settings_v5';
 
 function detectDefaultPerformanceMode(): PerformanceMode {
   if (typeof window === 'undefined') return 'balanced';
@@ -30,6 +36,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   enableScanlines: DEFAULT_PERF === 'high',
   enableGlow: DEFAULT_PERF !== 'performance',
   enableParticles: DEFAULT_PERF !== 'performance',
+  enablePostFx: DEFAULT_PERF === 'high',
+  simpleEntities: DEFAULT_PERF === 'performance',
+  canvasScale: DEFAULT_PERF === 'performance' ? 0.5 : DEFAULT_PERF === 'balanced' ? 0.75 : 1,
   targetFps: 60,
   audio: {
     masterMuted: false,
@@ -49,7 +58,15 @@ export function applyPerformancePreset(mode: PerformanceMode, current: AppSettin
       enableScanlines: false,
       enableGlow: false,
       enableParticles: false,
-      targetFps: 30
+      enablePostFx: false,
+      simpleEntities: true,
+      canvasScale: 0.5,
+      // Keep 60Hz — capping to 30 made fights feel worse without cutting work
+      targetFps: 60,
+      audio: {
+        ...current.audio,
+        ambientReverbEnabled: false
+      }
     };
   }
   if (mode === 'balanced') {
@@ -59,7 +76,14 @@ export function applyPerformancePreset(mode: PerformanceMode, current: AppSettin
       enableScanlines: false,
       enableGlow: true,
       enableParticles: true,
-      targetFps: 60
+      enablePostFx: true,
+      simpleEntities: false,
+      canvasScale: 0.75,
+      targetFps: 60,
+      audio: {
+        ...current.audio,
+        ambientReverbEnabled: false
+      }
     };
   }
   return {
@@ -68,8 +92,20 @@ export function applyPerformancePreset(mode: PerformanceMode, current: AppSettin
     enableScanlines: true,
     enableGlow: true,
     enableParticles: true,
-    targetFps: 60
+    enablePostFx: true,
+    simpleEntities: false,
+    canvasScale: 1,
+    targetFps: 60,
+    audio: {
+      ...current.audio,
+      ambientReverbEnabled: true
+    }
   };
+}
+
+function normalizeCanvasScale(v: unknown): 1 | 0.75 | 0.5 {
+  if (v === 0.5 || v === 0.75 || v === 1) return v;
+  return DEFAULT_APP_SETTINGS.canvasScale;
 }
 
 export function loadAppSettings(): AppSettings {
@@ -77,27 +113,48 @@ export function loadAppSettings(): AppSettings {
     if (typeof window === 'undefined' || !window.localStorage) {
       return DEFAULT_APP_SETTINGS;
     }
-    const raw = window.localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
+    // Prefer v5; fall back to v4 so existing users keep audio prefs
+    const raw =
+      window.localStorage.getItem(APP_SETTINGS_STORAGE_KEY) ||
+      window.localStorage.getItem('cyber_crypt_settings_v4');
     if (!raw) return DEFAULT_APP_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    const parsed = JSON.parse(raw) as Partial<AppSettings> & { performanceMode?: string };
+    const mode =
+      parsed.performanceMode === 'balanced' || parsed.performanceMode === 'performance'
+        ? parsed.performanceMode
+        : 'high';
+    // If loading legacy v4 without new fields, re-derive from preset for those fields
+    const presetDefaults = applyPerformancePreset(mode, DEFAULT_APP_SETTINGS);
     return {
-      performanceMode:
-        parsed.performanceMode === 'balanced' || parsed.performanceMode === 'performance'
-          ? parsed.performanceMode
-          : 'high',
+      performanceMode: mode,
       enableScanlines:
         typeof parsed.enableScanlines === 'boolean'
           ? parsed.enableScanlines
-          : DEFAULT_APP_SETTINGS.enableScanlines,
+          : presetDefaults.enableScanlines,
       enableGlow:
-        typeof parsed.enableGlow === 'boolean'
-          ? parsed.enableGlow
-          : DEFAULT_APP_SETTINGS.enableGlow,
+        typeof parsed.enableGlow === 'boolean' ? parsed.enableGlow : presetDefaults.enableGlow,
       enableParticles:
         typeof parsed.enableParticles === 'boolean'
           ? parsed.enableParticles
-          : DEFAULT_APP_SETTINGS.enableParticles,
-      targetFps: parsed.targetFps === 30 ? 30 : 60,
+          : presetDefaults.enableParticles,
+      enablePostFx:
+        typeof parsed.enablePostFx === 'boolean'
+          ? parsed.enablePostFx
+          : presetDefaults.enablePostFx,
+      simpleEntities:
+        typeof parsed.simpleEntities === 'boolean'
+          ? parsed.simpleEntities
+          : presetDefaults.simpleEntities,
+      canvasScale: normalizeCanvasScale(
+        parsed.canvasScale !== undefined ? parsed.canvasScale : presetDefaults.canvasScale
+      ),
+      // Legacy v4 performance preset forced 30 — migrate those users to 60
+      targetFps:
+        parsed.targetFps === 30 && mode === 'performance'
+          ? 60
+          : parsed.targetFps === 30
+          ? 30
+          : 60,
       audio: {
         masterMuted:
           typeof parsed.audio?.masterMuted === 'boolean'
@@ -122,7 +179,7 @@ export function loadAppSettings(): AppSettings {
         ambientReverbEnabled:
           typeof parsed.audio?.ambientReverbEnabled === 'boolean'
             ? parsed.audio.ambientReverbEnabled
-            : DEFAULT_APP_SETTINGS.audio.ambientReverbEnabled
+            : presetDefaults.audio.ambientReverbEnabled
       }
     };
   } catch {

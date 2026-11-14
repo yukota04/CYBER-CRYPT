@@ -1051,12 +1051,18 @@ test('appSettings performance presets and soundEngine audio settings apply clean
   assert.equal(perf.enableScanlines, false);
   assert.equal(perf.enableGlow, false);
   assert.equal(perf.enableParticles, false);
-  assert.equal(perf.targetFps, 30);
+  assert.equal(perf.enablePostFx, false);
+  assert.equal(perf.simpleEntities, true);
+  assert.equal(perf.canvasScale, 0.5);
+  assert.equal(perf.targetFps, 60, 'performance preset must stay at 60Hz (30Hz made fights worse)');
+  assert.equal(perf.audio.ambientReverbEnabled, false);
 
   const high = applyPerformancePreset('high', perf);
   assert.equal(high.enableScanlines, true);
   assert.equal(high.enableGlow, true);
   assert.equal(high.enableParticles, true);
+  assert.equal(high.enablePostFx, true);
+  assert.equal(high.canvasScale, 1);
   assert.equal(high.targetFps, 60);
 
   soundEngine.setAudioSettings({

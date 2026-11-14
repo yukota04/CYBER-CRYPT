@@ -208,6 +208,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const targetFpsRef = useRef<30 | 60>(appSettings.targetFps);
+  const canvasScaleRef = useRef<1 | 0.75 | 0.5>(appSettings.canvasScale);
   const floatingTextsRef = useRef<{ text: string; x: number; y: number; color: string; isCrit?: boolean; life: number }[]>([]);
   const lastFovPosRef = useRef<{ x: number; y: number; floor: number } | null>(null);
   const remotePlayersRef = useRef<CoopRemoteRenderPlayer[]>([]);
@@ -349,11 +350,24 @@ export default function App() {
     soundEngine.setAudioSettings(next.audio);
     setIsMuted(next.audio.masterMuted);
     targetFpsRef.current = next.targetFps;
+    canvasScaleRef.current = next.canvasScale;
     rendererRef.current?.applyPerformanceOptions({
       enableScanlines: next.enableScanlines,
       enableGlow: next.enableGlow,
-      enableParticles: next.enableParticles
+      enableParticles: next.enableParticles,
+      enablePostFx: next.enablePostFx,
+      simpleEntities: next.simpleEntities,
+      detailTiles: next.performanceMode === 'high'
     });
+    // Re-apply canvas resolution when scale preset changes
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const scale = next.canvasScale;
+      canvas.width = Math.max(1, Math.floor(window.innerWidth * scale));
+      canvas.height = Math.max(1, Math.floor(window.innerHeight * scale));
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+    }
   }, []);
 
   const handleToggleMasterMute = useCallback(() => {
@@ -765,13 +779,19 @@ export default function App() {
     renderer.applyPerformanceOptions({
       enableScanlines: appSettings.enableScanlines,
       enableGlow: appSettings.enableGlow,
-      enableParticles: appSettings.enableParticles
+      enableParticles: appSettings.enableParticles,
+      enablePostFx: appSettings.enablePostFx,
+      simpleEntities: appSettings.simpleEntities,
+      detailTiles: appSettings.performanceMode === 'high'
     });
     rendererRef.current = renderer;
 
     const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const scale = canvasScaleRef.current;
+      canvas.width = Math.max(1, Math.floor(window.innerWidth * scale));
+      canvas.height = Math.max(1, Math.floor(window.innerHeight * scale));
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
@@ -1536,21 +1556,21 @@ export default function App() {
       playerRef.current = result.player;
       dungeonRef.current = result.dungeon;
 
-      const hasEvents =
-        result.logs.length > 0 ||
-        result.soundEvents.length > 0 ||
+      // Structural world changes need a dungeon React update; combat SFX/VFX do not —
+      // canvas already reads dungeonRef every frame. Avoiding setDungeon in fights
+      // is the biggest React-side FPS win.
+      const structural =
         result.gameOver ||
         result.floorCompleted ||
         result.openShop ||
         result.checkpointTriggered ||
-        result.kills > 0 ||
-        result.attackEffects.length > 0;
+        result.kills > 0;
+      const hudEvent = structural || result.logs.length > 0;
 
-      // Canvas reads refs every frame; React HUD only needs ~10 Hz (or on events).
+      // Canvas reads refs every frame; React HUD only needs ~6 Hz (or on HUD events).
       hudSyncAccRef.current += dt;
-      if (hasEvents || hudSyncAccRef.current >= 0.1) {
+      if (hudEvent || hudSyncAccRef.current >= 0.16) {
         hudSyncAccRef.current = 0;
-        // Shallow copy so React sees a new identity after in-place sim mutations
         const p = result.player;
         setPlayer({
           ...p,
@@ -1558,7 +1578,7 @@ export default function App() {
           buffs: { ...p.buffs },
           activeCooldowns: { ...p.activeCooldowns }
         });
-        if (hasEvents) {
+        if (structural) {
           setDungeon({
             ...result.dungeon,
             monsters: result.dungeon.monsters.slice(),
