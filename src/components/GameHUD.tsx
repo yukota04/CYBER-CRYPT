@@ -12,8 +12,6 @@ import {
   Compass,
   Lock,
   Crosshair,
-  Maximize2,
-  Minimize2,
   Settings
 } from 'lucide-react';
 
@@ -24,13 +22,11 @@ interface GameHUDProps {
   turn: number;
   isMuted: boolean;
   showMinimap: boolean;
-  isFullscreen?: boolean;
   difficultyMode: DifficultyMode;
   coopRoom?: CoopRoomState | null;
   localPlayerId?: string;
   onToggleMinimap: () => void;
   onToggleMute: () => void;
-  onToggleFullscreen?: () => void;
   onOpenInventory: () => void;
   onOpenSkillTree: () => void;
   onOpenOptions: () => void;
@@ -46,13 +42,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   combatLogs,
   isMuted,
   showMinimap,
-  isFullscreen,
   difficultyMode,
   coopRoom,
   localPlayerId,
   onToggleMinimap,
   onToggleMute,
-  onToggleFullscreen,
   onOpenInventory,
   onOpenSkillTree,
   onOpenOptions,
@@ -278,18 +272,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
           </button>
-
-          {onToggleFullscreen && (
-            <button
-              onClick={onToggleFullscreen}
-              data-testid="hud-fullscreen-btn"
-              className="p-2 sm:p-2.5 rounded-lg bg-[#0a0718]/85 border border-slate-700 text-cyan-300 hover:bg-slate-800 transition cursor-pointer"
-              title={t('fullscreenToggle', language)}
-              aria-label={t('fullscreenToggle', language)}
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-          )}
 
           <button
             onClick={onOpenOptions}

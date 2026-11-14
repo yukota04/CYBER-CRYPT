@@ -19,11 +19,11 @@ export interface DungeonConfig {
 }
 
 const DEFAULT_CONFIG: DungeonConfig = {
-  width: 48,
-  height: 34,
-  maxRooms: 9,
-  minRoomSize: 5,
-  maxRoomSize: 10,
+  width: 68,
+  height: 48,
+  maxRooms: 13,
+  minRoomSize: 6,
+  maxRoomSize: 12,
   floor: 1
 };
 
@@ -151,9 +151,9 @@ function makeRng(seed?: number) {
 }
 
 export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial<DungeonConfig>): DungeonState {
-  const scaledWidth = DEFAULT_CONFIG.width + Math.min(16, Math.max(0, floor - 1) * 2);
-  const scaledHeight = DEFAULT_CONFIG.height + Math.min(10, Math.max(0, floor - 1));
-  const scaledRooms = DEFAULT_CONFIG.maxRooms + Math.min(6, Math.floor(Math.max(0, floor - 1) / 2));
+  const scaledWidth = DEFAULT_CONFIG.width + Math.min(24, Math.max(0, floor - 1) * 3);
+  const scaledHeight = DEFAULT_CONFIG.height + Math.min(16, Math.max(0, floor - 1) * 2);
+  const scaledRooms = DEFAULT_CONFIG.maxRooms + Math.min(8, Math.floor(Math.max(0, floor - 1) / 2));
 
   const config: DungeonConfig = {
     ...DEFAULT_CONFIG,
@@ -313,9 +313,9 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
   const defScale = Math.floor((floor - 1) * 1.1);
   const rewardScale = 1 + (floor - 1) * 0.24;
 
-  // Monster count per room scales progressively with floor
-  const minPerRoom = 1 + Math.floor((floor - 1) / 3);
-  const maxPerRoom = Math.min(6, 2 + Math.floor((floor - 1) / 2));
+  // Monster count per room scales progressively with floor (denser than before)
+  const minPerRoom = 2 + Math.floor((floor - 1) / 3);
+  const maxPerRoom = Math.min(8, 3 + Math.floor((floor - 1) / 2));
 
   for (let i = 1; i < rooms.length; i++) {
     const room = rooms[i];
@@ -346,17 +346,22 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     }
 
     const numMonsters = isBossRoom
-      ? Math.min(3, 1 + Math.floor(floor / 4))
+      ? Math.min(5, 2 + Math.floor(floor / 4))
       : Math.floor(rng() * (maxPerRoom - minPerRoom + 1)) + minPerRoom;
 
-    for (let m = 0; m < numMonsters; m++) {
+    // Retry placement so denser spawns don't collapse when tiles collide
+    let placed = 0;
+    let attempts = 0;
+    const maxAttempts = numMonsters * 8;
+    while (placed < numMonsters && attempts < maxAttempts) {
+      attempts++;
       const mx = Math.floor(rng() * (room.w - 2)) + room.x + 1;
       const my = Math.floor(rng() * (room.h - 2)) + room.y + 1;
 
       if (!tiles[my][mx].walkable || (mx === stairsPos.x && my === stairsPos.y)) {
         continue;
       }
-      if (monsters.some(mon => mon.x === mx && mon.y === my)) {
+      if (monsters.some(mon => Math.floor(mon.x) === mx && Math.floor(mon.y) === my)) {
         continue;
       }
 
@@ -431,6 +436,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         symbol,
         visualVariant: variant.visualVariant
       });
+      placed++;
     }
   }
 

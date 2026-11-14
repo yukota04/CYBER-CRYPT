@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppSettings, applyPerformancePreset, PerformanceMode } from '../game/settings';
 import { Language, t } from '../game/i18n';
-import { X, Cpu, Volume2, VolumeX, LogOut, Sparkles, Sliders } from 'lucide-react';
+import { X, Cpu, Volume2, VolumeX, LogOut, Sparkles, Sliders, Maximize2, Minimize2, Monitor } from 'lucide-react';
 
 interface OptionsModalProps {
   settings: AppSettings;
@@ -10,6 +10,8 @@ interface OptionsModalProps {
   onClose: () => void;
   userProfile: { username: string; role: string } | null;
   language: Language;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 export const OptionsModal: React.FC<OptionsModalProps> = ({
@@ -18,7 +20,9 @@ export const OptionsModal: React.FC<OptionsModalProps> = ({
   onLogout,
   onClose,
   userProfile,
-  language
+  language,
+  isFullscreen = false,
+  onToggleFullscreen
 }) => {
   const handlePreset = (mode: PerformanceMode) => {
     onUpdateSettings(applyPerformancePreset(mode, settings));
@@ -276,7 +280,32 @@ export const OptionsModal: React.FC<OptionsModalProps> = ({
             </div>
           </section>
 
-          {/* 3. ACCOUNT & SIGN OUT */}
+          {/* 3. DISPLAY */}
+          {onToggleFullscreen && (
+            <section className="p-4 rounded-xl bg-slate-900/60 border border-cyan-500/30">
+              <div className="flex items-center gap-2 text-xs font-bold text-cyan-300 tracking-wider uppercase mb-3">
+                <Monitor className="w-4 h-4" />
+                <span>{t('fullscreenToggle', language)}</span>
+              </div>
+              <button
+                data-testid="options-fullscreen-btn"
+                onClick={onToggleFullscreen}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition cursor-pointer ${
+                  isFullscreen
+                    ? 'bg-cyan-950/50 border-cyan-400/60 text-cyan-200'
+                    : 'bg-slate-950/60 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
+                }`}
+              >
+                <span className="flex items-center gap-2 font-bold text-xs">
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  {t('fullscreenToggle', language)}
+                </span>
+                <span className="font-bold text-xs">{isFullscreen ? 'ON' : 'OFF'}</span>
+              </button>
+            </section>
+          )}
+
+          {/* 4. ACCOUNT & SIGN OUT */}
           <section className="p-4 rounded-xl bg-slate-900/60 border border-pink-500/35">
             <div className="text-xs font-bold text-pink-300 tracking-wider uppercase mb-2">
               {t('accountSectionTitle', language)}

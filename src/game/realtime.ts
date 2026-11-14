@@ -46,6 +46,9 @@ export const STATUS_TICK_INTERVAL = 0.55;
 export interface MoveInput {
   dx: number;
   dy: number;
+  /** Optional aim vector (e. g. toward mouse). When set, facing + melee use this. */
+  aimDx?: number;
+  aimDy?: number;
 }
 
 export interface RealtimeClock {
@@ -766,18 +769,32 @@ export function tickRealtime(
 
   clock.playerAttackCd = Math.max(0, clock.playerAttackCd - dt);
 
-  // Normalize input
+  // Normalize move + optional mouse/aim vector
   let ix = input.dx;
   let iy = input.dy;
   const inputLen = Math.hypot(ix, iy);
-  if (inputLen > 1e-6) {
-    ix /= inputLen;
-    iy /= inputLen;
+  const aimLen = Math.hypot(input.aimDx ?? 0, input.aimDy ?? 0);
+  const atkDx = aimLen > 0.05 ? (input.aimDx as number) : inputLen > 1e-6 ? ix : 0;
+  const atkDy = aimLen > 0.05 ? (input.aimDy as number) : inputLen > 1e-6 ? iy : 0;
+
+  // Face mouse/aim first (PC), else face move direction
+  if (aimLen > 0.05) {
+    if (Math.abs(input.aimDx!) >= Math.abs(input.aimDy!)) {
+      player.facing = (input.aimDx as number) >= 0 ? 'right' : 'left';
+    } else {
+      player.facing = (input.aimDy as number) >= 0 ? 'down' : 'up';
+    }
+  } else if (inputLen > 1e-6) {
     if (Math.abs(ix) >= Math.abs(iy)) {
       player.facing = ix >= 0 ? 'right' : 'left';
     } else {
       player.facing = iy >= 0 ? 'down' : 'up';
     }
+  }
+
+  if (inputLen > 1e-6) {
+    ix /= inputLen;
+    iy /= inputLen;
 
     const blockers = dungeon.monsters.map(m => ({ x: m.x, y: m.y, id: m.id }));
     const next = moveWithCollision(
@@ -795,8 +812,11 @@ export function tickRealtime(
       player.y = next.y;
       moved = true;
     }
+  }
 
-    // Auto-melee with wide cone — no need for perfect frontal alignment
+  // Auto-melee toward aim (PC mouse) or move/facing cone
+  const nearEnemy = dungeon.monsters.some(m => inMeleeArc(player, m.x, m.y, atkDx, atkDy));
+  if (nearEnemy) {
     const melee = tryPlayerMelee(
       player,
       dungeon,
@@ -806,21 +826,12 @@ export function tickRealtime(
       soundEvents,
       floatingTexts,
       attackEffects,
-      ix,
-      iy
+      atkDx,
+      atkDy
     );
     screenShake += melee.screenShake;
     hitstopSeconds = Math.max(hitstopSeconds, melee.hitstopSeconds);
     kills += melee.kills;
-  } else {
-    // Standing still: swing at anything in facing cone / close bump range
-    const nearEnemy = dungeon.monsters.some(m => inMeleeArc(player, m.x, m.y));
-    if (nearEnemy) {
-      const melee = tryPlayerMelee(player, dungeon, clock, turn, logs, soundEvents, floatingTexts, attackEffects);
-      screenShake += melee.screenShake;
-      hitstopSeconds = Math.max(hitstopSeconds, melee.hitstopSeconds);
-      kills += melee.kills;
-    }
   }
 
   const interact = interactOccupiedTiles(player, dungeon, clock, turn, logs, soundEvents, floatingTexts);

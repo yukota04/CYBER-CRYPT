@@ -65,6 +65,7 @@ import { LoginScreen, type AuthCredentials, type RegisterPayload } from './compo
 import { TitleScreen } from './components/TitleScreen';
 import { GameHUD } from './components/GameHUD';
 import { TouchControls } from './components/TouchControls';
+import { VirtualJoystick } from './components/VirtualJoystick';
 import { InventoryModal } from './components/InventoryModal';
 import { SkillTreeModal } from './components/SkillTreeModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
@@ -225,13 +226,17 @@ export default function App() {
   selectedClassRef.current = selectedClass;
 
   // Free-movement input (held directions) + realtime combat clock
-  const moveInputRef = useRef({ dx: 0, dy: 0 });
+  const moveInputRef = useRef<{ dx: number; dy: number; aimDx?: number; aimDy?: number }>({ dx: 0, dy: 0 });
   const heldMoveKeysRef = useRef<Set<string>>(new Set());
+  const joystickActiveRef = useRef(false);
+  const onlineStickDirRef = useRef<'up' | 'down' | 'left' | 'right' | null>(null);
   const realtimeClockRef = useRef<RealtimeClock>(createRealtimeClock());
   const hudSyncAccRef = useRef(0);
   const applyRealtimeResultRef = useRef<(result: ReturnType<typeof tickRealtime>, dt: number) => void>(() => {});
 
   const syncMoveInputFromKeys = useCallback(() => {
+    // Joystick owns dx/dy while active
+    if (joystickActiveRef.current) return;
     const keys = heldMoveKeysRef.current;
     let dx = 0;
     let dy = 0;
@@ -239,8 +244,56 @@ export default function App() {
     if (keys.has('right')) dx += 1;
     if (keys.has('up')) dy -= 1;
     if (keys.has('down')) dy += 1;
-    moveInputRef.current = { dx, dy };
+    const prev = moveInputRef.current;
+    moveInputRef.current = { dx, dy, aimDx: prev.aimDx, aimDy: prev.aimDy };
   }, []);
+
+  const updateMouseAim = useCallback((screenX: number, screenY: number) => {
+    const renderer = rendererRef.current;
+    const p = playerRef.current;
+    if (!renderer || !p) return;
+    const world = renderer.screenToWorld(screenX, screenY);
+    const aimDx = world.x - p.x;
+    const aimDy = world.y - p.y;
+    const prev = moveInputRef.current;
+    moveInputRef.current = { ...prev, aimDx, aimDy };
+  }, []);
+
+  const clearMouseAim = useCallback(() => {
+    const prev = moveInputRef.current;
+    moveInputRef.current = { dx: prev.dx, dy: prev.dy };
+  }, []);
+
+  const handlePlayerMoveRef = useRef<(dx: number, dy: number) => void>(() => {});
+
+  const handleJoystickMove = useCallback((dx: number, dy: number) => {
+    joystickActiveRef.current = true;
+    // Mobile: face/move via stick (clear mouse aim while touching)
+    moveInputRef.current = { dx, dy };
+
+    if (playModeRef.current !== 'online') return;
+
+    const mag = Math.hypot(dx, dy);
+    if (mag < 0.45) {
+      onlineStickDirRef.current = null;
+      return;
+    }
+    const dir: 'up' | 'down' | 'left' | 'right' =
+      Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : dy >= 0 ? 'down' : 'up';
+    if (onlineStickDirRef.current === dir) return;
+    onlineStickDirRef.current = dir;
+    const stepDx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+    const stepDy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+    handlePlayerMoveRef.current(stepDx, stepDy);
+  }, []);
+
+  const handleJoystickRelease = useCallback(() => {
+    joystickActiveRef.current = false;
+    onlineStickDirRef.current = null;
+    const prev = moveInputRef.current;
+    moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
+    syncMoveInputFromKeys();
+  }, [syncMoveInputFromKeys]);
 
   useEffect(() => {
     document.body.dataset.state = gameState;
@@ -1089,14 +1142,16 @@ export default function App() {
             y: liveDungeon.rooms[0]?.centerY ?? 5
           };
 
-    if (liveDungeon.tiles[cpPos.y]?.[cpPos.x]?.hazard) {
-      delete liveDungeon.tiles[cpPos.y][cpPos.x].hazard;
+    const cpx = Math.floor(cpPos.x);
+    const cpy = Math.floor(cpPos.y);
+    if (liveDungeon.tiles[cpy]?.[cpx]?.hazard) {
+      delete liveDungeon.tiles[cpy][cpx].hazard;
     }
 
     const revivedPlayer: Player = {
       ...JSON.parse(JSON.stringify(curPlayer)),
-      x: cpPos.x,
-      y: cpPos.y,
+      x: cpx,
+      y: cpy,
       stats: {
         ...curPlayer.stats,
         hp: Math.max(1, Math.floor(totals.maxHp * 0.85)),
@@ -1110,6 +1165,13 @@ export default function App() {
         regenEnergyPerTurn: 0
       }
     };
+
+    // Must update sim refs BEFORE entering playing — otherwise next tick still sees hp=0 and re-triggers game over
+    realtimeClockRef.current = createRealtimeClock();
+    moveInputRef.current = { dx: 0, dy: 0 };
+    heldMoveKeysRef.current.clear();
+    playerRef.current = revivedPlayer;
+    dungeonRef.current = liveDungeon;
 
     refreshFOVIfNeeded(liveDungeon, revivedPlayer.x, revivedPlayer.y, true);
     setDungeon(liveDungeon);
@@ -1153,10 +1215,18 @@ export default function App() {
 
     // Clear floor hazard under feet on revive and immediately collect own Floating Skull bag if standing on it
     const updatedDungeon: DungeonState = JSON.parse(JSON.stringify(curDungeon));
-    if (updatedDungeon.tiles[revivedPlayer.y]?.[revivedPlayer.x]?.hazard) {
-      delete updatedDungeon.tiles[revivedPlayer.y][revivedPlayer.x].hazard;
+    const tx = Math.floor(revivedPlayer.x + 0.41);
+    const ty = Math.floor(revivedPlayer.y + 0.41);
+    if (updatedDungeon.tiles[ty]?.[tx]?.hazard) {
+      delete updatedDungeon.tiles[ty][tx].hazard;
     }
     const recovered = collectDeathDropBagsAt(revivedPlayer, updatedDungeon, 'solo');
+
+    realtimeClockRef.current = createRealtimeClock();
+    moveInputRef.current = { dx: 0, dy: 0 };
+    heldMoveKeysRef.current.clear();
+    playerRef.current = revivedPlayer;
+    dungeonRef.current = updatedDungeon;
 
     refreshFOVIfNeeded(updatedDungeon, revivedPlayer.x, revivedPlayer.y, true);
     setDungeon(updatedDungeon);
@@ -1272,6 +1342,7 @@ export default function App() {
     saveCheckpoint,
     triggerGameOver
   ]);
+  handlePlayerMoveRef.current = handlePlayerMove;
 
   /** Apply one offline free-movement sim result to React state / side effects. */
   const applyRealtimeOutcome = useCallback(
@@ -1732,7 +1803,8 @@ export default function App() {
           if (playModeRef.current === 'online') handlePlayerMove(0, 0);
           else {
             heldMoveKeysRef.current.clear();
-            moveInputRef.current = { dx: 0, dy: 0 };
+            const prev = moveInputRef.current;
+            moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
           }
           return;
         }
@@ -1772,7 +1844,9 @@ export default function App() {
 
     const clearMoveOnBlur = () => {
       heldMoveKeysRef.current.clear();
-      moveInputRef.current = { dx: 0, dy: 0 };
+      joystickActiveRef.current = false;
+      const prev = moveInputRef.current;
+      moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -2156,9 +2230,14 @@ export default function App() {
             e.nativeEvent.offsetX,
             e.nativeEvent.offsetY
           );
+          // PC: aim / face / melee toward mouse pointer
+          if (playModeRef.current === 'offline' && !joystickActiveRef.current) {
+            updateMouseAim(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+          }
         }}
         onMouseLeave={() => {
           hoveredTileRef.current = null;
+          clearMouseAim();
         }}
         onClick={e => {
           if (gameStateRef.current !== 'playing' || !rendererRef.current) return;
@@ -2263,13 +2342,11 @@ export default function App() {
             turn={turn}
             isMuted={isMuted}
             showMinimap={showMinimap}
-            isFullscreen={isFullscreen}
             difficultyMode={difficultyMode}
             coopRoom={playMode === 'online' ? coopRoom : null}
             localPlayerId={localPlayerId}
             onToggleMinimap={() => setShowMinimap(prev => !prev)}
             onToggleMute={handleToggleMasterMute}
-            onToggleFullscreen={toggleFullscreen}
             onOpenInventory={() => {
               soundEngine.playUI('open');
               setShowInventory(true);
@@ -2300,9 +2377,15 @@ export default function App() {
             }}
             language={language}
           />
+          <VirtualJoystick
+            onMove={handleJoystickMove}
+            onRelease={handleJoystickRelease}
+            disabled={gameState !== 'playing'}
+          />
           <TouchControls
             player={player}
             dungeon={dungeon}
+            hideDpad
             onMove={handlePlayerMove}
             onMoveHold={(dx, dy, pressed) => {
               if (playModeRef.current === 'online') {
@@ -2319,7 +2402,8 @@ export default function App() {
               if (playModeRef.current === 'online') handlePlayerMove(0, 0);
               else {
                 heldMoveKeysRef.current.clear();
-                moveInputRef.current = { dx: 0, dy: 0 };
+                const prev = moveInputRef.current;
+                moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
               }
             }}
             onOpenInventory={() => {
@@ -2478,6 +2562,8 @@ export default function App() {
           }}
           userProfile={userProfile}
           language={language}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
         />
       )}
     </div>
