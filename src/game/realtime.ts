@@ -49,6 +49,13 @@ export interface MoveInput {
   /** Optional aim vector (e. g. toward mouse). When set, facing + melee use this. */
   aimDx?: number;
   aimDy?: number;
+  /**
+   * When true (default), melee auto-swings in the aim/facing cone.
+   * When false, melee only while `attackHeld` is true.
+   */
+  autoAttack?: boolean;
+  /** Manual attack hold (mobile ATK sphere / F key when Auto is off). */
+  attackHeld?: boolean;
 }
 
 export interface RealtimeClock {
@@ -910,22 +917,28 @@ export function tickRealtime(
     }
   }
 
-  // Auto-melee toward aim (PC mouse) or move/facing cone — single pass (no pre-scan)
-  const melee = tryPlayerMelee(
-    player,
-    dungeon,
-    clock,
-    turn,
-    logs,
-    soundEvents,
-    floatingTexts,
-    attackEffects,
-    atkDx,
-    atkDy
-  );
-  screenShake += melee.screenShake;
-  hitstopSeconds = Math.max(hitstopSeconds, melee.hitstopSeconds);
-  kills += melee.kills;
+  // Melee toward aim (PC mouse) or move/facing cone.
+  // Auto ON (default): swing whenever a target is in cone.
+  // Auto OFF: only while the player holds the attack button / F.
+  const autoOn = input.autoAttack !== false;
+  const mayMelee = autoOn || !!input.attackHeld;
+  if (mayMelee) {
+    const melee = tryPlayerMelee(
+      player,
+      dungeon,
+      clock,
+      turn,
+      logs,
+      soundEvents,
+      floatingTexts,
+      attackEffects,
+      atkDx,
+      atkDy
+    );
+    screenShake += melee.screenShake;
+    hitstopSeconds = Math.max(hitstopSeconds, melee.hitstopSeconds);
+    kills += melee.kills;
+  }
 
   const interact = interactOccupiedTiles(
     player,

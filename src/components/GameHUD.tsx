@@ -33,6 +33,9 @@ interface GameHUDProps {
   onPause: () => void;
   onCastSkill: (skillId: string) => void;
   onRangedAttack: () => void;
+  autoAttack: boolean;
+  onAutoAttackChange: (enabled: boolean) => void;
+  onAttackHold?: (pressed: boolean) => void;
   language: Language;
 }
 
@@ -53,6 +56,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onPause,
   onCastSkill,
   onRangedAttack,
+  autoAttack,
+  onAutoAttackChange,
+  onAttackHold,
   language
 }) => {
   const totals = getTotalStats(player);
@@ -295,15 +301,39 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       <div className="flex flex-col sm:flex-row items-end justify-between w-full gap-3">
         <div className="cc-panel hidden sm:flex items-center gap-1.5 pointer-events-auto p-2">
           <button
+            data-testid="hud-auto-attack-btn"
+            type="button"
+            onClick={() => onAutoAttackChange(!autoAttack)}
+            aria-pressed={autoAttack}
+            title={autoAttack ? t('autoAttackOn', language) : t('autoAttackOff', language)}
+            aria-label={autoAttack ? t('autoAttackOn', language) : t('autoAttackOff', language)}
+            className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full border-2 transition cursor-pointer active:scale-90 ${
+              autoAttack
+                ? 'border-emerald-300 bg-emerald-950/70 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+                : 'border-slate-600 bg-slate-900/70 text-slate-400'
+            }`}
+          >
+            <span className="text-[10px] font-bold leading-none tracking-wider">{t('autoAttackBtn', language)}</span>
+            <span className="text-[8px] font-mono mt-0.5">{autoAttack ? 'ON' : 'OFF'}</span>
+          </button>
+
+          <button
             data-testid="hud-ranged-btn"
             onClick={() => !localCoopSlot?.movedThisTurn && onRangedAttack()}
+            onPointerDown={e => {
+              if (localCoopSlot?.movedThisTurn) return;
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              onAttackHold?.(true);
+            }}
+            onPointerUp={() => onAttackHold?.(false)}
+            onPointerCancel={() => onAttackHold?.(false)}
             disabled={!!localCoopSlot?.movedThisTurn}
             title={`${t('rangedStrikeBtn', language)} (${attackRange} tiles) — Click enemy or press F`}
             aria-label={`Ranged Attack (${attackRange} tiles)`}
-            className={`relative flex flex-col items-center justify-center w-16 h-14 rounded border transition cursor-pointer active:scale-90 active:brightness-125 ${
+            className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition cursor-pointer active:scale-[0.86] active:brightness-125 ${
               localCoopSlot?.movedThisTurn
                 ? 'opacity-50 border-slate-700 bg-slate-900/60 cursor-not-allowed'
-                : 'border-amber-400 bg-amber-950/60 hover:bg-amber-900/80 text-amber-200 shadow-[0_0_12px_rgba(255,230,0,0.3)]'
+                : 'border-amber-400 bg-amber-950/70 text-amber-200 shadow-[0_0_14px_rgba(255,230,0,0.35)]'
             }`}
           >
             <span className="text-[9px] font-bold text-amber-300 leading-none">[F]</span>
@@ -321,6 +351,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             return (
               <button
                 key={skill.id}
+                type="button"
+                onPointerDown={e => {
+                  if (!isReady) return;
+                  if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+                    e.preventDefault();
+                    onCastSkill(skill.id);
+                  }
+                }}
                 onClick={() => isReady && onCastSkill(skill.id)}
                 disabled={!isReady}
                 aria-label={`${skill.name} (${energyNeeded} NRG)`}

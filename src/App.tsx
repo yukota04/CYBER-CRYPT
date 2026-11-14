@@ -248,6 +248,11 @@ export default function App() {
 
   // Free-movement input (held directions) + realtime combat clock
   const moveInputRef = useRef<{ dx: number; dy: number; aimDx?: number; aimDy?: number }>({ dx: 0, dy: 0 });
+  /** Auto-melee ON by default (legacy behavior). When OFF, only attack while attackHeld. */
+  const [autoAttack, setAutoAttack] = useState(true);
+  const autoAttackRef = useRef(true);
+  autoAttackRef.current = autoAttack;
+  const attackHeldRef = useRef(false);
   const heldMoveKeysRef = useRef<Set<string>>(new Set());
   const joystickActiveRef = useRef(false);
   const onlineStickDirRef = useRef<'up' | 'down' | 'left' | 'right' | null>(null);
@@ -341,6 +346,7 @@ export default function App() {
       gameState !== 'playing';
     if (uiBlockedRef.current) {
       heldMoveKeysRef.current.clear();
+      attackHeldRef.current = false;
       const prev = moveInputRef.current;
       moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
       joystickActiveRef.current = false;
@@ -867,7 +873,11 @@ export default function App() {
         const result = tickRealtime(
           playerRef.current,
           dungeonRef.current,
-          moveInputRef.current,
+          {
+            ...moveInputRef.current,
+            autoAttack: autoAttackRef.current,
+            attackHeld: attackHeldRef.current
+          },
           dt,
           turnRef.current,
           realtimeClockRef.current
@@ -2020,6 +2030,11 @@ export default function App() {
         }
         if (e.key === 'f' || e.key === 'F') {
           e.preventDefault();
+          if (e.repeat) return;
+          // Offline free-move: F holds melee when Auto is off; always try ranged/strike too
+          if (playModeRef.current !== 'online') {
+            attackHeldRef.current = true;
+          }
           handleRangedAttack();
           return;
         }
@@ -2076,6 +2091,9 @@ export default function App() {
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (playModeRef.current === 'online') return;
+      if (e.key === 'f' || e.key === 'F') {
+        attackHeldRef.current = false;
+      }
       const dir =
         e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp'
           ? 'up'
@@ -2094,6 +2112,7 @@ export default function App() {
     const clearMoveOnBlur = () => {
       heldMoveKeysRef.current.clear();
       joystickActiveRef.current = false;
+      attackHeldRef.current = false;
       const prev = moveInputRef.current;
       moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
     };
@@ -2720,6 +2739,11 @@ export default function App() {
             }}
             onCastSkill={handleCastSkill}
             onRangedAttack={() => handleRangedAttack()}
+            autoAttack={autoAttack}
+            onAutoAttackChange={setAutoAttack}
+            onAttackHold={pressed => {
+              attackHeldRef.current = pressed;
+            }}
             language={language}
           />
           <Minimap
@@ -2741,6 +2765,12 @@ export default function App() {
             player={player}
             dungeon={dungeon}
             hideDpad
+            language={language}
+            autoAttack={autoAttack}
+            onAutoAttackChange={setAutoAttack}
+            onAttackHold={pressed => {
+              attackHeldRef.current = pressed;
+            }}
             onMove={handlePlayerMove}
             onMoveHold={(dx, dy, pressed) => {
               if (playModeRef.current === 'online') {
