@@ -49,14 +49,24 @@ export class CanvasRenderer {
   public enableScanlines = true;
   public enableGlow = true;
   public enableParticles = true;
+  public enablePostFx = true;
+  public simpleEntities = false;
+  public detailTiles = true;
+  private scanlinePattern: CanvasPattern | null = null;
 
   public applyPerformanceOptions(opts: {
     enableScanlines?: boolean;
     enableGlow?: boolean;
     enableParticles?: boolean;
+    enablePostFx?: boolean;
+    simpleEntities?: boolean;
+    detailTiles?: boolean;
   }) {
     if (typeof opts.enableScanlines === 'boolean') this.enableScanlines = opts.enableScanlines;
     if (typeof opts.enableGlow === 'boolean') this.enableGlow = opts.enableGlow;
+    if (typeof opts.enablePostFx === 'boolean') this.enablePostFx = opts.enablePostFx;
+    if (typeof opts.simpleEntities === 'boolean') this.simpleEntities = opts.simpleEntities;
+    if (typeof opts.detailTiles === 'boolean') this.detailTiles = opts.detailTiles;
     if (typeof opts.enableParticles === 'boolean') {
       this.enableParticles = opts.enableParticles;
       if (!opts.enableParticles) {
@@ -67,7 +77,7 @@ export class CanvasRenderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }) || canvas.getContext('2d')!;
 
     for (let i = 0; i < this.maxParticles; i++) {
       this.particles.push({
@@ -165,8 +175,23 @@ export class CanvasRenderer {
   private drawProceduralMonster(ctx: CanvasRenderingContext2D, monster: Monster, mx: number, my: number, nowSec: number) {
     const cx = mx + 16;
     const cy = my + 16;
-    const v = monster.visualVariant;
     const bodyColor = monster.color;
+
+    // Fast path for performance preset — skip aura/spikes/polygons
+    if (this.simpleEntities) {
+      ctx.fillStyle = bodyColor;
+      ctx.fillRect(mx + 6, my + 6, 20, 20);
+      ctx.fillStyle = '#0a0718';
+      ctx.fillRect(mx + 10, my + 10, 12, 12);
+      ctx.fillStyle = bodyColor;
+      ctx.font = '14px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(monster.symbol || '?', cx, cy + 1);
+      return;
+    }
+
+    const v = monster.visualVariant;
     const secColor = v?.secondaryColor || '#ffffff';
     const auraColor = v?.auraColor || monster.color;
     const tier = v?.tier || 1;
@@ -626,7 +651,8 @@ export class CanvasRenderer {
     const startTileY = Math.max(0, Math.floor((this.cameraY - 40) / this.tileSize));
     const endTileY = Math.min(dungeon.height, Math.ceil((this.cameraY + height + 40) / this.tileSize));
 
-    // 1. RENDER TILES
+    // 1. RENDER TILES — fills only (no per-tile strokeRect; that was the #1 FPS killer)
+    const detail = this.detailTiles && !this.simpleEntities;
     for (let y = startTileY; y < endTileY; y++) {
       for (let x = startTileX; x < endTileX; x++) {
         const tile = dungeon.tiles[y]?.[x];
@@ -639,128 +665,95 @@ export class CanvasRenderer {
         if (tile.type === 'wall') {
           ctx.fillStyle = isLit ? '#1b1238' : '#0e0920';
           ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-          ctx.fillStyle = isLit ? '#492c85' : '#231444';
-          ctx.fillRect(screenX, screenY, this.tileSize, 3);
-          ctx.strokeStyle = isLit ? 'rgba(168, 85, 247, 0.4)' : 'rgba(88, 28, 135, 0.2)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(screenX + 0.5, screenY + 0.5, this.tileSize - 1, this.tileSize - 1);
+          if (detail) {
+            ctx.fillStyle = isLit ? '#492c85' : '#231444';
+            ctx.fillRect(screenX, screenY, this.tileSize, 3);
+          }
         } else {
           ctx.fillStyle = isLit ? '#120d26' : '#0a0718';
           ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
-          ctx.strokeStyle = isLit ? 'rgba(0, 240, 255, 0.12)' : 'rgba(0, 240, 255, 0.03)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(screenX + 0.5, screenY + 0.5, this.tileSize - 1, this.tileSize - 1);
-
-          if (isLit) {
-            ctx.fillStyle = 'rgba(255, 0, 128, 0.15)';
-            ctx.fillRect(screenX + 15, screenY + 15, 2, 2);
-          }
 
           if (tile.type === 'stairs_down') {
             ctx.fillStyle = isLit ? '#00f0ff' : '#007788';
             ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
             ctx.fillStyle = '#0a0718';
             ctx.fillRect(screenX + 8, screenY + 8, this.tileSize - 16, this.tileSize - 16);
-            ctx.fillStyle = isLit ? '#ffe600' : '#887700';
-            ctx.font = '14px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('▼', screenX + 16, screenY + 16);
-          }
-
-          if (tile.type === 'checkpoint') {
+            if (detail) {
+              ctx.fillStyle = isLit ? '#ffe600' : '#887700';
+              ctx.font = '14px monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('▼', screenX + 16, screenY + 16);
+            }
+          } else if (tile.type === 'checkpoint') {
             const cpActive = !!tile.checkpointActivated;
             const cpColor = cpActive ? '#10b981' : '#f59e0b';
-            ctx.fillStyle = isLit ? (cpActive ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.22)') : 'rgba(16,185,129,0.1)';
-            ctx.beginPath();
-            ctx.arc(screenX + 16, screenY + 16, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = isLit ? cpColor : '#065f46';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
+            ctx.fillStyle = isLit
+              ? cpActive
+                ? 'rgba(16,185,129,0.25)'
+                : 'rgba(245,158,11,0.22)'
+              : 'rgba(16,185,129,0.1)';
+            ctx.fillRect(screenX + 6, screenY + 6, 20, 20);
             ctx.fillStyle = isLit ? cpColor : '#047857';
-            ctx.font = 'bold 13px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('◈', screenX + 16, screenY + 16);
-          }
-
-          if (tile.type === 'chest') {
+            if (detail) {
+              ctx.font = 'bold 13px monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('◈', screenX + 16, screenY + 16);
+            } else {
+              ctx.fillRect(screenX + 12, screenY + 12, 8, 8);
+            }
+          } else if (tile.type === 'chest') {
             ctx.fillStyle = isLit ? '#ffe600' : '#887700';
             ctx.fillRect(screenX + 6, screenY + 8, this.tileSize - 12, this.tileSize - 14);
             ctx.fillStyle = '#ff007f';
             ctx.fillRect(screenX + 10, screenY + 6, this.tileSize - 20, 4);
-            ctx.strokeStyle = '#ffffff';
-            ctx.strokeRect(screenX + 14, screenY + 14, 4, 4);
-          }
-
-          if (tile.type === 'shrine') {
+          } else if (tile.type === 'shrine') {
             ctx.fillStyle = isLit ? 'rgba(0, 240, 255, 0.3)' : 'rgba(0, 240, 255, 0.1)';
-            ctx.beginPath();
-            ctx.arc(screenX + 16, screenY + 16, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = isLit ? '#00f0ff' : '#008899';
-            ctx.font = '16px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('⚡', screenX + 16, screenY + 16);
-          }
-
-          if (tile.type === 'shop') {
-            const pulse = 0.65 + Math.sin(nowSec * 4) * 0.25;
-            ctx.fillStyle = isLit ? `rgba(255, 0, 170, ${0.28 * pulse})` : 'rgba(255, 0, 170, 0.12)';
-            ctx.beginPath();
-            ctx.arc(screenX + 16, screenY + 17, 13, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = isLit ? '#ffe600' : '#887700';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            // Cyber NPC Merchant Silhouette
-            ctx.fillStyle = isLit ? '#c026d3' : '#6b21a8';
-            ctx.fillRect(screenX + 9, screenY + 14, 14, 13); // cloak
-            ctx.fillStyle = isLit ? '#fde047' : '#854d0e';
-            ctx.fillRect(screenX + 11, screenY + 7, 10, 8); // hood/head
-            ctx.fillStyle = isLit ? '#00f0ff' : '#0891b2';
-            ctx.fillRect(screenX + 13, screenY + 10, 6, 2); // visor
-
-            if (isLit) {
-              ctx.font = 'bold 7px ui-monospace, monospace';
+            ctx.fillRect(screenX + 6, screenY + 6, 20, 20);
+            if (detail) {
+              ctx.fillStyle = isLit ? '#00f0ff' : '#008899';
+              ctx.font = '16px monospace';
               ctx.textAlign = 'center';
-              ctx.fillStyle = '#060410';
-              ctx.fillText('NPC SHOP', screenX + 17, screenY + 4);
-              ctx.fillStyle = '#ffe600';
-              ctx.fillText('NPC SHOP', screenX + 16, screenY + 3);
+              ctx.textBaseline = 'middle';
+              ctx.fillText('⚡', screenX + 16, screenY + 16);
             }
-          }
-
-          if (tile.hazard && isLit) {
-            ctx.strokeStyle = '#ff0055';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(screenX + 6, screenY + 6);
-            ctx.lineTo(screenX + 26, screenY + 26);
-            ctx.moveTo(screenX + 26, screenY + 6);
-            ctx.lineTo(screenX + 6, screenY + 26);
-            ctx.stroke();
+          } else if (tile.type === 'shop') {
+            ctx.fillStyle = isLit ? 'rgba(255, 0, 170, 0.28)' : 'rgba(255, 0, 170, 0.12)';
+            ctx.fillRect(screenX + 4, screenY + 4, 24, 24);
+            ctx.fillStyle = isLit ? '#c026d3' : '#6b21a8';
+            ctx.fillRect(screenX + 9, screenY + 14, 14, 13);
+            ctx.fillStyle = isLit ? '#fde047' : '#854d0e';
+            ctx.fillRect(screenX + 11, screenY + 7, 10, 8);
+            ctx.fillStyle = isLit ? '#00f0ff' : '#0891b2';
+            ctx.fillRect(screenX + 13, screenY + 10, 6, 2);
+          } else if (tile.hazard && isLit) {
+            ctx.fillStyle = 'rgba(255, 0, 85, 0.35)';
+            ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
           }
         }
 
         if (!isLit) {
-          ctx.fillStyle = 'rgba(8, 6, 20, 0.65)';
+          ctx.fillStyle = 'rgba(8, 6, 20, 0.55)';
           ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
         }
       }
     }
 
-    // 1b. RENDER GROUND COINS (Only on explored/visible tiles)
+    // 1b. RENDER GROUND COINS — viewport-culled, no glow/text in simple mode
     if (dungeon.groundCoins) {
+      const camL = this.cameraX - 16;
+      const camT = this.cameraY - 16;
+      const camR = this.cameraX + width + 16;
+      const camB = this.cameraY + height + 16;
       for (const coin of dungeon.groundCoins) {
+        const wx = coin.x * this.tileSize;
+        const wy = coin.y * this.tileSize;
+        if (wx < camL || wy < camT || wx > camR || wy > camB) continue;
         const tile = dungeon.tiles[coin.y]?.[coin.x];
         if (!tile || !tile.visible) continue;
-        const cx = coin.x * this.tileSize + 16;
-        const cy = coin.y * this.tileSize + 16 + Math.sin(nowSec * 5 + coin.x) * 2;
+        const cx = wx + 16;
+        const cy = wy + 16 + (this.simpleEntities ? 0 : Math.sin(nowSec * 5 + coin.x) * 2);
         const coinColor =
           coin.tier === 'quantum'
             ? '#00f0ff'
@@ -770,26 +763,14 @@ export class CanvasRenderer {
             ? '#e2e8f0'
             : '#d97706';
 
-        ctx.save();
-        if (this.enableGlow) {
-          ctx.shadowColor = coinColor;
-          ctx.shadowBlur = 8;
-        }
         ctx.fillStyle = coinColor;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#0a0718';
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-
-        ctx.fillStyle = '#0a0718';
-        ctx.font = 'bold 7px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('$', cx, cy + 0.5);
-        ctx.restore();
+        if (this.simpleEntities) {
+          ctx.fillRect(cx - 5, cy - 5, 10, 10);
+        } else {
+          ctx.beginPath();
+          ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
@@ -872,23 +853,22 @@ export class CanvasRenderer {
 
       this.drawProceduralMonster(ctx, monster, mx, my, nowSec);
 
-      // Monster HP Mini-bar & Level tag
+      // Monster HP Mini-bar (skip expensive text labels in simple mode)
       const hpPercent = Math.max(0, monster.hp / monster.maxHp);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
       ctx.fillRect(mx + 2, my - 6, this.tileSize - 4, 4);
       ctx.fillStyle = hpPercent > 0.4 ? '#00f0ff' : '#ff0055';
       ctx.fillRect(mx + 2, my - 6, (this.tileSize - 4) * hpPercent, 4);
 
-      ctx.font = 'bold 8px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#060410';
-      ctx.fillText(`Lv.${monster.level || 1}`, mx + 17, my - 9);
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillText(`Lv.${monster.level || 1}`, mx + 16, my - 10);
-
-      if (monster.burnTurns && monster.burnTurns > 0) {
-        ctx.font = '10px monospace';
-        ctx.fillText('🔥', mx + this.tileSize - 4, my + 4);
+      if (!this.simpleEntities) {
+        ctx.font = 'bold 8px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillText(`Lv.${monster.level || 1}`, mx + 16, my - 10);
+        if (monster.burnTurns && monster.burnTurns > 0) {
+          ctx.font = '10px monospace';
+          ctx.fillText('🔥', mx + this.tileSize - 4, my + 4);
+        }
       }
     }
 
@@ -1161,47 +1141,64 @@ export class CanvasRenderer {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Player-hurt fear vignette — pulsing crimson screen edges
+    // Player-hurt fear vignette — border-only when postFX off; full radial when on
     if (this.damageVignette > 0.01) {
       const v = this.damageVignette;
       const pulse = 0.75 + Math.sin(nowSec * 28) * 0.25;
-      const edge = Math.min(width, height) * (0.42 - v * 0.08);
-      const fear = ctx.createRadialGradient(
-        width / 2,
-        height / 2,
-        edge,
-        width / 2,
-        height / 2,
-        Math.max(width, height) * 0.72
-      );
-      fear.addColorStop(0, 'rgba(120, 0, 0, 0)');
-      fear.addColorStop(0.55, `rgba(160, 0, 20, ${0.12 * v * pulse})`);
-      fear.addColorStop(0.82, `rgba(200, 0, 30, ${0.45 * v * pulse})`);
-      fear.addColorStop(1, `rgba(255, 0, 40, ${0.72 * v})`);
-      ctx.fillStyle = fear;
-      ctx.fillRect(0, 0, width, height);
-
-      // Hard border streaks for impact punch
-      const border = Math.max(10, Math.min(width, height) * 0.045) * (0.65 + v * 0.55);
-      ctx.fillStyle = `rgba(255, 20, 40, ${0.35 * v * pulse})`;
+      const border = Math.max(8, Math.min(width, height) * 0.04) * (0.65 + v * 0.55);
+      ctx.fillStyle = `rgba(255, 20, 40, ${0.4 * v * pulse})`;
       ctx.fillRect(0, 0, width, border);
       ctx.fillRect(0, height - border, width, border);
       ctx.fillRect(0, 0, border, height);
       ctx.fillRect(width - border, 0, border, height);
+      if (this.enablePostFx) {
+        const edge = Math.min(width, height) * (0.45 - v * 0.06);
+        const fear = ctx.createRadialGradient(
+          width / 2,
+          height / 2,
+          edge,
+          width / 2,
+          height / 2,
+          Math.max(width, height) * 0.7
+        );
+        fear.addColorStop(0, 'rgba(120, 0, 0, 0)');
+        fear.addColorStop(1, `rgba(200, 0, 30, ${0.5 * v})`);
+        ctx.fillStyle = fear;
+        ctx.fillRect(0, 0, width, height);
+      }
     }
 
-    // 7. RETRO CRT SCANLINE OVERLAY (cheap: 2 fills, not hundreds of 1px rects)
+    // 7. CRT overlay — cached pattern (not hundreds of 1px fills)
     if (this.enableScanlines) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-      // Simulate scanlines with a repeating pattern via a coarse stride
-      for (let y = 0; y < height; y += 4) {
-        ctx.fillRect(0, y, width, 1);
+      if (!this.scanlinePattern) {
+        const off = document.createElement('canvas');
+        off.width = 4;
+        off.height = 4;
+        const octx = off.getContext('2d');
+        if (octx) {
+          octx.fillStyle = 'rgba(0,0,0,0.22)';
+          octx.fillRect(0, 0, 4, 1);
+          this.scanlinePattern = ctx.createPattern(off, 'repeat');
+        }
       }
-      const grad = ctx.createRadialGradient(width / 2, height / 2, width * 0.35, width / 2, height / 2, width * 0.7);
-      grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, width, height);
+      if (this.scanlinePattern) {
+        ctx.fillStyle = this.scanlinePattern;
+        ctx.fillRect(0, 0, width, height);
+      }
+      if (this.enablePostFx) {
+        const grad = ctx.createRadialGradient(
+          width / 2,
+          height / 2,
+          width * 0.35,
+          width / 2,
+          height / 2,
+          width * 0.7
+        );
+        grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+      }
     }
   }
 }

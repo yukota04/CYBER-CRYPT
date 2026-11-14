@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { DungeonState, Player } from '../game/types';
 import { Language } from '../game/i18n';
-import { calculateMinimapStats, getMinimapTileColor } from '../game/minimap';
+import { getMinimapTileColor } from '../game/minimap';
 
 interface MinimapProps {
   dungeon: DungeonState;
@@ -11,15 +11,20 @@ interface MinimapProps {
   language: Language;
 }
 
-/** Clean minimap: canvas only — sized/positioned clear of the HP/NRG cluster. */
+/** Clean minimap — throttled redraw (~8 Hz) via refs so combat React updates don't restart the loop. */
 export const Minimap: React.FC<MinimapProps> = ({
   dungeon,
   player,
   isOpen
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dungeonRef = useRef(dungeon);
+  const playerRef = useRef(player);
   const [isMobile, setIsMobile] = useState(false);
   const pulseRef = useRef<number>(0);
+
+  dungeonRef.current = dungeon;
+  playerRef.current = player;
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
@@ -29,8 +34,6 @@ export const Minimap: React.FC<MinimapProps> = ({
     return () => mq.removeEventListener('change', update);
   }, []);
 
-  const stats = calculateMinimapStats(dungeon);
-
   useEffect(() => {
     if (!isOpen) return;
     const canvas = canvasRef.current;
@@ -38,9 +41,10 @@ export const Minimap: React.FC<MinimapProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animId = 0;
-    const render = () => {
-      pulseRef.current += 0.08;
+    const draw = () => {
+      const dng = dungeonRef.current;
+      const pl = playerRef.current;
+      pulseRef.current += 0.35;
       const w = canvas.width;
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
@@ -50,12 +54,12 @@ export const Minimap: React.FC<MinimapProps> = ({
       ctx.lineWidth = 1;
       ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 
-      const cellW = w / dungeon.width;
-      const cellH = h / dungeon.height;
+      const cellW = w / dng.width;
+      const cellH = h / dng.height;
 
-      for (let y = 0; y < dungeon.height; y++) {
-        for (let x = 0; x < dungeon.width; x++) {
-          const tile = dungeon.tiles[y]?.[x];
+      for (let y = 0; y < dng.height; y++) {
+        for (let x = 0; x < dng.width; x++) {
+          const tile = dng.tiles[y]?.[x];
           if (!tile || (!tile.explored && !tile.visible)) continue;
           const color = getMinimapTileColor(tile);
           if (!color) continue;
@@ -66,32 +70,28 @@ export const Minimap: React.FC<MinimapProps> = ({
       }
       ctx.globalAlpha = 1;
 
-      for (const m of dungeon.monsters) {
+      for (const m of dng.monsters) {
         const tx = Math.floor(m.x);
         const ty = Math.floor(m.y);
-        if (!dungeon.tiles[ty]?.[tx]?.visible) continue;
+        if (!dng.tiles[ty]?.[tx]?.visible) continue;
         ctx.fillStyle = '#f43f5e';
-        ctx.beginPath();
-        ctx.arc(m.x * cellW, m.y * cellH, Math.max(1.5, cellW * 0.35), 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(m.x * cellW - 1, m.y * cellH - 1, Math.max(2, cellW * 0.7), Math.max(2, cellH * 0.7));
       }
 
       const pulse = 0.65 + Math.sin(pulseRef.current) * 0.35;
       ctx.fillStyle = `rgba(34,211,238,${pulse})`;
-      ctx.beginPath();
-      ctx.arc(player.x * cellW, player.y * cellH, Math.max(2, cellW * 0.55), 0, Math.PI * 2);
-      ctx.fill();
-
-      animId = requestAnimationFrame(render);
+      const pr = Math.max(2, cellW * 0.55);
+      ctx.fillRect(pl.x * cellW - pr, pl.y * cellH - pr, pr * 2, pr * 2);
     };
 
-    render();
-    return () => cancelAnimationFrame(animId);
-  }, [dungeon, player, isOpen, isMobile, stats.exploredPercent]);
+    draw();
+    // 8 Hz is enough for a status map and avoids fighting the main rAF
+    const id = window.setInterval(draw, 125);
+    return () => window.clearInterval(id);
+  }, [isOpen, isMobile]);
 
   if (!isOpen) return null;
 
-  // Larger map, parked under the HP/NRG panel (not behind it)
   const canvasDim = isMobile ? 148 : 200;
 
   return (

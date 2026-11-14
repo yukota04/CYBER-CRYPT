@@ -676,7 +676,8 @@ function interactOccupiedTiles(
   turn: number,
   logs: CombatLogEntry[],
   soundEvents: SoundEventType[],
-  floatingTexts: RealtimeTickResult['floatingTexts']
+  floatingTexts: RealtimeTickResult['floatingTexts'],
+  checkCoins = true
 ): {
   floorCompleted: boolean;
   openShop: boolean;
@@ -696,23 +697,22 @@ function interactOccupiedTiles(
 
   const tiles = occupiedTiles(player.x, player.y);
 
-  // Coins on any overlapped tile
-  const beforeCoins = dungeon.groundCoins.length;
-  let gainedCoins = 0;
-  dungeon.groundCoins = dungeon.groundCoins.filter(c => {
-    const onTile = tiles.some(t => t.tx === c.x && t.ty === c.y);
-    if (onTile) {
-      gainedCoins += c.value;
-      return false;
+  // Coins only when the player actually moved onto a tile (skip O(coins) scan otherwise)
+  if (checkCoins && dungeon.groundCoins.length > 0) {
+    let gainedCoins = 0;
+    dungeon.groundCoins = dungeon.groundCoins.filter(c => {
+      const onTile = tiles.some(t => t.tx === c.x && t.ty === c.y);
+      if (onTile) {
+        gainedCoins += c.value;
+        return false;
+      }
+      return true;
+    });
+    if (gainedCoins > 0) {
+      player.stats.coins += gainedCoins;
+      soundEvents.push('coin');
+      floatingTexts.push({ text: `+${gainedCoins} 🪙`, x: player.x, y: player.y, color: '#fbbf24' });
     }
-    return true;
-  });
-  if (gainedCoins > 0) {
-    player.stats.coins += gainedCoins;
-    soundEvents.push('coin');
-    floatingTexts.push({ text: `+${gainedCoins} 🪙`, x: player.x, y: player.y, color: '#fbbf24' });
-  } else if (beforeCoins !== dungeon.groundCoins.length) {
-    // no-op
   }
 
   const recovered = collectDeathDropBagsAt(player, dungeon, 'solo');
@@ -910,27 +910,33 @@ export function tickRealtime(
     }
   }
 
-  // Auto-melee toward aim (PC mouse) or move/facing cone
-  const nearEnemy = dungeon.monsters.some(m => inMeleeArc(player, m.x, m.y, atkDx, atkDy));
-  if (nearEnemy) {
-    const melee = tryPlayerMelee(
-      player,
-      dungeon,
-      clock,
-      turn,
-      logs,
-      soundEvents,
-      floatingTexts,
-      attackEffects,
-      atkDx,
-      atkDy
-    );
-    screenShake += melee.screenShake;
-    hitstopSeconds = Math.max(hitstopSeconds, melee.hitstopSeconds);
-    kills += melee.kills;
-  }
+  // Auto-melee toward aim (PC mouse) or move/facing cone — single pass (no pre-scan)
+  const melee = tryPlayerMelee(
+    player,
+    dungeon,
+    clock,
+    turn,
+    logs,
+    soundEvents,
+    floatingTexts,
+    attackEffects,
+    atkDx,
+    atkDy
+  );
+  screenShake += melee.screenShake;
+  hitstopSeconds = Math.max(hitstopSeconds, melee.hitstopSeconds);
+  kills += melee.kills;
 
-  const interact = interactOccupiedTiles(player, dungeon, clock, turn, logs, soundEvents, floatingTexts);
+  const interact = interactOccupiedTiles(
+    player,
+    dungeon,
+    clock,
+    turn,
+    logs,
+    soundEvents,
+    floatingTexts,
+    moved
+  );
   floorCompleted = interact.floorCompleted;
   openShop = interact.openShop;
   checkpointTriggered = interact.checkpointTriggered;
