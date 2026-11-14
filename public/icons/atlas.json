@@ -248,7 +248,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "titanium_helm": {
       "sheet": "atlas-00.webp",
@@ -264,7 +264,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "cyber_vest": {
       "sheet": "atlas-00.webp",
@@ -280,7 +280,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "aegis_nanosuit": {
       "sheet": "atlas-00.webp",
@@ -288,7 +288,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "hyperion_chassis": {
       "sheet": "atlas-00.webp",
@@ -296,7 +296,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "tactical_grips": {
       "sheet": "atlas-00.webp",
@@ -304,7 +304,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "kinetic_gauntlets": {
       "sheet": "atlas-00.webp",
@@ -312,7 +312,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "synth_handwraps": {
       "sheet": "atlas-00.webp",
@@ -320,7 +320,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "exo_trousers": {
       "sheet": "atlas-00.webp",
@@ -328,7 +328,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "carbon_greaves": {
       "sheet": "atlas-00.webp",
@@ -336,7 +336,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "titan_legplates": {
       "sheet": "atlas-00.webp",
@@ -344,7 +344,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "mag_boots": {
       "sheet": "atlas-00.webp",
@@ -352,7 +352,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "strider_thrusters": {
       "sheet": "atlas-00.webp",
@@ -360,7 +360,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "void_sabatons": {
       "sheet": "atlas-00.webp",
@@ -368,7 +368,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "neural_chip": {
       "sheet": "atlas-00.webp",
@@ -432,7 +432,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "mythic_chronos_ring": {
       "sheet": "atlas-00.webp",
@@ -952,7 +952,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_13": {
       "sheet": "atlas-01.webp",
@@ -960,7 +960,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_14": {
       "sheet": "atlas-01.webp",
@@ -968,7 +968,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_15": {
       "sheet": "atlas-01.webp",
@@ -976,7 +976,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_16": {
       "sheet": "atlas-01.webp",
@@ -984,7 +984,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_17": {
       "sheet": "atlas-01.webp",
@@ -992,7 +992,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_18": {
       "sheet": "atlas-01.webp",
@@ -1000,7 +1000,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_19": {
       "sheet": "atlas-01.webp",
@@ -1008,7 +1008,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_20": {
       "sheet": "atlas-01.webp",
@@ -1016,7 +1016,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_helmet_21": {
       "sheet": "atlas-01.webp",
@@ -1024,7 +1024,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_striker_chest_00": {
       "sheet": "atlas-01.webp",
@@ -2056,7 +2056,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_03": {
       "sheet": "atlas-03.webp",
@@ -2064,7 +2064,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_04": {
       "sheet": "atlas-03.webp",
@@ -2072,7 +2072,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_05": {
       "sheet": "atlas-03.webp",
@@ -2080,7 +2080,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_06": {
       "sheet": "atlas-03.webp",
@@ -2088,7 +2088,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_07": {
       "sheet": "atlas-03.webp",
@@ -2096,7 +2096,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_08": {
       "sheet": "atlas-03.webp",
@@ -2104,7 +2104,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_09": {
       "sheet": "atlas-03.webp",
@@ -2112,7 +2112,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_10": {
       "sheet": "atlas-04.webp",
@@ -2120,7 +2120,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_11": {
       "sheet": "atlas-04.webp",
@@ -2128,7 +2128,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_technomancer_helmet_12": {
       "sheet": "atlas-04.webp",
@@ -2456,7 +2456,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_09": {
       "sheet": "atlas-04.webp",
@@ -2464,7 +2464,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_10": {
       "sheet": "atlas-04.webp",
@@ -2472,7 +2472,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_11": {
       "sheet": "atlas-04.webp",
@@ -2480,7 +2480,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_12": {
       "sheet": "atlas-04.webp",
@@ -2488,7 +2488,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_13": {
       "sheet": "atlas-04.webp",
@@ -2496,7 +2496,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_14": {
       "sheet": "atlas-04.webp",
@@ -2504,7 +2504,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_15": {
       "sheet": "atlas-04.webp",
@@ -2512,7 +2512,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_16": {
       "sheet": "atlas-04.webp",
@@ -2520,7 +2520,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_17": {
       "sheet": "atlas-04.webp",
@@ -2528,7 +2528,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_gloves_18": {
       "sheet": "atlas-04.webp",
@@ -2816,7 +2816,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_10": {
       "sheet": "atlas-05.webp",
@@ -2824,7 +2824,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_11": {
       "sheet": "atlas-05.webp",
@@ -2832,7 +2832,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_12": {
       "sheet": "atlas-05.webp",
@@ -2840,7 +2840,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_boots_13": {
       "sheet": "atlas-05.webp",
@@ -2848,7 +2848,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_boots_14": {
       "sheet": "atlas-05.webp",
@@ -2856,7 +2856,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_boots_15": {
       "sheet": "atlas-05.webp",
@@ -2864,7 +2864,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_boots_16": {
       "sheet": "atlas-05.webp",
@@ -2872,7 +2872,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_technomancer_boots_17": {
       "sheet": "atlas-05.webp",
@@ -2880,7 +2880,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_18": {
       "sheet": "atlas-05.webp",
@@ -2888,7 +2888,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_19": {
       "sheet": "atlas-05.webp",
@@ -2896,7 +2896,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_20": {
       "sheet": "atlas-05.webp",
@@ -2904,7 +2904,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_technomancer_boots_21": {
       "sheet": "atlas-05.webp",
@@ -2912,7 +2912,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_weapon_06": {
       "sheet": "atlas-05.webp",
@@ -3208,7 +3208,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_01": {
       "sheet": "atlas-06.webp",
@@ -3216,7 +3216,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_02": {
       "sheet": "atlas-06.webp",
@@ -3224,7 +3224,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_03": {
       "sheet": "atlas-06.webp",
@@ -3232,7 +3232,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_04": {
       "sheet": "atlas-06.webp",
@@ -3240,7 +3240,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_05": {
       "sheet": "atlas-06.webp",
@@ -3248,7 +3248,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_06": {
       "sheet": "atlas-06.webp",
@@ -3256,7 +3256,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_07": {
       "sheet": "atlas-06.webp",
@@ -3264,7 +3264,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_08": {
       "sheet": "atlas-06.webp",
@@ -3272,7 +3272,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_09": {
       "sheet": "atlas-06.webp",
@@ -3280,7 +3280,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_10": {
       "sheet": "atlas-06.webp",
@@ -3288,7 +3288,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_11": {
       "sheet": "atlas-06.webp",
@@ -3296,7 +3296,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_12": {
       "sheet": "atlas-06.webp",
@@ -3304,7 +3304,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_13": {
       "sheet": "atlas-06.webp",
@@ -3312,7 +3312,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_14": {
       "sheet": "atlas-06.webp",
@@ -3320,7 +3320,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_15": {
       "sheet": "atlas-06.webp",
@@ -3328,7 +3328,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_16": {
       "sheet": "atlas-06.webp",
@@ -3336,7 +3336,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_17": {
       "sheet": "atlas-06.webp",
@@ -3344,7 +3344,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_18": {
       "sheet": "atlas-06.webp",
@@ -3352,7 +3352,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_19": {
       "sheet": "atlas-06.webp",
@@ -3360,7 +3360,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_20": {
       "sheet": "atlas-06.webp",
@@ -3368,7 +3368,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_helmet_21": {
       "sheet": "atlas-06.webp",
@@ -3376,7 +3376,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_00": {
       "sheet": "atlas-06.webp",
@@ -3384,7 +3384,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_01": {
       "sheet": "atlas-06.webp",
@@ -3392,7 +3392,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_02": {
       "sheet": "atlas-06.webp",
@@ -3400,7 +3400,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_03": {
       "sheet": "atlas-06.webp",
@@ -3408,7 +3408,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_04": {
       "sheet": "atlas-06.webp",
@@ -3416,7 +3416,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_05": {
       "sheet": "atlas-06.webp",
@@ -3424,7 +3424,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-01.jpg"
     },
     "gen_vanguard_chest_06": {
       "sheet": "atlas-06.webp",
@@ -3432,7 +3432,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_07": {
       "sheet": "atlas-06.webp",
@@ -3440,7 +3440,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_08": {
       "sheet": "atlas-06.webp",
@@ -3448,7 +3448,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_09": {
       "sheet": "atlas-06.webp",
@@ -3456,7 +3456,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_10": {
       "sheet": "atlas-06.webp",
@@ -3464,7 +3464,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_11": {
       "sheet": "atlas-06.webp",
@@ -3472,7 +3472,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_12": {
       "sheet": "atlas-06.webp",
@@ -3480,7 +3480,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_13": {
       "sheet": "atlas-06.webp",
@@ -3488,7 +3488,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_14": {
       "sheet": "atlas-06.webp",
@@ -3496,7 +3496,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_15": {
       "sheet": "atlas-06.webp",
@@ -3504,7 +3504,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_16": {
       "sheet": "atlas-06.webp",
@@ -3512,7 +3512,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_17": {
       "sheet": "atlas-06.webp",
@@ -3520,7 +3520,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_18": {
       "sheet": "atlas-06.webp",
@@ -3528,7 +3528,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_19": {
       "sheet": "atlas-06.webp",
@@ -3536,7 +3536,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_20": {
       "sheet": "atlas-06.webp",
@@ -3544,7 +3544,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_chest_21": {
       "sheet": "atlas-06.webp",
@@ -3552,7 +3552,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_gloves_00": {
       "sheet": "atlas-06.webp",
@@ -3560,7 +3560,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_gloves_01": {
       "sheet": "atlas-06.webp",
@@ -3568,7 +3568,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_gloves_02": {
       "sheet": "atlas-06.webp",
@@ -3576,7 +3576,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_gloves_03": {
       "sheet": "atlas-06.webp",
@@ -3584,7 +3584,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_gloves_04": {
       "sheet": "atlas-06.webp",
@@ -3592,7 +3592,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_05": {
       "sheet": "atlas-06.webp",
@@ -3600,7 +3600,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_06": {
       "sheet": "atlas-06.webp",
@@ -3608,7 +3608,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_07": {
       "sheet": "atlas-06.webp",
@@ -3616,7 +3616,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_08": {
       "sheet": "atlas-06.webp",
@@ -3624,7 +3624,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_09": {
       "sheet": "atlas-06.webp",
@@ -3632,7 +3632,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_10": {
       "sheet": "atlas-06.webp",
@@ -3640,7 +3640,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_11": {
       "sheet": "atlas-06.webp",
@@ -3648,7 +3648,7 @@
       "y": 896,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_12": {
       "sheet": "atlas-07.webp",
@@ -3656,7 +3656,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_13": {
       "sheet": "atlas-07.webp",
@@ -3664,7 +3664,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_14": {
       "sheet": "atlas-07.webp",
@@ -3672,7 +3672,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_15": {
       "sheet": "atlas-07.webp",
@@ -3680,7 +3680,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_16": {
       "sheet": "atlas-07.webp",
@@ -3688,7 +3688,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_17": {
       "sheet": "atlas-07.webp",
@@ -3696,7 +3696,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_18": {
       "sheet": "atlas-07.webp",
@@ -3704,7 +3704,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_19": {
       "sheet": "atlas-07.webp",
@@ -3712,7 +3712,7 @@
       "y": 0,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_20": {
       "sheet": "atlas-07.webp",
@@ -3720,7 +3720,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_gloves_21": {
       "sheet": "atlas-07.webp",
@@ -3728,7 +3728,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_legs_00": {
       "sheet": "atlas-07.webp",
@@ -3736,7 +3736,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_01": {
       "sheet": "atlas-07.webp",
@@ -3744,7 +3744,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_02": {
       "sheet": "atlas-07.webp",
@@ -3752,7 +3752,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_03": {
       "sheet": "atlas-07.webp",
@@ -3760,7 +3760,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_04": {
       "sheet": "atlas-07.webp",
@@ -3768,7 +3768,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_05": {
       "sheet": "atlas-07.webp",
@@ -3776,7 +3776,7 @@
       "y": 128,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_06": {
       "sheet": "atlas-07.webp",
@@ -3784,7 +3784,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_07": {
       "sheet": "atlas-07.webp",
@@ -3792,7 +3792,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_08": {
       "sheet": "atlas-07.webp",
@@ -3800,7 +3800,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_09": {
       "sheet": "atlas-07.webp",
@@ -3808,7 +3808,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_10": {
       "sheet": "atlas-07.webp",
@@ -3816,7 +3816,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_11": {
       "sheet": "atlas-07.webp",
@@ -3824,7 +3824,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_12": {
       "sheet": "atlas-07.webp",
@@ -3832,7 +3832,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_13": {
       "sheet": "atlas-07.webp",
@@ -3840,7 +3840,7 @@
       "y": 256,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_14": {
       "sheet": "atlas-07.webp",
@@ -3848,7 +3848,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_15": {
       "sheet": "atlas-07.webp",
@@ -3856,7 +3856,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_16": {
       "sheet": "atlas-07.webp",
@@ -3864,7 +3864,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_17": {
       "sheet": "atlas-07.webp",
@@ -3872,7 +3872,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_18": {
       "sheet": "atlas-07.webp",
@@ -3880,7 +3880,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_19": {
       "sheet": "atlas-07.webp",
@@ -3888,7 +3888,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_20": {
       "sheet": "atlas-07.webp",
@@ -3896,7 +3896,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_legs_21": {
       "sheet": "atlas-07.webp",
@@ -3904,7 +3904,7 @@
       "y": 384,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "gen_vanguard_boots_00": {
       "sheet": "atlas-07.webp",
@@ -3912,7 +3912,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_boots_01": {
       "sheet": "atlas-07.webp",
@@ -3920,7 +3920,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_boots_02": {
       "sheet": "atlas-07.webp",
@@ -3928,7 +3928,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_boots_03": {
       "sheet": "atlas-07.webp",
@@ -3936,7 +3936,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_boots_04": {
       "sheet": "atlas-07.webp",
@@ -3944,7 +3944,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_boots_05": {
       "sheet": "atlas-07.webp",
@@ -3952,7 +3952,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_vanguard_boots_06": {
       "sheet": "atlas-07.webp",
@@ -3960,7 +3960,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_07": {
       "sheet": "atlas-07.webp",
@@ -3968,7 +3968,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_08": {
       "sheet": "atlas-07.webp",
@@ -3976,7 +3976,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_09": {
       "sheet": "atlas-07.webp",
@@ -3984,7 +3984,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_10": {
       "sheet": "atlas-07.webp",
@@ -3992,7 +3992,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_11": {
       "sheet": "atlas-07.webp",
@@ -4000,7 +4000,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_12": {
       "sheet": "atlas-07.webp",
@@ -4048,7 +4048,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_18": {
       "sheet": "atlas-07.webp",
@@ -4056,7 +4056,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_19": {
       "sheet": "atlas-07.webp",
@@ -4064,7 +4064,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_20": {
       "sheet": "atlas-07.webp",
@@ -4072,7 +4072,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-04.jpg"
     },
     "gen_vanguard_boots_21": {
       "sheet": "atlas-07.webp",
@@ -4080,7 +4080,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-03.jpg"
     },
     "gen_shared_ring_05": {
       "sheet": "atlas-07.webp",
@@ -4456,7 +4456,7 @@
       "y": 512,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-02.jpg"
     },
     "striker_slash": {
       "sheet": "atlas-08.webp",
@@ -5965,8 +5965,8 @@
   },
   "counts": {
     "total": 737,
-    "ai": 568,
+    "ai": 732,
     "alias": 0,
-    "procedural": 169
+    "procedural": 5
   }
 }
