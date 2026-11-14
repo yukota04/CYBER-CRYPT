@@ -786,13 +786,15 @@ export function createItem(key: string, customId?: string, itemLevel = 1): GameI
   const levelMult = isGear ? 1 + (lvl - 1) * 0.12 : 1;
   return {
     ...base,
+    baseKey: key,
     attackBonus: base.attackBonus ? Math.round(base.attackBonus * levelMult) : base.attackBonus,
     defenseBonus: base.defenseBonus ? Math.round(base.defenseBonus * levelMult) : base.defenseBonus,
     hpBonus: base.hpBonus ? Math.round(base.hpBonus * levelMult) : base.hpBonus,
     energyBonus: base.energyBonus ? Math.round(base.energyBonus * levelMult) : base.energyBonus,
     upgradeLevel: isGear ? 0 : undefined,
     itemLevel: isGear ? lvl : undefined,
-    name: isGear && lvl > 1 ? `${base.name} [Lv.${lvl}]` : base.name,
+    // Keep English storage name; UI localizes via baseKey + itemLevel/upgradeLevel
+    name: base.name,
     id: customId || `item_${key}_${Date.now()}_${itemCounter++}`
   };
 }
@@ -924,11 +926,9 @@ export function getItemSellPrice(item: GameItem): number {
 export function upgradeItem(item: GameItem): GameItem {
   if (!canUpgradeItem(item)) return item;
   const nextLevel = (item.upgradeLevel || 0) + 1;
-  const baseName = item.name.replace(/\s\+\d+$/, '');
   return {
     ...item,
-    upgradeLevel: nextLevel,
-    name: `${baseName} +${nextLevel}`
+    upgradeLevel: nextLevel
   };
 }
 
