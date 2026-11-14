@@ -533,12 +533,56 @@ export function updateFOV(tiles: Tile[][], startX: number, startY: number, radiu
     }
   }
 
+  castFovRays(tiles, startX, startY, radius, width, height, null);
+}
+
+/**
+ * Incremental FOV: clear only previously visible cells instead of the whole map.
+ * Pass a reusable `lastVisible` buffer owned by the realtime clock.
+ */
+export function updateFOVIncremental(
+  tiles: Tile[][],
+  startX: number,
+  startY: number,
+  radius = 7,
+  lastVisible: Array<{ x: number; y: number }>
+) {
+  const height = tiles.length;
+  const width = tiles[0]?.length || 0;
+
+  for (let i = 0; i < lastVisible.length; i++) {
+    const c = lastVisible[i];
+    const tile = tiles[c.y]?.[c.x];
+    if (tile) tile.visible = false;
+  }
+  lastVisible.length = 0;
+
+  castFovRays(tiles, startX, startY, radius, width, height, lastVisible);
+}
+
+function castFovRays(
+  tiles: Tile[][],
+  startX: number,
+  startY: number,
+  radius: number,
+  width: number,
+  height: number,
+  lastVisible: Array<{ x: number; y: number }> | null
+) {
+  const mark = (tx: number, ty: number) => {
+    const tile = tiles[ty]?.[tx];
+    if (!tile) return false;
+    tile.visible = true;
+    tile.explored = true;
+    if (lastVisible) lastVisible.push({ x: tx, y: ty });
+    return tile.transparent;
+  };
+
   if (tiles[startY]?.[startX]) {
-    tiles[startY][startX].visible = true;
-    tiles[startY][startX].explored = true;
+    mark(startX, startY);
   }
 
-  const steps = 180;
+  const steps = 120; // slightly fewer rays — still smooth, cheaper on large maps
   for (let i = 0; i < steps; i++) {
     const angle = (i * 2 * Math.PI) / steps;
     const dx = Math.cos(angle);
@@ -555,12 +599,8 @@ export function updateFOV(tiles: Tile[][], startX: number, startY: number, radiu
 
       if (tx < 0 || tx >= width || ty < 0 || ty >= height) break;
 
-      tiles[ty][tx].visible = true;
-      tiles[ty][tx].explored = true;
-
-      if (!tiles[ty][tx].transparent) {
-        break;
-      }
+      const transparent = mark(tx, ty);
+      if (!transparent) break;
     }
   }
 }

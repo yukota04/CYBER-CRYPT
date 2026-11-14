@@ -232,7 +232,17 @@ export default function App() {
   const onlineStickDirRef = useRef<'up' | 'down' | 'left' | 'right' | null>(null);
   const realtimeClockRef = useRef<RealtimeClock>(createRealtimeClock());
   const hudSyncAccRef = useRef(0);
+  /** When true, freeze offline sim so inventory/skills aren't stomped mid-edit */
+  const uiBlockedRef = useRef(false);
   const applyRealtimeResultRef = useRef<(result: ReturnType<typeof tickRealtime>, dt: number) => void>(() => {});
+
+  /** Apply a player mutation to BOTH the live sim ref and React state (offline-safe). */
+  const commitPlayer = useCallback((updater: (prev: Player) => Player) => {
+    const next = updater(playerRef.current);
+    if (next === playerRef.current) return;
+    playerRef.current = next;
+    setPlayer(next);
+  }, []);
 
   const syncMoveInputFromKeys = useCallback(() => {
     // Joystick owns dx/dy while active
@@ -298,6 +308,17 @@ export default function App() {
   useEffect(() => {
     document.body.dataset.state = gameState;
   }, [gameState]);
+
+  useEffect(() => {
+    uiBlockedRef.current =
+      showInventory || showSkillTree || showShop || showOptions || gameState !== 'playing';
+    if (uiBlockedRef.current) {
+      heldMoveKeysRef.current.clear();
+      const prev = moveInputRef.current;
+      moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
+      joystickActiveRef.current = false;
+    }
+  }, [showInventory, showSkillTree, showShop, showOptions, gameState]);
 
   const handleUpdateSettings = useCallback((next: AppSettings) => {
     setAppSettings(next);
@@ -384,24 +405,27 @@ export default function App() {
     };
   }, []);
 
-  // Adaptive Music Context Sync (Title -> Explore -> Combat -> Boss)
+  // Adaptive Music Context Sync — cheap deps only (avoid re-scanning the map every HUD tick)
   useEffect(() => {
-    const nearbyEnemies = dungeon.monsters.filter(
-      m => m.alerted || Math.hypot(m.x - player.x, m.y - player.y) <= 7
-    ).length;
-    const bossVisible = dungeon.monsters.some(
-      m => m.archetype === 'core_synthesizer' && (m.alerted || dungeon.tiles[m.y]?.[m.x]?.visible)
-    );
-    const lowHp = player.stats.hp > 0 && player.stats.hp <= player.stats.maxHp * 0.3;
+    const p = playerRef.current;
+    const d = dungeonRef.current;
+    let nearbyEnemies = 0;
+    let bossVisible = false;
+    for (const m of d.monsters) {
+      const dist = Math.hypot(m.x - p.x, m.y - p.y);
+      if (m.alerted || dist <= 7) nearbyEnemies++;
+      if (m.archetype === 'core_synthesizer' && (m.alerted || dist <= 10)) bossVisible = true;
+    }
+    const lowHp = p.stats.hp > 0 && p.stats.hp <= p.stats.maxHp * 0.3;
 
     soundEngine.setMusicContext({
       scene: authScreenVisible ? 'login' : gameState,
-      floor: dungeon.floor,
+      floor: d.floor,
       nearbyEnemies,
       bossVisible,
       lowHp
     });
-  }, [authScreenVisible, gameState, dungeon.floor, dungeon.monsters, dungeon.tiles, player.x, player.y, player.stats.hp, player.stats.maxHp]);
+  }, [authScreenVisible, gameState, dungeon.floor, player.stats.hp, player.stats.maxHp, monstersSlain]);
 
   // Keep remotePlayersRef synced when coopRoom updates
   useEffect(() => {
@@ -692,9 +716,11 @@ export default function App() {
       }
 
       // Offline free-movement simulation (player + mobs)
+      // Pause while inventory / skill / shop / options are open so UI edits stick.
       if (
         gameStateRef.current === 'playing' &&
         playModeRef.current === 'offline' &&
+        !uiBlockedRef.current &&
         renderer.getHitstopRemaining() <= 0 &&
         playerRef.current &&
         dungeonRef.current
@@ -1360,11 +1386,20 @@ export default function App() {
         result.kills > 0 ||
         result.attackEffects.length > 0;
 
+      // Canvas reads refs every frame; React HUD only needs ~10 Hz (or on events).
+      // Pushing full dungeon+player every move was starving audio & UI.
       hudSyncAccRef.current += dt;
-      if (hasEvents || result.moved || hudSyncAccRef.current >= 0.05) {
+      if (hasEvents || hudSyncAccRef.current >= 0.1) {
         hudSyncAccRef.current = 0;
         setPlayer(result.player);
-        setDungeon(result.dungeon);
+        if (hasEvents) {
+          // New object identity so React/minimap notice monster/coin changes
+          setDungeon({
+            ...result.dungeon,
+            monsters: result.dungeon.monsters.slice(),
+            groundCoins: result.dungeon.groundCoins ? result.dungeon.groundCoins.slice() : []
+          });
+        }
       }
 
       if (result.logs.length > 0) {
@@ -1867,7 +1902,7 @@ export default function App() {
       return;
     }
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       if (!canClassEquipItem(prev.characterClass, item)) return prev;
       const slot = getEquipSlotForItem(item, prev.equipment);
       if (!slot) return prev;
@@ -1903,7 +1938,7 @@ export default function App() {
       return;
     }
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       const currentItem = prev.equipment[slot];
       if (!currentItem || prev.inventory.length >= prev.maxInventory) return prev;
 
@@ -1927,7 +1962,7 @@ export default function App() {
     const curPlayer = playerRef.current;
     if (curPlayer.stats.coins < stoneCost) return;
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       if (prev.stats.coins < stoneCost) return prev;
       return {
         ...prev,
@@ -1948,7 +1983,7 @@ export default function App() {
       ...prev
     ].slice(0, 30));
     soundEngine.playSFX('pickup');
-  }, [sendCoopWs]);
+  }, [sendCoopWs, commitPlayer]);
 
   const handleUpgradeItem = (item: GameItem, useProbabilityStone = false) => {
     if (playMode === 'online' && coopRoom?.status === 'playing') {
@@ -1972,7 +2007,7 @@ export default function App() {
       }
     }
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       if (prev.stats.coins < cost) return prev;
       const newEquipment = { ...prev.equipment };
       let foundInEquip = false;
@@ -2029,7 +2064,7 @@ export default function App() {
     if (!destroyedItemRecovery) return;
     const { item, equipSlot } = destroyedItemRecovery;
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       const nextEq = { ...prev.equipment };
       if (equipSlot && !nextEq[equipSlot]) {
         nextEq[equipSlot] = item;
@@ -2057,7 +2092,7 @@ export default function App() {
     ].slice(0, 30));
     setDestroyedItemRecovery(null);
     soundEngine.playSFX('level_up');
-  }, [destroyedItemRecovery, language]);
+  }, [destroyedItemRecovery, language, commitPlayer]);
 
   const handleDeclineRecoverDestroyedItem = useCallback(() => {
     setDestroyedItemRecovery(null);
@@ -2076,6 +2111,8 @@ export default function App() {
 
     const result = useConsumableItem(curPlayer, curDungeon, item, curTurn);
     refreshFOVIfNeeded(result.dungeon, result.player.x, result.player.y);
+    playerRef.current = result.player;
+    dungeonRef.current = result.dungeon;
     setPlayer(result.player);
     setDungeon(result.dungeon);
     setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
@@ -2104,7 +2141,7 @@ export default function App() {
       return;
     }
 
-    setPlayer(prev => ({
+    commitPlayer(prev => ({
       ...prev,
       inventory: prev.inventory.filter(i => i.id !== item.id)
     }));
@@ -2129,7 +2166,7 @@ export default function App() {
 
     if (!isStone && curPlayer.inventory.length >= curPlayer.maxInventory) return;
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       if (currency === 'coins' && prev.stats.coins < item.value) return prev;
       if (currency !== 'coins' && prev.stats.soulShards < item.value) return prev;
       if (!isStone && prev.inventory.length >= prev.maxInventory) return prev;
@@ -2172,7 +2209,7 @@ export default function App() {
     ].slice(0, 30));
 
     soundEngine.playSFX('chest');
-  }, [sendCoopWs]);
+  }, [sendCoopWs, commitPlayer]);
 
   const handleUnlockSkill = (skillId: string) => {
     const node = SKILL_DATABASE[skillId];
@@ -2184,11 +2221,12 @@ export default function App() {
       return;
     }
 
-    if (!canUnlockSkill(skillId, player.unlockedSkills, player.stats.skillPoints).canUnlock) {
+    const live = playerRef.current;
+    if (!canUnlockSkill(skillId, live.unlockedSkills, live.stats.skillPoints).canUnlock) {
       return;
     }
 
-    setPlayer(prev => {
+    commitPlayer(prev => {
       const nextUnlocked = [...prev.unlockedSkills, skillId];
       const nextPoints = prev.stats.skillPoints - node.pointCost;
 
@@ -2215,7 +2253,7 @@ export default function App() {
     if (node.tier >= 3) {
       setAchievements(prev => prev.map(a => a.id === 'tech_master' ? { ...a, unlocked: true } : a));
     }
-    checkAchievements(dungeon.floor, monstersSlain, player.stats.soulShards);
+    checkAchievements(dungeonRef.current.floor, monstersSlainRef.current, playerRef.current.stats.soulShards);
   };
 
   return (

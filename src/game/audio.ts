@@ -722,19 +722,30 @@ class HybridAcousticAudioEngine {
     if (!this.ctx || !this.musicDryGain || this.isMuted || !this.musicEnabled || this.musicVolume <= 0.01 || this.isMusicPaused) return;
     if (this.ctx.state === 'suspended') return;
 
-    const lookaheadSec = 0.11;
-    // Recover gracefully if tab was backgrounded or unpaused
-    if (this.nextStepTime < this.ctx.currentTime - 0.25) {
-      this.nextStepTime = this.ctx.currentTime + 0.03;
+    const now = this.ctx.currentTime;
+    const lookaheadSec = 0.22;
+
+    // If the main thread stalled, SKIP overdue steps instead of burst-scheduling
+    // past-due notes (that pile-up is what warbles/distorts the soundtrack).
+    if (this.nextStepTime < now - 0.04) {
+      let guard = 0;
+      while (this.nextStepTime < now + 0.02 && guard < 64) {
+        this.nextStepTime += this.getCurrentStepDurationSec();
+        this.step++;
+        guard++;
+      }
     }
 
-    while (this.nextStepTime < this.ctx.currentTime + lookaheadSec) {
+    let scheduled = 0;
+    const maxPerCallback = 4;
+    while (this.nextStepTime < now + lookaheadSec && scheduled < maxPerCallback) {
       const stepDur = this.getCurrentStepDurationSec();
       // Subtle human groove swing on odd 16th notes
       const swingOffset = this.step % 2 === 1 ? stepDur * 0.09 : 0;
       this.scheduleBeatStep(this.step, this.nextStepTime + swingOffset, stepDur);
       this.nextStepTime += stepDur;
       this.step++;
+      scheduled++;
     }
   }
 
