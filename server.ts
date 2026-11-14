@@ -204,11 +204,16 @@ function writeJsonFile() {
   fs.writeFileSync(DB_FILE, JSON.stringify(serialized, null, 2), 'utf8');
 }
 
+/** False until loadDatabaseOrSeed finishes — blocks flush of empty memory onto Neon. */
+let persistenceReady = false;
 let persistTimer: NodeJS.Timeout | null = null;
+
 function schedulePersist() {
+  if (!persistenceReady) return;
   if (persistTimer) return;
   persistTimer = setTimeout(() => {
     persistTimer = null;
+    if (!persistenceReady) return;
     try {
       if (pgStore) {
         void pgStore.save(buildSnapshot());
@@ -222,6 +227,10 @@ function schedulePersist() {
 }
 
 async function flushPersistence() {
+  if (!persistenceReady) {
+    console.warn('[CYBER-CRYPT][db] skip flush — persistence not ready yet');
+    return;
+  }
   if (persistTimer) {
     clearTimeout(persistTimer);
     persistTimer = null;
@@ -332,6 +341,7 @@ async function loadDatabaseOrSeed() {
     }
     if (snap) {
       applyRawState({ ...snap.kv, users: snap.users, cloudSaves: snap.cloudSaves, onlineLoadouts: snap.onlineLoadouts });
+      persistenceReady = true;
       console.log(`[CYBER-CRYPT][db] loaded ${users.size} accounts and ${cloudSaves.size} cloud saves from Neon Postgres`);
       return;
     }
@@ -350,6 +360,7 @@ async function loadDatabaseOrSeed() {
     } else {
       seedDefaults();
     }
+    persistenceReady = true;
     await flushPersistence();
     pgStore.enableRowDeletes();
     return;
@@ -358,9 +369,11 @@ async function loadDatabaseOrSeed() {
   const raw = readJsonFile();
   if (raw) {
     applyRawState(raw);
+    persistenceReady = true;
     return;
   }
   seedDefaults();
+  persistenceReady = true;
   schedulePersist();
 }
 
@@ -440,7 +453,8 @@ app.get('/api/health', (req, res) => {
     timestamp: Date.now(),
     persistence: PERSISTENCE_MODE,
     accounts: users.size,
-    neonHydrated: pgStore ? pgStore.isHydrated : false
+    neonHydrated: pgStore ? pgStore.isHydrated : false,
+    persistenceReady
   });
 });
 
@@ -1559,8 +1573,12 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     shuttingDown = true;
     console.log(`[CYBER-CRYPT] ${sig} received, flushing persistence...`);
     try {
-      await flushPersistence();
-      if (pgStore) await pgStore.close();
+      if (persistenceReady) {
+        await flushPersistence();
+        if (pgStore) await pgStore.close();
+      } else {
+        console.warn('[CYBER-CRYPT][db] shutdown before hydrate — skipping flush to protect Neon');
+      }
     } catch (err) {
       console.error('[CYBER-CRYPT] Flush on shutdown failed:', err);
     }

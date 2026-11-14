@@ -824,9 +824,13 @@ export default function App() {
               return;
             }
           }
-          if (!cancelled) clearAuthSession();
+          // Only drop the session on definitive auth rejection — keep token on
+          // deploy blips / 5xx / network errors so Neon accounts stay signed in.
+          if (!cancelled && (res.status === 401 || res.status === 403)) {
+            clearAuthSession();
+          }
         } catch {
-          if (!cancelled) clearAuthSession();
+          // Transient — keep localStorage token for retry after redeploy
         } finally {
           if (!cancelled) setIsAuthLoading(false);
         }
