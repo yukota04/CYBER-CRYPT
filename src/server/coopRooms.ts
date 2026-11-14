@@ -32,7 +32,7 @@ import {
 import { canUnlockSkill, SKILL_DATABASE } from '../game/skills';
 import {
   attemptUpgradeItem,
-  canClassEquipItem,
+  canEquipItem,
   canUpgradeItem,
   getEquipSlotForItem,
   getItemSellPrice,
@@ -278,7 +278,8 @@ export class CoopRoomManager {
       return { ok: false, error: check.reason };
     }
 
-    const dungeon = generateDungeon(1, seed);
+    const partySize = Math.max(1, room.players.filter(p => p.characterClass).length);
+    const dungeon = generateDungeon(1, seed, { partySize });
     const startRoom = dungeon.rooms[0];
     const startCp = dungeon.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
     const offsets = [
@@ -676,7 +677,8 @@ export class CoopRoomManager {
     // Floor completion transitions whole squad to next level
     if (floorCompleted) {
       const nextFloor = dungeon.floor + 1;
-      const nextDungeon = generateDungeon(nextFloor);
+      const partySize = Math.max(1, room.players.filter(p => p.alive && p.player).length);
+      const nextDungeon = generateDungeon(nextFloor, undefined, { partySize });
       const startRoom = nextDungeon.rooms[0];
       const nextStartCp = nextDungeon.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
       const offsets = [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: -1, dy: 0 }];
@@ -786,7 +788,9 @@ export class CoopRoomManager {
     const p = slot.player;
     const item = p.inventory.find(i => i.id === itemId);
     if (!item) return { ok: false, error: 'ITEM_NOT_FOUND' };
-    if (!canClassEquipItem(p.characterClass, item)) return { ok: false, error: 'CLASS_INCOMPATIBLE' };
+    if (!canEquipItem(p.characterClass, p.stats.level, item)) {
+      return { ok: false, error: 'LEVEL_OR_CLASS_REQUIREMENT' };
+    }
 
     const targetSlot = getEquipSlotForItem(item, p.equipment);
     if (!targetSlot) return { ok: false, error: 'INVALID_SLOT' };

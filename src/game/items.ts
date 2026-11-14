@@ -782,6 +782,33 @@ export const BASE_ITEMS: Record<string, Omit<GameItem, 'id'>> = expandItemCatalo
 
 let itemCounter = 1;
 
+/** Rarity bumps the level gate so high-tier gifts stay locked for low-level players. */
+export function computeRequiredLevel(itemLevel: number, rarity: GameItem['rarity']): number {
+  const ilvl = Math.max(1, itemLevel);
+  const rarityBonus =
+    rarity === 'cyber-relic'
+      ? 4
+      : rarity === 'mythic'
+      ? 3
+      : rarity === 'legendary'
+      ? 2
+      : rarity === 'epic'
+      ? 1
+      : 0;
+  return ilvl + rarityBonus;
+}
+
+export function getItemRequiredLevel(item: GameItem): number {
+  if (item.type === 'consumable') return 1;
+  if (typeof item.requiredLevel === 'number' && item.requiredLevel > 0) return item.requiredLevel;
+  return computeRequiredLevel(item.itemLevel || 1, item.rarity);
+}
+
+export function canMeetItemLevelRequirement(playerLevel: number, item: GameItem): boolean {
+  if (item.type === 'consumable') return true;
+  return playerLevel >= getItemRequiredLevel(item);
+}
+
 export function createItem(key: string, customId?: string, itemLevel = 1): GameItem {
   const base = BASE_ITEMS[key] || BASE_ITEMS['stim_pack'];
   const lvl = Math.max(1, itemLevel);
@@ -797,6 +824,7 @@ export function createItem(key: string, customId?: string, itemLevel = 1): GameI
     energyBonus: base.energyBonus ? Math.round(base.energyBonus * levelMult) : base.energyBonus,
     upgradeLevel: isGear ? 0 : undefined,
     itemLevel: isGear ? lvl : undefined,
+    requiredLevel: isGear ? computeRequiredLevel(lvl, base.rarity) : undefined,
     // Keep English storage name; UI localizes via baseKey + itemLevel/upgradeLevel
     name: base.name,
     id: customId || `item_${key}_${Date.now()}_${itemCounter++}`
@@ -809,6 +837,11 @@ export function canClassEquipItem(cls: CharacterClass, item: GameItem): boolean 
     return item.allowedClasses.includes(cls);
   }
   return true;
+}
+
+/** Class + level gate for equipping gear. */
+export function canEquipItem(cls: CharacterClass, playerLevel: number, item: GameItem): boolean {
+  return canClassEquipItem(cls, item) && canMeetItemLevelRequirement(playerLevel, item);
 }
 
 export function getEquipSlotForItem(item: GameItem, equipment: PlayerEquipment): EquipSlot | null {
