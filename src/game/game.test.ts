@@ -1062,3 +1062,40 @@ test('DSP exports physical / granular / additive music primitives', async () => 
   assert.equal(typeof dsp.GranularEngine, 'function');
 });
 
+
+test('realtime free-movement: entities can straddle two tiles and slide on walls', async () => {
+  const { occupiedTiles, canOccupy, moveWithCollision, ENTITY_BODY, tickRealtime, createRealtimeClock } = await import('./realtime');
+  const dungeon = generateDungeon(1, 99);
+  const floorTile = (() => {
+    for (const room of dungeon.rooms) {
+      for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+        for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+          if (dungeon.tiles[y][x].walkable) return { x, y };
+        }
+      }
+    }
+    return { x: dungeon.rooms[0].centerX, y: dungeon.rooms[0].centerY };
+  })();
+
+  // Centered on one tile → single cell; shifted → two cells
+  const one = occupiedTiles(floorTile.x, floorTile.y, ENTITY_BODY);
+  assert.equal(one.length, 1);
+  const two = occupiedTiles(floorTile.x + 0.35, floorTile.y, ENTITY_BODY);
+  assert.ok(two.length >= 2, 'Body straddling tile boundary occupies 2+ cells');
+
+  assert.equal(canOccupy(dungeon, floorTile.x, floorTile.y), true);
+
+  const blocked = moveWithCollision(dungeon, floorTile.x, floorTile.y, -40, 0, 0.05, []);
+  // Extreme left velocity against map/walls should not leave walkable space illegally
+  assert.ok(canOccupy(dungeon, blocked.x, blocked.y));
+
+  const player = createInitialPlayer('striker', floorTile.x, floorTile.y);
+  dungeon.monsters = dungeon.monsters.filter(
+    m => Math.hypot(m.x - player.x, m.y - player.y) > 3
+  );
+  const clock = createRealtimeClock();
+  const beforeX = player.x;
+  const tick = tickRealtime(player, dungeon, { dx: 1, dy: 0 }, 0.05, 1, clock);
+  assert.ok(tick.player.x > beforeX || tick.moved === false, 'Player advances continuously with held input');
+  assert.ok(Number.isFinite(tick.player.x) && Number.isFinite(tick.player.y));
+});

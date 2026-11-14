@@ -665,7 +665,9 @@ export class CanvasRenderer {
 
     // 2. RENDER MONSTERS (Procedurally Evolving)
     for (const monster of dungeon.monsters) {
-      if (!dungeon.tiles[monster.y]?.[monster.x]?.visible) continue;
+      const mTileX = Math.floor(monster.x + 0.41);
+      const mTileY = Math.floor(monster.y + 0.41);
+      if (!dungeon.tiles[mTileY]?.[mTileX]?.visible) continue;
 
       const mx = monster.x * this.tileSize;
       const my = monster.y * this.tileSize;
@@ -709,10 +711,14 @@ export class CanvasRenderer {
     // 2b. RANGED TARGETING RETICLE & RANGE INDICATOR
     if (hoveredTile) {
       const weaponRange = Math.max(1, Math.min(5, player.equipment.weapon?.attackRange || 1));
-      const dist = Math.max(Math.abs(hoveredTile.x - player.x), Math.abs(hoveredTile.y - player.y));
-      const hoveredMonster = dungeon.monsters.find(
-        m => m.x === hoveredTile.x && m.y === hoveredTile.y && dungeon.tiles[m.y]?.[m.x]?.visible
-      );
+      const pTileX = Math.floor(player.x + 0.41);
+      const pTileY = Math.floor(player.y + 0.41);
+      const dist = Math.max(Math.abs(hoveredTile.x - pTileX), Math.abs(hoveredTile.y - pTileY));
+      const hoveredMonster = dungeon.monsters.find(m => {
+        const mx = Math.floor(m.x + 0.41);
+        const my = Math.floor(m.y + 0.41);
+        return mx === hoveredTile.x && my === hoveredTile.y && dungeon.tiles[my]?.[mx]?.visible;
+      });
       if (hoveredMonster && dist >= 1 && dist <= weaponRange) {
         const pxCenter = player.x * this.tileSize + 16;
         const pyCenter = player.y * this.tileSize + 16;
