@@ -251,7 +251,13 @@ export function collectDeathDropBagsAt(
   let totalStones = 0;
 
   for (const bag of dungeon.deathDrops) {
-    const matchesPos = bag.x === player.x && bag.y === player.y;
+    // Support continuous positions: bag sits on integer tile; player may straddle cells.
+    const px0 = Math.floor(player.x);
+    const py0 = Math.floor(player.y);
+    const px1 = Math.floor(player.x + 0.82 - 1e-4);
+    const py1 = Math.floor(player.y + 0.82 - 1e-4);
+    const matchesPos =
+      bag.x >= px0 && bag.x <= px1 && bag.y >= py0 && bag.y <= py1;
     const matchesOwner = !ownerId || bag.ownerId === ownerId;
     if (!matchesPos || !matchesOwner) {
       remaining.push(bag);
@@ -1052,7 +1058,11 @@ export function resolveRangedAttack(
   let targetIdx = -1;
 
   if (typeof targetX === 'number' && typeof targetY === 'number') {
-    targetIdx = dungeon.monsters.findIndex(m => m.x === targetX && m.y === targetY);
+    targetIdx = dungeon.monsters.findIndex(m => {
+      const mx = Math.floor(m.x + 0.41);
+      const my = Math.floor(m.y + 0.41);
+      return mx === targetX && my === targetY;
+    });
   } else {
     // Auto-select nearest visible enemy within weapon range (1..5 tiles) in line of sight
     let bestScore = Infinity;
@@ -1418,7 +1428,7 @@ function canMonsterMoveTo(x: number, y: number, dungeon: DungeonState, players: 
   return true;
 }
 
-function applyMonsterDamageToPlayer(
+export function applyMonsterDamageToPlayer(
   player: Player,
   dmg: number,
   sourceName: string,

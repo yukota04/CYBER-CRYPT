@@ -58,6 +58,7 @@ import {
 import { soundEngine } from './game/audio';
 import { preloadAdsBitvex } from './game/adsbitvex';
 import { CanvasRenderer, CoopRemoteRenderPlayer } from './game/canvasRenderer';
+import { createRealtimeClock, tickRealtime, type RealtimeClock } from './game/realtime';
 import { Language, t } from './game/i18n';
 
 import { LoginScreen } from './components/LoginScreen';
@@ -239,11 +240,18 @@ export default function App() {
   const remotePlayersRef = useRef<CoopRemoteRenderPlayer[]>([]);
   const hoveredTileRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Live Refs
+  // Live Refs — while offline free-move is active, the sim owns these refs
+  // (avoid React state overwriting mid-frame positions).
   const playerRef = useRef(player);
-  playerRef.current = player;
   const dungeonRef = useRef(dungeon);
-  dungeonRef.current = dungeon;
+  useEffect(() => {
+    if (gameState === 'playing' && playMode === 'offline') return;
+    playerRef.current = player;
+  }, [player, gameState, playMode]);
+  useEffect(() => {
+    if (gameState === 'playing' && playMode === 'offline') return;
+    dungeonRef.current = dungeon;
+  }, [dungeon, gameState, playMode]);
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
   const turnRef = useRef(turn);
@@ -260,6 +268,24 @@ export default function App() {
   difficultyModeRef.current = difficultyMode;
   const selectedClassRef = useRef(selectedClass);
   selectedClassRef.current = selectedClass;
+
+  // Free-movement input (held directions) + realtime combat clock
+  const moveInputRef = useRef({ dx: 0, dy: 0 });
+  const heldMoveKeysRef = useRef<Set<string>>(new Set());
+  const realtimeClockRef = useRef<RealtimeClock>(createRealtimeClock());
+  const hudSyncAccRef = useRef(0);
+  const applyRealtimeResultRef = useRef<(result: ReturnType<typeof tickRealtime>, dt: number) => void>(() => {});
+
+  const syncMoveInputFromKeys = useCallback(() => {
+    const keys = heldMoveKeysRef.current;
+    let dx = 0;
+    let dy = 0;
+    if (keys.has('left')) dx -= 1;
+    if (keys.has('right')) dx += 1;
+    if (keys.has('up')) dy -= 1;
+    if (keys.has('down')) dy += 1;
+    moveInputRef.current = { dx, dy };
+  }, []);
 
   useEffect(() => {
     document.body.dataset.state = gameState;
@@ -741,6 +767,25 @@ export default function App() {
         }
       }
 
+      // Offline free-movement simulation (player + mobs)
+      if (
+        gameStateRef.current === 'playing' &&
+        playModeRef.current === 'offline' &&
+        renderer.getHitstopRemaining() <= 0 &&
+        playerRef.current &&
+        dungeonRef.current
+      ) {
+        const result = tickRealtime(
+          playerRef.current,
+          dungeonRef.current,
+          moveInputRef.current,
+          dt,
+          turnRef.current,
+          realtimeClockRef.current
+        );
+        applyRealtimeResultRef.current(result, dt);
+      }
+
       if (dungeonRef.current && playerRef.current) {
         renderer.render(
           dungeonRef.current,
@@ -1011,12 +1056,14 @@ export default function App() {
   }, [userToken]);
 
   const refreshFOVIfNeeded = useCallback((dng: DungeonState, px: number, py: number, force = false) => {
+    const fx = Math.floor(px + 0.41);
+    const fy = Math.floor(py + 0.41);
     const prev = lastFovPosRef.current;
-    if (!force && prev && prev.x === px && prev.y === py && prev.floor === dng.floor) {
+    if (!force && prev && prev.x === fx && prev.y === fy && prev.floor === dng.floor) {
       return;
     }
-    updateFOV(dng.tiles, px, py, getFovRadius(dng));
-    lastFovPosRef.current = { x: px, y: py, floor: dng.floor };
+    updateFOV(dng.tiles, fx, fy, getFovRadius(dng));
+    lastFovPosRef.current = { x: fx, y: fy, floor: dng.floor };
   }, []);
 
   const saveCheckpoint = useCallback(
@@ -1358,6 +1405,131 @@ export default function App() {
     triggerGameOver
   ]);
 
+  /** Apply one offline free-movement sim result to React state / side effects. */
+  const applyRealtimeOutcome = useCallback(
+    (result: ReturnType<typeof tickRealtime>, dt: number) => {
+      playerRef.current = result.player;
+      dungeonRef.current = result.dungeon;
+
+      const hasEvents =
+        result.logs.length > 0 ||
+        result.soundEvents.length > 0 ||
+        result.gameOver ||
+        result.floorCompleted ||
+        result.openShop ||
+        result.checkpointTriggered ||
+        result.kills > 0 ||
+        result.attackEffects.length > 0;
+
+      hudSyncAccRef.current += dt;
+      if (hasEvents || result.moved || hudSyncAccRef.current >= 0.05) {
+        hudSyncAccRef.current = 0;
+        setPlayer(result.player);
+        setDungeon(result.dungeon);
+      }
+
+      if (result.logs.length > 0) {
+        setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+      }
+
+      handleSoundAndVisuals(
+        result.soundEvents,
+        result.screenShake,
+        result.floatingTexts,
+        result.hitstopSeconds,
+        result.attackEffects
+      );
+
+      if (result.openShop) setShowShop(true);
+      if (result.statusTicks > 0) {
+        setTurn(t => t + result.statusTicks);
+        turnRef.current += result.statusTicks;
+      }
+
+      let nextTotalKills = monstersSlainRef.current;
+      let nextScore = scoreRef.current;
+      if (result.kills > 0) {
+        nextTotalKills = monstersSlainRef.current + result.kills;
+        nextScore = scoreRef.current + result.kills * 150;
+        setMonstersSlain(nextTotalKills);
+        setScore(nextScore);
+        checkAchievements(result.dungeon.floor, nextTotalKills, result.player.stats.soulShards);
+      }
+
+      const curTurn = turnRef.current;
+      if (result.checkpointTriggered) {
+        saveCheckpoint(result.player, result.dungeon, nextScore, nextTotalKills, curTurn);
+      }
+
+      if (result.floorCompleted) {
+        const nextFloor = result.dungeon.floor + 1;
+        const newDungeonState = generateDungeon(nextFloor);
+        const startRoom = newDungeonState.rooms[0];
+        const nextStartCp =
+          newDungeonState.checkpoints[0] || {
+            x: startRoom.centerX,
+            y: startRoom.centerY,
+            activated: true
+          };
+
+        result.player.x = startRoom.centerX;
+        result.player.y = startRoom.centerY;
+        result.player.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
+        refreshFOVIfNeeded(newDungeonState, result.player.x, result.player.y, true);
+
+        realtimeClockRef.current = createRealtimeClock();
+        playerRef.current = result.player;
+        dungeonRef.current = newDungeonState;
+        setDungeon(newDungeonState);
+        setPlayer(result.player);
+        setShowShop(false);
+        setScore(nextScore + 500);
+        setTurn(t => t + 1);
+        saveCheckpoint(result.player, newDungeonState, nextScore + 500, nextTotalKills, curTurn + 1);
+
+        if (newDungeonState.activeEvent) {
+          setCombatLogs(prev =>
+            [
+              {
+                id: `env_banner_${Date.now()}`,
+                text: `${newDungeonState.activeEvent!.icon} EVENT TRIGGERED: ${newDungeonState.activeEvent!.name} — ${newDungeonState.activeEvent!.effectText}`,
+                type: 'level_up' as const,
+                turn: curTurn + 1
+              },
+              ...prev
+            ].slice(0, 30)
+          );
+        }
+        checkAchievements(nextFloor, nextTotalKills, result.player.stats.soulShards);
+        return;
+      }
+
+      if (result.gameOver) {
+        triggerGameOver(
+          result.player,
+          result.dungeon,
+          result.dungeon.floor,
+          curTurn,
+          nextTotalKills,
+          nextScore
+        );
+      }
+    },
+    [
+      handleSoundAndVisuals,
+      checkAchievements,
+      refreshFOVIfNeeded,
+      saveCheckpoint,
+      triggerGameOver
+    ]
+  );
+
+  useEffect(() => {
+    applyRealtimeResultRef.current = (result, dt) => {
+      applyRealtimeOutcome(result, dt);
+    };
+  }, [applyRealtimeOutcome]);
+
   // Cast Active Skill
   const handleCastSkill = useCallback((skillId: string) => {
     if (gameStateRef.current !== 'playing') return;
@@ -1376,6 +1548,8 @@ export default function App() {
     const result = executeSkill(curPlayer, curDungeon, skillId, curTurn);
     refreshFOVIfNeeded(result.dungeon, result.player.x, result.player.y);
 
+    playerRef.current = result.player;
+    dungeonRef.current = result.dungeon;
     setPlayer(result.player);
     setDungeon(result.dungeon);
     setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
@@ -1432,6 +1606,8 @@ export default function App() {
       }
 
       refreshFOVIfNeeded(result.dungeon, result.player.x, result.player.y);
+      playerRef.current = result.player;
+      dungeonRef.current = result.dungeon;
       setPlayer(result.player);
       setDungeon(result.dungeon);
       setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
@@ -1526,11 +1702,18 @@ export default function App() {
       scene: 'playing',
       floor: restoredDungeon.floor,
       nearbyEnemies: nearby,
-      bossVisible: restoredDungeon.monsters.some(
-        m => m.archetype === 'core_synthesizer' && (m.alerted || restoredDungeon.tiles[m.y]?.[m.x]?.visible)
-      ),
+      bossVisible: restoredDungeon.monsters.some(m => {
+        const mx = Math.floor(m.x + 0.41);
+        const my = Math.floor(m.y + 0.41);
+        return m.archetype === 'core_synthesizer' && (m.alerted || restoredDungeon.tiles[my]?.[mx]?.visible);
+      }),
       lowHp: restoredPlayer.stats.hp <= restoredPlayer.stats.maxHp * 0.3
     });
+    realtimeClockRef.current = createRealtimeClock();
+    moveInputRef.current = { dx: 0, dy: 0 };
+    heldMoveKeysRef.current.clear();
+    playerRef.current = restoredPlayer;
+    dungeonRef.current = restoredDungeon;
     setGameState('playing');
     soundEngine.startMusic();
   }, [savedOfflineRuns, refreshFOVIfNeeded, requestNativeFullscreen]);
@@ -1569,6 +1752,11 @@ export default function App() {
       { id: 'start_run', text: `DEPLOYED: Operative ${newPlayer.characterClass.toUpperCase()} initialized on Floor 1 (${activeDiff.toUpperCase()}).`, type: 'info', turn: 1 }
     ]);
     saveCheckpoint(newPlayer, newDungeon, 0, 0, 1);
+
+    realtimeClockRef.current = createRealtimeClock();
+    moveInputRef.current = { dx: 0, dy: 0 };
+    playerRef.current = newPlayer;
+    dungeonRef.current = newDungeon;
 
     soundEngine.setMusicContext({
       scene: 'playing',
@@ -1617,6 +1805,8 @@ export default function App() {
           if (showShop) { setShowShop(false); return; }
           if (showInventory) { setUpgradeFeedback(null); setShowInventory(false); return; }
           if (showSkillTree) { setShowSkillTree(false); return; }
+          heldMoveKeysRef.current.clear();
+          moveInputRef.current = { dx: 0, dy: 0 };
           setGameState('paused');
         } else if (state === 'paused') {
           setGameState('playing');
@@ -1646,21 +1836,37 @@ export default function App() {
           return;
         }
 
-        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+        const dirFromKey = (key: string): 'up' | 'down' | 'left' | 'right' | null => {
+          if (key === 'w' || key === 'W' || key === 'ArrowUp') return 'up';
+          if (key === 's' || key === 'S' || key === 'ArrowDown') return 'down';
+          if (key === 'a' || key === 'A' || key === 'ArrowLeft') return 'left';
+          if (key === 'd' || key === 'D' || key === 'ArrowRight') return 'right';
+          return null;
+        };
+
+        const dir = dirFromKey(e.key);
+        if (dir) {
           e.preventDefault();
-          handlePlayerMove(0, -1);
-        } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+          if (e.repeat) return;
+          if (playModeRef.current === 'online') {
+            const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+            const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+            handlePlayerMove(dx, dy);
+          } else {
+            heldMoveKeysRef.current.add(dir);
+            syncMoveInputFromKeys();
+          }
+          return;
+        }
+
+        if (e.key === ' ' || e.key === '.') {
           e.preventDefault();
-          handlePlayerMove(0, 1);
-        } else if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
-          e.preventDefault();
-          handlePlayerMove(-1, 0);
-        } else if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
-          e.preventDefault();
-          handlePlayerMove(1, 0);
-        } else if (e.key === ' ' || e.key === '.') {
-          e.preventDefault();
-          handlePlayerMove(0, 0);
+          if (playModeRef.current === 'online') handlePlayerMove(0, 0);
+          else {
+            heldMoveKeysRef.current.clear();
+            moveInputRef.current = { dx: 0, dy: 0 };
+          }
+          return;
         }
 
         if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(e.key)) {
@@ -1679,9 +1885,37 @@ export default function App() {
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (playModeRef.current === 'online') return;
+      const dir =
+        e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp'
+          ? 'up'
+          : e.key === 's' || e.key === 'S' || e.key === 'ArrowDown'
+            ? 'down'
+            : e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft'
+              ? 'left'
+              : e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight'
+                ? 'right'
+                : null;
+      if (!dir) return;
+      heldMoveKeysRef.current.delete(dir);
+      syncMoveInputFromKeys();
+    };
+
+    const clearMoveOnBlur = () => {
+      heldMoveKeysRef.current.clear();
+      moveInputRef.current = { dx: 0, dy: 0 };
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleStartGame, handlePlayerMove, handleCastSkill, handleRangedAttack, showShop, showInventory, showSkillTree]);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', clearMoveOnBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', clearMoveOnBlur);
+    };
+  }, [handleStartGame, handlePlayerMove, handleCastSkill, handleRangedAttack, showShop, showInventory, showSkillTree, syncMoveInputFromKeys]);
 
   // Inventory Actions (10-slot Equipment + Class Weapon Guard + Coins Forge Upgrade)
   const handleEquipItem = (item: GameItem) => {
@@ -2075,7 +2309,11 @@ export default function App() {
             return;
           }
 
-          const targetMonster = curDungeon.monsters.find(m => m.x === tile.x && m.y === tile.y);
+          const targetMonster = curDungeon.monsters.find(m => {
+            const mx = Math.floor(m.x + 0.41);
+            const my = Math.floor(m.y + 0.41);
+            return mx === tile.x && my === tile.y;
+          });
           if (targetMonster && curDungeon.tiles[tile.y]?.[tile.x]?.visible) {
             const maxRange = getPlayerAttackRange(curPlayer);
             const dist = Math.max(Math.abs(tile.x - curPlayer.x), Math.abs(tile.y - curPlayer.y));
@@ -2198,7 +2436,24 @@ export default function App() {
             player={player}
             dungeon={dungeon}
             onMove={handlePlayerMove}
-            onWaitTurn={() => handlePlayerMove(0, 0)}
+            onMoveHold={(dx, dy, pressed) => {
+              if (playModeRef.current === 'online') {
+                if (pressed) handlePlayerMove(dx, dy);
+                return;
+              }
+              const dir = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : dx > 0 ? 'right' : null;
+              if (!dir) return;
+              if (pressed) heldMoveKeysRef.current.add(dir);
+              else heldMoveKeysRef.current.delete(dir);
+              syncMoveInputFromKeys();
+            }}
+            onWaitTurn={() => {
+              if (playModeRef.current === 'online') handlePlayerMove(0, 0);
+              else {
+                heldMoveKeysRef.current.clear();
+                moveInputRef.current = { dx: 0, dy: 0 };
+              }
+            }}
             onOpenInventory={() => {
               soundEngine.playUI('open');
               setShowInventory(true);
