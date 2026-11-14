@@ -4,6 +4,7 @@ import { Language, t } from '../game/i18n';
 import { CanvasButton } from './CanvasButton';
 import { showAdsBitvexRewarded } from '../game/adsbitvex';
 import { Skull, ShieldCheck, Tv } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 
 interface GameOverModalProps {
   snapshot: RunSnapshot;
@@ -197,7 +198,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <div className="p-3 rounded-lg bg-[#0e0a20] border border-cyan-500/20 text-left">
                 <span className="text-[10px] text-slate-400 uppercase font-bold">{t('coins', language)} / {t('shards', language)}</span>
                 <div className="text-sm font-bold text-yellow-300 tabular-nums">
-                  🪙 {snapshot.coins || 0} · 💎 {snapshot.soulShards}
+                  <GameIcon id="currency.coins" fallback="🪙" size={14} /> {snapshot.coins || 0} · <GameIcon id="currency.soul_shards" fallback="💎" size={14} /> {snapshot.soulShards}
                 </div>
               </div>
             </div>

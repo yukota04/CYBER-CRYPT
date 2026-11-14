@@ -13,6 +13,7 @@ import {
   Lock,
   Crosshair,
 } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 
 interface GameHUDProps {
   player: Player;
@@ -75,11 +76,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const aliveCount = coopRoom?.players.filter(p => p.alive).length || 0;
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 sm:p-5 select-none font-mono">
+    <div className="fixed inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 sm:p-5 select-none cc-font">
       {/* TOP BAR */}
       <div className="flex items-start justify-between w-full gap-1.5 sm:gap-2">
         {/* Top-Left Status Cluster */}
-        <div className="flex flex-col gap-1 sm:gap-1.5 p-2 sm:p-3 rounded-lg bg-[#0a0718]/85 border border-cyan-500/30 shadow-[0_4px_12px_rgba(0,0,0,0.5)] pointer-events-auto max-w-[192px] sm:max-w-sm">
+        <div className="cc-panel flex flex-col gap-1 sm:gap-1.5 p-2 sm:p-3 pointer-events-auto max-w-[200px] sm:max-w-sm">
           <div className="flex items-center justify-between text-xs text-cyan-300 gap-2">
             <span className="font-bold tracking-wider uppercase text-white flex items-center gap-1.5 truncate">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
@@ -111,9 +112,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 {player.stats.hp} / {totals.maxHp} HP
               </span>
             </div>
-            <div className="w-full h-3 bg-slate-900 rounded-sm overflow-hidden border border-pink-500/30 relative">
+            <div className="cc-bar w-full h-3 rounded-sm border-pink-500/40 relative">
               <div
-                className="h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all duration-200"
+                className="cc-bar-fill bg-gradient-to-r from-red-600 via-pink-500 to-fuchsia-400 shadow-[0_0_8px_rgba(255,0,127,0.55)]"
                 style={{ width: `${hpPercent * 100}%` }}
               />
               {player.buffs.shieldAmount > 0 && (
@@ -133,9 +134,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 {player.stats.energy} / {totals.maxEnergy} NRG
               </span>
             </div>
-            <div className="w-full h-2.5 bg-slate-900 rounded-sm overflow-hidden border border-cyan-500/30">
+            <div className="cc-bar w-full h-2.5 rounded-sm border-cyan-500/40">
               <div
-                className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-200"
+                className="cc-bar-fill bg-gradient-to-r from-cyan-700 via-cyan-400 to-sky-200 shadow-[0_0_8px_rgba(0,240,255,0.55)]"
                 style={{ width: `${energyPercent * 100}%` }}
               />
             </div>
@@ -145,15 +146,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-[10px] text-slate-300 gap-2">
             <div className="flex items-center gap-1.5 flex-1">
               <span className="text-purple-400">{t('exp', language)}</span>
-              <div className="w-full h-1.5 bg-slate-900 rounded overflow-hidden">
-                <div className="h-full bg-purple-500" style={{ width: `${expPercent * 100}%` }} />
+              <div className="cc-bar w-full h-1.5 rounded">
+                <div className="cc-bar-fill bg-gradient-to-r from-purple-600 to-fuchsia-400" style={{ width: `${expPercent * 100}%` }} />
               </div>
             </div>
-            <div data-testid="hud-coins" className="text-yellow-300 font-bold whitespace-nowrap">
-              🪙 {player.stats.coins}
+            <div data-testid="hud-coins" className="text-yellow-300 font-bold whitespace-nowrap flex items-center gap-1">
+              <GameIcon id="currency.coins" fallback="🪙" size={14} /> {player.stats.coins}
             </div>
-            <div className="text-cyan-300 font-bold whitespace-nowrap">
-              💎 {player.stats.soulShards}
+            <div className="text-cyan-300 font-bold whitespace-nowrap flex items-center gap-1">
+              <GameIcon id="currency.soul_shards" fallback="💎" size={14} /> {player.stats.soulShards}
             </div>
           </div>
 
@@ -186,12 +187,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <div className="flex flex-wrap gap-1 text-[9px] font-bold">
               {player.buffs.regenTurns > 0 && (
                 <span className="px-1.5 py-0.5 rounded bg-emerald-950/75 border border-emerald-400/50 text-emerald-300">
-                  🌿 +{player.buffs.regenHpPerTurn}HP ({player.buffs.regenTurns}T)
+                  <><GameIcon id="status.regen" fallback="🌿" size={12} /> +{player.buffs.regenHpPerTurn}HP ({player.buffs.regenTurns}T)</>
                 </span>
               )}
               {player.buffs.overclockTurns > 0 && (
                 <span className="px-1.5 py-0.5 rounded bg-pink-950/75 border border-pink-400/50 text-pink-300">
-                  ⚡ CRIT 100% ({player.buffs.overclockTurns}T)
+                  <><GameIcon id="status.overclock" fallback="⚡" size={12} /> CRIT 100% ({player.buffs.overclockTurns}T)</>
                 </span>
               )}
             </div>
@@ -210,7 +211,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               }}
             >
               <div className="font-bold flex items-center gap-1 uppercase tracking-wide">
-                <span>{dungeon.activeEvent.icon}</span>
+                <GameIcon id={`event.${dungeon.activeEvent.id}`} fallback={dungeon.activeEvent.icon} size={14} />
                 <span className="truncate">{dungeon.activeEvent.name}</span>
               </div>
               <div className="text-slate-200 text-[8px] sm:text-[9px] mt-0.5 hidden sm:block">{dungeon.activeEvent.effectText}</div>
@@ -239,16 +240,16 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             aria-label="Toggle Minimap"
             aria-pressed={showMinimap}
           >
-            <Compass className="w-6 h-6 sm:w-6 sm:h-6" />
+            <GameIcon id="ui.hud.minimap" fallback={<Compass className="w-6 h-6" />} size={24} />
           </button>
 
           <button
             onClick={onOpenInventory}
-            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/80 hover:border-cyan-300 transition cursor-pointer relative"
+            className="cc-btn p-2.5 sm:p-3 rounded-xl text-cyan-300 relative"
             title={`${t('inventoryTitle', language)} [I]`}
             aria-label="Open Inventory"
           >
-            <Backpack className="w-6 h-6" />
+            <GameIcon id="ui.hud.inventory" fallback={<Backpack className="w-6 h-6" />} size={24} />
             {player.inventory.length > 0 && (
               <span className="absolute -top-1 -right-1 px-1.5 text-[10px] font-bold bg-pink-600 text-white rounded-full">
                 {player.inventory.length}
@@ -258,11 +259,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           <button
             onClick={onOpenSkillTree}
-            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/80 hover:border-purple-300 transition cursor-pointer relative"
+            className="cc-btn cc-btn-magenta p-2.5 sm:p-3 rounded-xl text-purple-300 relative"
             title={`${t('techTreeTitle', language)} [K]`}
             aria-label="Open Skill Tree"
           >
-            <Sparkles className="w-6 h-6" />
+            <GameIcon id="ui.hud.skill_tree" fallback={<Sparkles className="w-6 h-6" />} size={24} />
             {player.stats.skillPoints > 0 && (
               <span className="absolute -top-1 -right-1 px-1.5 text-[10px] font-bold bg-amber-500 text-black rounded-full animate-bounce">
                 +{player.stats.skillPoints}
@@ -272,27 +273,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           <button
             onClick={onToggleMute}
-            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer"
+            className="cc-btn p-2.5 sm:p-3 rounded-xl text-slate-300"
             title={`${t('toggleAudio', language)} [N]`}
             aria-label="Toggle Sound"
           >
-            {isMuted ? <VolumeX className="w-6 h-6 text-red-400" /> : <Volume2 className="w-6 h-6 text-cyan-400" />}
+            {isMuted ? <GameIcon id="ui.hud.mute" fallback={<VolumeX className="w-6 h-6 text-red-400" />} size={24} /> : <GameIcon id="ui.hud.unmute" fallback={<Volume2 className="w-6 h-6 text-cyan-400" />} size={24} />}
           </button>
 
           <button
             onClick={onPause}
-            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer"
+            className="cc-btn p-2.5 sm:p-3 rounded-xl text-slate-300"
             title={`${t('pauseTitle', language)} [Esc / P]`}
             aria-label="Pause Game"
           >
-            <Pause className="w-6 h-6 text-slate-200" />
+            <GameIcon id="ui.hud.pause" fallback={<Pause className="w-6 h-6 text-slate-200" />} size={24} />
           </button>
         </div>
       </div>
 
       {/* BOTTOM CLUSTER */}
       <div className="flex flex-col sm:flex-row items-end justify-between w-full gap-3">
-        <div className="hidden sm:flex items-center gap-1.5 pointer-events-auto p-2 rounded-lg bg-[#0a0718]/85 border border-cyan-500/30">
+        <div className="cc-panel hidden sm:flex items-center gap-1.5 pointer-events-auto p-2">
           <button
             data-testid="hud-ranged-btn"
             onClick={() => !localCoopSlot?.movedThisTurn && onRangedAttack()}
@@ -306,7 +307,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             }`}
           >
             <span className="text-[9px] font-bold text-amber-300 leading-none">[F]</span>
-            <Crosshair className="w-4 h-4 my-0.5 text-amber-300" />
+            <GameIcon id="ui.hud.ranged" fallback={<Crosshair className="w-4 h-4 my-0.5 text-amber-300" />} size={22} className="my-0.5" />
             <span className="text-[9px] font-bold leading-none">RNG {attackRange}</span>
           </button>
 
@@ -323,12 +324,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 onClick={() => isReady && onCastSkill(skill.id)}
                 disabled={!isReady}
                 aria-label={`${skill.name} (${energyNeeded} NRG)`}
-                className={`relative flex flex-col items-center justify-center w-13 h-14 rounded border transition cursor-pointer ${
-                  !isUnlocked
-                    ? 'opacity-40 border-slate-700 bg-slate-900/50 cursor-not-allowed'
-                    : isReady
-                    ? 'border-cyan-400 bg-cyan-950/50 hover:bg-cyan-900/80 shadow-[0_0_10px_rgba(0,240,255,0.3)]'
-                    : 'opacity-60 border-slate-700 bg-slate-900/60 cursor-not-allowed'
+                data-ready={isReady ? 'true' : 'false'}
+                className={`cc-hotbar-slot relative w-13 h-14 rounded cursor-pointer ${
+                  !isUnlocked ? 'opacity-40 cursor-not-allowed' : isReady ? '' : 'cursor-not-allowed'
                 }`}
                 title={`${skill.name} (${energyNeeded} NRG) - ${skill.description}`}
               >
@@ -338,7 +336,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 <span className="absolute top-0.5 right-1 text-[9px] font-mono text-cyan-400">
                   {energyNeeded}e
                 </span>
-                <span className="text-xl mt-1">{skill.icon}</span>
+                <GameIcon id={skill.id} fallback={skill.icon} size={28} className="mt-1" />
                 {cd > 0 && (
                   <div className="absolute inset-0 bg-black/75 rounded flex items-center justify-center font-bold text-pink-400 text-sm">
                     {cd}t
@@ -349,7 +347,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           })}
         </div>
 
-        <div className="w-full sm:max-w-md h-9 sm:h-24 overflow-hidden px-2 py-1 sm:p-2.5 rounded-lg bg-[#0a0718]/90 border border-slate-700/60 text-[10px] sm:text-[11px] leading-relaxed flex flex-col-reverse justify-start pointer-events-auto">
+        <div className="cc-panel w-full sm:max-w-md h-9 sm:h-24 overflow-hidden px-2 py-1 sm:p-2.5 text-[10px] sm:text-[11px] leading-relaxed flex flex-col-reverse justify-start pointer-events-auto">
           {combatLogs.slice(0, 4).map((log, i) => {
             let color = 'text-slate-300';
             if (log.type === 'critical') color = 'text-pink-400 font-bold';
