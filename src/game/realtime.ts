@@ -370,17 +370,6 @@ export function moveWithCollision(
   return { x: clampX(nx), y: clampY(ny), hitWall };
 }
 
-function clonePlayer(player: Player): Player {
-  return {
-    ...player,
-    stats: { ...player.stats },
-    buffs: { ...player.buffs },
-    activeCooldowns: { ...player.activeCooldowns },
-    equipment: { ...player.equipment },
-    inventory: [...player.inventory]
-  };
-}
-
 /**
  * Hot-path dungeon handle: KEEP the same tile grid reference.
  * Deep-cloning thousands of tiles every rAF frame was the main lag source
