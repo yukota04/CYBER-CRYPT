@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DifficultyMode, RunSnapshot } from '../game/types';
 import { Language, t } from '../game/i18n';
 import { CanvasButton } from './CanvasButton';
+import { showAdsBitvexRewarded } from '../game/adsbitvex';
 import { Skull, ShieldCheck, Tv } from 'lucide-react';
 
 interface GameOverModalProps {
@@ -18,11 +19,7 @@ interface GameOverModalProps {
   language: Language;
 }
 
-const SPONSOR_ADS = [
-  { brand: 'HYPERION BIOTECH', tagline: 'Quantum Nanite Tissue Reconstructor v9.2' },
-  { brand: 'CHRONOS ENERGY CORP', tagline: 'Zero-Latency Neural Capacitor Boost' },
-  { brand: 'AETHER-GRID SYNDICATE', tagline: 'Tactical Field Defibrillator Uplinks' }
-];
+type AdPhase = 'idle' | 'loading' | 'playing' | 'error';
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
   snapshot,
@@ -38,39 +35,66 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   language
 }) => {
   const canReviveCheckpoint = (difficultyMode === 'normal' || isOnlineCoop) && hasCheckpoint;
-  const [isWatchingAd, setIsWatchingAd] = useState(false);
+  const [adPhase, setAdPhase] = useState<AdPhase>('idle');
   const [adProgress, setAdProgress] = useState(0);
-  const [sponsorIdx, setSponsorIdx] = useState(0);
+  const [adError, setAdError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    if (!isWatchingAd) return;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
 
+  // Indeterminate progress while waiting for the AdsBitvex creative to appear
+  useEffect(() => {
+    if (adPhase !== 'loading' && adPhase !== 'playing') return;
     const interval = setInterval(() => {
       setAdProgress(prev => {
-        const next = Math.min(100, prev + 6);
-        if (next >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsWatchingAd(false);
-            setAdProgress(0);
-            onReviveInPlace();
-          }, 150);
-        }
-        return next;
+        if (adPhase === 'playing') return Math.min(96, prev + 1.2);
+        // Slow crawl until the SDK launches the ad UI
+        return Math.min(88, prev + (prev < 40 ? 4 : prev < 70 ? 2 : 0.6));
       });
-    }, 90);
-
+    }, 120);
     return () => clearInterval(interval);
-  }, [isWatchingAd, onReviveInPlace]);
+  }, [adPhase]);
 
-  const handleStartAdRevive = () => {
-    if (isWatchingAd) return;
-    setSponsorIdx(prev => (prev + 1) % SPONSOR_ADS.length);
+  const handleStartAdRevive = async () => {
+    if (adPhase === 'loading' || adPhase === 'playing') return;
+    cancelledRef.current = false;
+    setAdError(null);
+    setAdProgress(6);
+    setAdPhase('loading');
+
+    const result = await showAdsBitvexRewarded({
+      onAdLaunching: () => {
+        if (!cancelledRef.current) {
+          setAdPhase('playing');
+          setAdProgress(prev => Math.max(prev, 55));
+        }
+      }
+    });
+
+    if (cancelledRef.current) return;
+
+    if (result.ok) {
+      setAdProgress(100);
+      setAdPhase('idle');
+      setAdProgress(0);
+      onReviveInPlace();
+      return;
+    }
+
+    setAdPhase('error');
+    setAdError(
+      language === 'es'
+        ? 'Anuncio no disponible. Inténtalo de nuevo.'
+        : 'Ad unavailable. Please try again.'
+    );
     setAdProgress(0);
-    setIsWatchingAd(true);
   };
 
-  const sponsor = SPONSOR_ADS[sponsorIdx];
+  const isWatchingAd = adPhase === 'loading' || adPhase === 'playing';
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm select-none font-mono">
@@ -96,12 +120,22 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
             <div className="w-full p-4 rounded-xl bg-gradient-to-br from-amber-950/50 via-[#120d26] to-cyan-950/50 border border-amber-400/40">
               <div className="text-[10px] text-cyan-300 uppercase tracking-widest mb-1">
-                SPONSORED TRANSMISSION
+                ADSBITVEX · REWARDED
               </div>
               <div className="text-base font-bold text-white tracking-wider">
-                {sponsor.brand}
+                {adPhase === 'loading'
+                  ? language === 'es'
+                    ? 'Preparando anuncio…'
+                    : 'Preparing ad…'
+                  : language === 'es'
+                    ? 'Anuncio en curso'
+                    : 'Ad playing'}
               </div>
-              <div className="text-xs text-slate-300 mt-1">{sponsor.tagline}</div>
+              <div className="text-xs text-slate-300 mt-1">
+                {language === 'es'
+                  ? 'Mantén esta pantalla hasta que aparezca el anuncio.'
+                  : 'Keep this screen open until the ad appears.'}
+              </div>
             </div>
 
             <p className="text-xs text-slate-300">{t('adLoadingDesc', language)}</p>
@@ -109,11 +143,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             <div className="w-full">
               <div className="flex justify-between text-[11px] font-bold text-amber-300 mb-1">
                 <span>AD STREAM</span>
-                <span>{adProgress}%</span>
+                <span>{Math.round(adProgress)}%</span>
               </div>
               <div className="w-full h-3 rounded-full bg-slate-900 border border-amber-500/40 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-400 transition-all duration-75"
+                  className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-400 transition-all duration-100"
                   style={{ width: `${adProgress}%` }}
                 />
               </div>
@@ -174,6 +208,15 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               </div>
             )}
 
+            {adError && (
+              <div
+                data-testid="ad-error-banner"
+                className="w-full mb-3 px-3 py-2 rounded-lg bg-rose-950/60 border border-rose-400/50 text-[11px] text-rose-200"
+              >
+                {adError}
+              </div>
+            )}
+
             <div className="flex flex-col gap-3 w-full items-center">
               {canReviveWithAd && (
                 <div className="flex flex-col items-center gap-1 w-full">
@@ -185,7 +228,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                     width={340}
                     height={54}
                     data-testid="revive-ad-btn"
-                    onClick={handleStartAdRevive}
+                    onClick={() => {
+                      void handleStartAdRevive();
+                    }}
                   />
                 </div>
               )}

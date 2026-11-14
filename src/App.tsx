@@ -56,6 +56,7 @@ import {
   getUpgradeCost
 } from './game/items';
 import { soundEngine } from './game/audio';
+import { preloadAdsBitvex } from './game/adsbitvex';
 import { CanvasRenderer, CoopRemoteRenderPlayer } from './game/canvasRenderer';
 import { Language, t } from './game/i18n';
 
@@ -278,6 +279,7 @@ export default function App() {
     let audioBooted = false;
     const unlockAudio = () => {
       soundEngine.unlockFromGesture();
+      preloadAdsBitvex();
       if (!audioBooted) {
         audioBooted = true;
         soundEngine.startMusic();
