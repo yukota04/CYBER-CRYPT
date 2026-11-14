@@ -3,11 +3,15 @@ import {
   Monster,
   MonsterArchetype,
   MonsterVisualVariant,
+  PendingMonsterSpawn,
   Room,
   Tile
 } from './types';
 import { generateRandomLoot } from './items';
 import { getEnvironmentalEventForFloor, generateShopItems } from './events';
+
+/** Diamonds (soul shards) drop at 20% of previous rates (−80%). */
+const SHARD_DROP_MULT = 0.2;
 
 export interface DungeonConfig {
   width: number;
@@ -305,17 +309,20 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     }
   }
 
-  // Balanced progressive monster scaling
+  // Lazy spawn: blueprints sit in pendingSpawns until the player approaches
   const monsters: Monster[] = [];
+  const pendingSpawns: PendingMonsterSpawn[] = [];
   let monsterIdCount = 1;
   const hpCurve = 1 + (floor - 1) * 0.25 + Math.pow(Math.max(0, floor - 1), 1.28) * 0.03;
   const atkScale = Math.floor((floor - 1) * 2.1);
   const defScale = Math.floor((floor - 1) * 1.1);
   const rewardScale = 1 + (floor - 1) * 0.24;
 
-  // Monster count per room scales progressively with floor (denser than before)
   const minPerRoom = 2 + Math.floor((floor - 1) / 3);
   const maxPerRoom = Math.min(8, 3 + Math.floor((floor - 1) / 2));
+
+  const occupiedPending = (mx: number, my: number) =>
+    pendingSpawns.some(mon => Math.floor(mon.x) === mx && Math.floor(mon.y) === my);
 
   for (let i = 1; i < rooms.length; i++) {
     const room = rooms[i];
@@ -325,7 +332,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
       const bossIdNum = monsterIdCount++;
       const variant = buildMonsterVisualVariant(floor, 'core_synthesizer', bossIdNum);
       const bossHp = Math.round(135 * hpCurve);
-      monsters.push({
+      pendingSpawns.push({
         id: `boss_${floor}_${bossIdNum}`,
         name: `${variant.evolvedPrefix}CORE SYNTHESIZER MK-${floor}`,
         level: floor + 4,
@@ -337,8 +344,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         attack: 16 + Math.floor(floor * 3.2),
         defense: 9 + Math.floor(floor * 1.6),
         expReward: Math.round(145 * rewardScale),
-        shardReward: Math.round(40 * rewardScale),
-        alerted: true,
+        shardReward: Math.max(1, Math.round(40 * rewardScale * SHARD_DROP_MULT)),
         color: variant.primaryColor,
         symbol: 'Ω',
         visualVariant: variant.visualVariant
@@ -349,7 +355,6 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
       ? Math.min(5, 2 + Math.floor(floor / 4))
       : Math.floor(rng() * (maxPerRoom - minPerRoom + 1)) + minPerRoom;
 
-    // Retry placement so denser spawns don't collapse when tiles collide
     let placed = 0;
     let attempts = 0;
     const maxAttempts = numMonsters * 8;
@@ -361,9 +366,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
       if (!tiles[my][mx].walkable || (mx === stairsPos.x && my === stairsPos.y)) {
         continue;
       }
-      if (monsters.some(mon => Math.floor(mon.x) === mx && Math.floor(mon.y) === my)) {
-        continue;
-      }
+      if (occupiedPending(mx, my)) continue;
 
       const archetypeRoll = rng();
       let archetype: MonsterArchetype = 'glitch_swarmer';
@@ -375,7 +378,6 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
       let baseExp = 20;
       let baseShard = 5;
 
-      // Higher floors unlock stronger archetype weightings smoothly
       const eliteBias = Math.min(0.25, (floor - 1) * 0.03);
       if (archetypeRoll > 0.78 - eliteBias) {
         archetype = 'cyber_behemoth';
@@ -418,7 +420,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
           ? floor + 1
           : floor;
 
-      monsters.push({
+      pendingSpawns.push({
         id: `mob_${floor}_${idNum}`,
         name: `${variant.evolvedPrefix}${baseName}`,
         level: monsterLevel,
@@ -430,8 +432,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         attack,
         defense,
         expReward: Math.round(baseExp * rewardScale),
-        shardReward: Math.round(baseShard * rewardScale),
-        alerted: false,
+        shardReward: Math.max(1, Math.round(baseShard * rewardScale * SHARD_DROP_MULT)),
         color: variant.primaryColor,
         symbol,
         visualVariant: variant.visualVariant
@@ -470,13 +471,14 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
 
   const shopItems = generateShopItems(floor, activeEvent?.id === 'black_market');
 
-  return {
+  const dungeon: DungeonState = {
     floor,
     width,
     height,
     tiles,
     rooms,
     monsters,
+    pendingSpawns,
     stairsPos,
     activeEvent,
     shopItems,
@@ -484,6 +486,37 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     checkpoints,
     deathDrops: []
   };
+  // Wake creatures near the spawn room so the first chamber feels alive without loading the whole floor
+  activateNearbySpawns(dungeon, startRoom.centerX, startRoom.centerY, 12);
+  return dungeon;
+}
+
+/** Activate pending monsters within `radius` tiles of the player. */
+export function activateNearbySpawns(
+  dungeon: DungeonState,
+  playerX: number,
+  playerY: number,
+  radius = 11
+): number {
+  if (!dungeon.pendingSpawns || dungeon.pendingSpawns.length === 0) return 0;
+  const r2 = radius * radius;
+  const keep: PendingMonsterSpawn[] = [];
+  let activated = 0;
+  for (const spawn of dungeon.pendingSpawns) {
+    const dx = spawn.x - playerX;
+    const dy = spawn.y - playerY;
+    if (dx * dx + dy * dy <= r2) {
+      dungeon.monsters.push({
+        ...spawn,
+        alerted: spawn.archetype === 'core_synthesizer'
+      });
+      activated++;
+    } else {
+      keep.push(spawn);
+    }
+  }
+  dungeon.pendingSpawns = keep;
+  return activated;
 }
 
 function carveHorizontalTunnel(tiles: Tile[][], x1: number, x2: number, y: number) {

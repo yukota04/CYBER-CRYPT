@@ -105,6 +105,8 @@ export interface GameItem {
   twoHanded?: boolean;
   allowedClasses?: CharacterClass[];
   upgradeLevel?: number;
+  /** Gear power level that scales with dungeon floor when dropped/bought */
+  itemLevel?: number;
   attackRange?: number;
 }
 
@@ -328,6 +330,25 @@ export interface EnvironmentalEvent {
   hazardTurns?: number;
 }
 
+/** Monster blueprint waiting until the player approaches (lazy spawn). */
+export interface PendingMonsterSpawn {
+  id: string;
+  name: string;
+  level: number;
+  archetype: MonsterArchetype;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  expReward: number;
+  shardReward: number;
+  color: string;
+  symbol: string;
+  visualVariant?: MonsterVisualVariant;
+}
+
 export interface DungeonState {
   floor: number;
   width: number;
@@ -335,6 +356,8 @@ export interface DungeonState {
   tiles: Tile[][];
   rooms: Room[];
   monsters: Monster[];
+  /** Inactive until player is nearby — keeps far rooms cheap to simulate */
+  pendingSpawns?: PendingMonsterSpawn[];
   stairsPos: { x: number; y: number };
   activeEvent?: EnvironmentalEvent | null;
   shopItems?: GameItem[];

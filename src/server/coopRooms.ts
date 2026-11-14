@@ -10,7 +10,7 @@ import {
   Player,
   SavedPlayerLoadout
 } from '../game/types';
-import { generateDungeon, updateFOV } from '../game/dungeon';
+import { activateNearbySpawns, generateDungeon, updateFOV } from '../game/dungeon';
 import {
   awardXP,
   buildOnlineExitStash,
@@ -35,6 +35,7 @@ import {
   canClassEquipItem,
   canUpgradeItem,
   getEquipSlotForItem,
+  getItemSellPrice,
   getProbabilityStoneCost,
   getUpgradeCost
 } from '../game/items';
@@ -701,6 +702,9 @@ export class CoopRoomManager {
       // Shared monster turn targeting nearest living player
       const livingPlayers = room.players.filter(s => s.alive && s.player).map(s => s.player!);
       if (livingPlayers.length > 0) {
+        for (const lp of livingPlayers) {
+          activateNearbySpawns(dungeon, lp.x, lp.y, 11);
+        }
         resolveMonsterTurns(livingPlayers[0], dungeon, logs, soundEvents as any, floatingTexts, turn, livingPlayers);
       }
 
@@ -885,6 +889,19 @@ export class CoopRoomManager {
     return { ok: true, room: this.sanitizeRoom(room) };
   }
 
+  public sellItem(roomId: string, playerId: string, itemId: string): { ok: boolean; error?: string; room?: CoopRoomState } {
+    const room = this.getRoom(roomId);
+    const slot = room?.players.find(p => p.playerId === playerId);
+    if (!room || !slot?.player) return { ok: false, error: 'NOT_FOUND' };
+    const item = slot.player.inventory.find(i => i.id === itemId);
+    if (!item) return { ok: false, error: 'ITEM_NOT_FOUND' };
+    const price = getItemSellPrice(item);
+    slot.player.inventory = slot.player.inventory.filter(i => i.id !== itemId);
+    slot.player.stats.coins += price;
+    this.saveLiveSlotLoadout(slot, room.dungeon);
+    return { ok: true, room: this.sanitizeRoom(room) };
+  }
+
   public reviveAtCheckpoint(
     roomId: string,
     playerId: string
@@ -1031,5 +1048,46 @@ export class CoopRoomManager {
       destroyChance: outcome.destroyChance,
       room: this.sanitizeRoom(room)
     };
+  }
+
+  /** Swap up to 6 inventory items between two alive players. */
+  public executeTrade(
+    roomId: string,
+    fromPlayerId: string,
+    toPlayerId: string,
+    fromItemIds: string[],
+    toItemIds: string[]
+  ): { ok: boolean; error?: string; room?: CoopRoomState } {
+    const room = this.getRoom(roomId);
+    if (!room) return { ok: false, error: 'ROOM_NOT_FOUND' };
+    const a = room.players.find(p => p.playerId === fromPlayerId);
+    const b = room.players.find(p => p.playerId === toPlayerId);
+    if (!a?.player || !b?.player || !a.alive || !b.alive) return { ok: false, error: 'TRADE_PARTNER_INVALID' };
+
+    const takeA = (fromItemIds || []).slice(0, 6);
+    const takeB = (toItemIds || []).slice(0, 6);
+    const itemsA = takeA
+      .map(id => a.player!.inventory.find(i => i.id === id))
+      .filter((i): i is GameItem => !!i);
+    const itemsB = takeB
+      .map(id => b.player!.inventory.find(i => i.id === id))
+      .filter((i): i is GameItem => !!i);
+    if (itemsA.length !== takeA.length || itemsB.length !== takeB.length) {
+      return { ok: false, error: 'TRADE_ITEMS_MISSING' };
+    }
+
+    const idsA = new Set(itemsA.map(i => i.id));
+    const idsB = new Set(itemsB.map(i => i.id));
+    a.player.inventory = [...a.player.inventory.filter(i => !idsA.has(i.id)), ...itemsB];
+    b.player.inventory = [...b.player.inventory.filter(i => !idsB.has(i.id)), ...itemsA];
+    this.saveLiveSlotLoadout(a, room.dungeon);
+    this.saveLiveSlotLoadout(b, room.dungeon);
+    room.logs.unshift({
+      id: `trade_${Date.now()}`,
+      text: `🤝 Trade completed: ${a.username} ↔ ${b.username}`,
+      type: 'item',
+      turn: room.turn
+    });
+    return { ok: true, room: this.sanitizeRoom(room) };
   }
 }

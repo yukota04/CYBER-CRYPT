@@ -138,8 +138,10 @@ interface LeaderboardRecord {
   characterClass: string;
   floor: number;
   score: number;
+  kills: number;
   timeSec: number;
   platform: string;
+  difficultyMode: 'normal' | 'hard';
 }
 
 const coopManager = new CoopRoomManager();
@@ -159,11 +161,11 @@ const friendRequests = new Map<string, Set<string>>();
 const auditLogs: AuditLog[] = [];
 const securityAlerts: { id: string; to: string; subject: string; body: string; sentAt: number }[] = [];
 let globalLeaderboards: LeaderboardRecord[] = [
-  { rank: 1, username: 'ZeroCool', characterClass: 'striker', floor: 12, score: 28450, timeSec: 642, platform: 'desktop' },
-  { rank: 2, username: 'NeonValkyrie', characterClass: 'technomancer', floor: 9, score: 19800, timeSec: 512, platform: 'mobile' },
-  { rank: 3, username: 'CyberGhost', characterClass: 'vanguard', floor: 8, score: 16400, timeSec: 490, platform: 'desktop' },
-  { rank: 4, username: 'GlitchPhantom', characterClass: 'striker', floor: 7, score: 13920, timeSec: 430, platform: 'mobile' },
-  { rank: 5, username: 'AcidBurn', characterClass: 'technomancer', floor: 6, score: 11200, timeSec: 380, platform: 'desktop' }
+  { rank: 1, username: 'ZeroCool', characterClass: 'striker', floor: 12, score: 28450, kills: 312, timeSec: 642, platform: 'desktop', difficultyMode: 'hard' },
+  { rank: 2, username: 'NeonValkyrie', characterClass: 'technomancer', floor: 9, score: 19800, kills: 241, timeSec: 512, platform: 'mobile', difficultyMode: 'normal' },
+  { rank: 3, username: 'CyberGhost', characterClass: 'vanguard', floor: 8, score: 16400, kills: 198, timeSec: 490, platform: 'desktop', difficultyMode: 'hard' },
+  { rank: 4, username: 'GlitchPhantom', characterClass: 'striker', floor: 7, score: 13920, kills: 176, timeSec: 430, platform: 'mobile', difficultyMode: 'normal' },
+  { rank: 5, username: 'AcidBurn', characterClass: 'technomancer', floor: 6, score: 11200, kills: 142, timeSec: 380, platform: 'desktop', difficultyMode: 'normal' }
 ];
 
 let persistTimer: NodeJS.Timeout | null = null;
@@ -839,18 +841,26 @@ app.post('/api/matchmaking/score', authMiddleware, (req, res) => {
 // LEADERBOARDS & STATS
 // ----------------------------------------------------
 app.get('/api/leaderboard', (req, res) => {
-  res.json({
-    leaderboard: globalLeaderboards
-  });
+  const mode = req.query.mode === 'hard' ? 'hard' : req.query.mode === 'normal' ? 'normal' : null;
+  const list = mode
+    ? globalLeaderboards.filter(e => (e.difficultyMode || 'normal') === mode)
+    : globalLeaderboards;
+  const ranked = [...list]
+    .sort((a, b) => (b.kills || 0) - (a.kills || 0) || b.floor - a.floor)
+    .slice(0, 20)
+    .map((e, idx) => ({ ...e, rank: idx + 1, kills: e.kills || 0 }));
+  res.json({ leaderboard: ranked });
 });
 
 app.post('/api/leaderboard/submit', authMiddleware, (req, res) => {
   const user = (req as any).user as ServerUser;
-  const { score, floor, characterClass, timeSec, platform = 'desktop' } = req.body || {};
+  const { score, floor, characterClass, timeSec, platform = 'desktop', kills = 0, difficultyMode = 'normal' } = req.body || {};
 
   const safeScore = Math.max(0, Number(score) || 0);
   const safeFloor = Math.max(1, Number(floor) || 1);
+  const safeKills = Math.max(0, Number(kills) || 0);
   const safeClass = ['striker', 'technomancer', 'vanguard'].includes(characterClass) ? characterClass : 'striker';
+  const safeMode = difficultyMode === 'hard' ? 'hard' : 'normal';
 
   const entry: LeaderboardRecord = {
     rank: 0,
@@ -858,21 +868,27 @@ app.post('/api/leaderboard/submit', authMiddleware, (req, res) => {
     characterClass: safeClass,
     floor: safeFloor,
     score: safeScore,
+    kills: safeKills,
     timeSec: Math.max(1, Number(timeSec) || 60),
-    platform: sanitizeText(platform, 24) || 'desktop'
+    platform: sanitizeText(platform, 24) || 'desktop',
+    difficultyMode: safeMode
   };
 
   globalLeaderboards.push(entry);
-  globalLeaderboards.sort((a, b) => b.score - a.score);
-  globalLeaderboards = globalLeaderboards.slice(0, 20).map((e, idx) => ({ ...e, rank: idx + 1 }));
+  globalLeaderboards.sort((a, b) => (b.kills || 0) - (a.kills || 0) || b.floor - a.floor);
+  globalLeaderboards = globalLeaderboards.slice(0, 40).map((e, idx) => ({ ...e, rank: idx + 1 }));
   schedulePersist();
 
-  const assignedRank = globalLeaderboards.find(e => e.username === entry.username && e.score === entry.score)?.rank || entry.rank;
+  const modeList = globalLeaderboards
+    .filter(e => (e.difficultyMode || 'normal') === safeMode)
+    .sort((a, b) => (b.kills || 0) - (a.kills || 0));
+  const assignedRank =
+    modeList.findIndex(e => e.username === entry.username && e.kills === entry.kills) + 1 || entry.rank;
 
   res.json({
     success: true,
     rank: assignedRank,
-    leaderboard: globalLeaderboards
+    leaderboard: modeList.slice(0, 20).map((e, idx) => ({ ...e, rank: idx + 1 }))
   });
 });
 
@@ -1255,6 +1271,14 @@ async function setupServer() {
           }
           schedulePersist();
           broadcastToRoom(meta.roomId, { type: 'coop:room_update', room: res.room });
+        } else if (type === 'coop:sell_item') {
+          const res = coopManager.sellItem(meta.roomId, meta.playerId, msg.itemId);
+          if (!res.ok) {
+            ws.send(JSON.stringify({ type: 'coop:error', error: res.error }));
+            return;
+          }
+          schedulePersist();
+          broadcastToRoom(meta.roomId, { type: 'coop:room_update', room: res.room });
         } else if (type === 'coop:upgrade_item') {
           const res = coopManager.upgradeItem(meta.roomId, meta.playerId, msg.itemId, !!msg.useProbabilityStone);
           if (!res.ok) {
@@ -1271,6 +1295,32 @@ async function setupServer() {
             })
           );
           broadcastToRoom(meta.roomId, { type: 'coop:room_update', room: res.room });
+        } else if (
+          type === 'coop:trade_request' ||
+          type === 'coop:trade_response' ||
+          type === 'coop:trade_offer' ||
+          type === 'coop:trade_cancel'
+        ) {
+          broadcastToRoom(meta.roomId, {
+            ...msg,
+            fromPlayerId: meta.playerId
+          });
+        } else if (type === 'coop:trade_execute') {
+          const targetId = sanitizeText(msg.toPlayerId || '', 48);
+          const fromIds = Array.isArray(msg.fromItemIds) ? msg.fromItemIds.slice(0, 6).map((id: unknown) => String(id)) : [];
+          const toIds = Array.isArray(msg.toItemIds) ? msg.toItemIds.slice(0, 6).map((id: unknown) => String(id)) : [];
+          const res = coopManager.executeTrade(meta.roomId, meta.playerId, targetId, fromIds, toIds);
+          if (!res.ok) {
+            ws.send(JSON.stringify({ type: 'coop:error', error: res.error }));
+            return;
+          }
+          schedulePersist();
+          broadcastToRoom(meta.roomId, {
+            type: 'coop:trade_done',
+            fromPlayerId: meta.playerId,
+            toPlayerId: targetId,
+            room: res.room
+          });
         }
       } catch {
         ws.send(JSON.stringify({ type: 'coop:error', error: 'MALFORMED_WS_MESSAGE' }));

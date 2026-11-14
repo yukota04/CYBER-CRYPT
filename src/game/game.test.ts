@@ -64,12 +64,19 @@ test('procedural monster visual variants evolve across floors and density scales
   const f5 = generateDungeon(5, 77);
   const f12 = generateDungeon(12, 77);
 
-  assert.ok(f1.monsters.length > 0 && f5.monsters.length > 0 && f12.monsters.length > 0);
-  assert.ok(f12.monsters.length >= f1.monsters.length, 'Deeper floors spawn more enemies');
+  const all = (d: typeof f1) => [...d.monsters, ...(d.pendingSpawns || [])];
+  const a1 = all(f1);
+  const a5 = all(f5);
+  const a12 = all(f12);
 
-  const m1 = f1.monsters[0];
-  const m5 = f5.monsters[0];
-  const m12 = f12.monsters[0];
+  assert.ok(a1.length > 0 && a5.length > 0 && a12.length > 0);
+  assert.ok(a12.length >= a1.length, 'Deeper floors spawn more enemies');
+
+  const pick = (arr: typeof a1) =>
+    arr.find(m => m.archetype === 'glitch_swarmer') || arr[0];
+  const m1 = pick(a1);
+  const m5 = pick(a5);
+  const m12 = pick(a12);
 
   assert.ok(m1.visualVariant && m5.visualVariant && m12.visualVariant);
   assert.notEqual(m1.visualVariant!.hueShift, m5.visualVariant!.hueShift, 'Enemy colors evolve per floor');

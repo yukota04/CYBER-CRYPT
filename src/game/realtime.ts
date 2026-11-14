@@ -23,7 +23,7 @@ import {
 } from './combat';
 import { applyEnvironmentalTurnEffects } from './events';
 import { SoundEventType } from './audio';
-import { updateFOVIncremental } from './dungeon';
+import { activateNearbySpawns, updateFOVIncremental } from './dungeon';
 
 /** Footprint in tiles — < 1 so an entity can straddle two cells. */
 export const ENTITY_BODY = 0.72;
@@ -846,6 +846,9 @@ export function tickRealtime(
   let statusTicks = 0;
 
   clock.playerAttackCd = Math.max(0, clock.playerAttackCd - dt);
+
+  // Wake nearby pending monsters (far rooms stay dormant → huge FPS win)
+  activateNearbySpawns(dungeon, player.x, player.y, 11);
 
   // Normalize move + optional mouse/aim vector
   let ix = input.dx;
