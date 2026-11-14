@@ -1,0 +1,5972 @@
+{
+  "cell": 128,
+  "sheetWidth": 1024,
+  "sheetHeight": 1024,
+  "style": "cyberpunk neon cyan/magenta",
+  "atlases": [
+    {
+      "file": "atlas-00.webp",
+      "png": "atlas-00.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-01.webp",
+      "png": "atlas-01.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-02.webp",
+      "png": "atlas-02.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-03.webp",
+      "png": "atlas-03.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-04.webp",
+      "png": "atlas-04.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-05.webp",
+      "png": "atlas-05.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-06.webp",
+      "png": "atlas-06.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-07.webp",
+      "png": "atlas-07.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-08.webp",
+      "png": "atlas-08.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-09.webp",
+      "png": "atlas-09.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-10.webp",
+      "png": "atlas-10.png",
+      "count": 64
+    },
+    {
+      "file": "atlas-11.webp",
+      "png": "atlas-11.png",
+      "count": 33
+    }
+  ],
+  "icons": {
+    "cyber_tanto": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "katana_neon": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "twin_phantom_daggers": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "laser_pistol": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "void_katana": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "hyperion_pulse_carbine": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "relic_singularity_blade": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "alloy_sword": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "plasma_sword": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "titan_greatsword": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "vanguard_rail_lance": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "hyperion_greatsword": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "aegis_mythic_halberd": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "aegis_kite_shield": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "bastion_tower_shield": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "pulse_rod": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "arcane_pulse_staff": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "plasma_scythe": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "cyber_railgun": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "astral_mythic_staff": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "prism_focus": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "striker_holo_buckler": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-items-handcrafted-a-4x4.jpg"
+    },
+    "recon_visor": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "titanium_helm": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "arcane_crown": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "cyber_vest": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "chitin_carapace": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "aegis_nanosuit": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "hyperion_chassis": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "tactical_grips": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "kinetic_gauntlets": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "synth_handwraps": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "exo_trousers": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "carbon_greaves": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "titan_legplates": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "mag_boots": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "strider_thrusters": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "void_sabatons": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "neural_chip": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "quantum_pendant": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "matrix_core": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "crimson_signet": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "synapse_studs": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "ether_drops": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "cyber_ear_cuffs": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "mythic_astral_robe": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "mythic_chronos_ring": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "stim_pack": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "super_stim": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "omega_medkit": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "energy_cell": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "hyper_cell": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "dual_elixir": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "omni_serum": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "regen_serum": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "grand_regen_serum": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "igneous_potion": {
+      "sheet": "atlas-00.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "inferno_potion": {
+      "sheet": "atlas-00.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "aegis_tonic": {
+      "sheet": "atlas-00.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "berserk_vial": {
+      "sheet": "atlas-00.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "overclock_serum": {
+      "sheet": "atlas-00.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "teleport_scroll": {
+      "sheet": "atlas-00.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_striker_weapon_07": {
+      "sheet": "atlas-00.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_08": {
+      "sheet": "atlas-00.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_09": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_10": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_11": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_12": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_13": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_14": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_15": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_16": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_17": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_18": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_19": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_20": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_weapon_21": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_striker_offhand_01": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_02": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_03": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_04": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_05": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_06": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_07": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_08": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_09": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_10": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_11": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_12": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_13": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_14": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_15": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_16": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_17": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_18": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_19": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_20": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_offhand_21": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_striker_helmet_00": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_01": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_02": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_03": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_04": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_05": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_06": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_07": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_08": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_09": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_10": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_11": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_striker_helmet_12": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_13": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_14": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_15": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_16": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_17": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_18": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_19": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_20": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_helmet_21": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_striker_chest_00": {
+      "sheet": "atlas-01.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_01": {
+      "sheet": "atlas-01.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_02": {
+      "sheet": "atlas-01.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_03": {
+      "sheet": "atlas-01.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_04": {
+      "sheet": "atlas-01.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_05": {
+      "sheet": "atlas-01.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_06": {
+      "sheet": "atlas-01.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_07": {
+      "sheet": "atlas-01.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_08": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_09": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_10": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_11": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_12": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_13": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_14": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_15": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_16": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_17": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_18": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_19": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_20": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_chest_21": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_00": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_01": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_02": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_03": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_04": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_05": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_06": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_07": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_08": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_09": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_10": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_11": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_12": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_13": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_14": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_15": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_16": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_17": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_18": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_19": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_20": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_gloves_21": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_00": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_01": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_02": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_03": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_04": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_05": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-08.jpg"
+    },
+    "gen_striker_legs_06": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_07": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_08": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_09": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_10": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_11": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_12": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_13": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_14": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_15": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_16": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_17": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_18": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_19": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_20": {
+      "sheet": "atlas-02.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_legs_21": {
+      "sheet": "atlas-02.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_00": {
+      "sheet": "atlas-02.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_01": {
+      "sheet": "atlas-02.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_02": {
+      "sheet": "atlas-02.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_03": {
+      "sheet": "atlas-02.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_04": {
+      "sheet": "atlas-02.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_05": {
+      "sheet": "atlas-02.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_06": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_07": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_08": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_09": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_10": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_11": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_12": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_13": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_14": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_15": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_16": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_17": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_18": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_19": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_20": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_striker_boots_21": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_technomancer_weapon_05": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_06": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_07": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_08": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_09": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_10": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_11": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_12": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_13": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_14": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_15": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_16": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_17": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "gen_technomancer_weapon_18": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_technomancer_weapon_19": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_technomancer_weapon_20": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_technomancer_weapon_21": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_technomancer_offhand_01": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_02": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_03": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_04": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_05": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_06": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_07": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_08": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_09": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_10": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_11": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_12": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_13": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_technomancer_offhand_14": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_15": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_16": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_17": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_18": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_19": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_20": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_offhand_21": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_technomancer_helmet_00": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_technomancer_helmet_01": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-09.jpg"
+    },
+    "gen_technomancer_helmet_02": {
+      "sheet": "atlas-03.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_03": {
+      "sheet": "atlas-03.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_04": {
+      "sheet": "atlas-03.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_05": {
+      "sheet": "atlas-03.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_06": {
+      "sheet": "atlas-03.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_07": {
+      "sheet": "atlas-03.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_08": {
+      "sheet": "atlas-03.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_09": {
+      "sheet": "atlas-03.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_10": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_11": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_helmet_12": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_13": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_14": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_15": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_16": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_17": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_18": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_19": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_20": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_helmet_21": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_00": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_01": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_02": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_03": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_04": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_05": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_06": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_07": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_08": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_09": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_10": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_11": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_12": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_13": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_14": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_15": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_16": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_17": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_18": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_19": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_20": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_chest_21": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_00": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_01": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_02": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_03": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_04": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_05": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_06": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_07": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-10.jpg"
+    },
+    "gen_technomancer_gloves_08": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_09": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_10": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_11": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_12": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_13": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_14": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_15": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_16": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_17": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_gloves_18": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_gloves_19": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_gloves_20": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_gloves_21": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_00": {
+      "sheet": "atlas-04.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_01": {
+      "sheet": "atlas-04.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_02": {
+      "sheet": "atlas-04.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_03": {
+      "sheet": "atlas-04.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_04": {
+      "sheet": "atlas-04.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_05": {
+      "sheet": "atlas-04.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_06": {
+      "sheet": "atlas-04.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_07": {
+      "sheet": "atlas-04.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_08": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_09": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_10": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_11": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_12": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_13": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_14": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_15": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_16": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_17": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_18": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_19": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_20": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_legs_21": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_00": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_01": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_02": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_03": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_04": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_05": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_06": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_07": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_08": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-11.jpg"
+    },
+    "gen_technomancer_boots_09": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_10": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_11": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_12": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_13": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_14": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_15": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_16": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_17": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_18": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_19": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_20": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_technomancer_boots_21": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_weapon_06": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_07": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_08": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_09": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_10": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_11": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_12": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_13": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_14": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_15": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_16": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_17": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_18": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_19": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_20": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_weapon_21": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_vanguard_offhand_02": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_03": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_04": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_05": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_06": {
+      "sheet": "atlas-05.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_07": {
+      "sheet": "atlas-05.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_08": {
+      "sheet": "atlas-05.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_09": {
+      "sheet": "atlas-05.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_10": {
+      "sheet": "atlas-05.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_11": {
+      "sheet": "atlas-05.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_12": {
+      "sheet": "atlas-05.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_13": {
+      "sheet": "atlas-05.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_14": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_15": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_16": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_17": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_18": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_19": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_20": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_offhand_21": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-07.jpg"
+    },
+    "gen_vanguard_helmet_00": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_01": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_02": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_03": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_04": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_05": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_06": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_07": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_08": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_09": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_10": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_11": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_12": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_13": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_14": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_15": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_16": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_17": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_18": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_19": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_20": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_helmet_21": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_00": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_01": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_02": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_03": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_04": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_05": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_06": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_07": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_08": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_09": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_10": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_11": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_12": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_13": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_14": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_15": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_16": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_17": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_18": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_19": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_20": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_chest_21": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_00": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_01": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_02": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_03": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_04": {
+      "sheet": "atlas-06.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_05": {
+      "sheet": "atlas-06.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_06": {
+      "sheet": "atlas-06.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_07": {
+      "sheet": "atlas-06.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_08": {
+      "sheet": "atlas-06.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_09": {
+      "sheet": "atlas-06.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_10": {
+      "sheet": "atlas-06.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_11": {
+      "sheet": "atlas-06.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_12": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_13": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_14": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_15": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_16": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_17": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_18": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_19": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_20": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_gloves_21": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_00": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_01": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_02": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_03": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_04": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_05": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_06": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_07": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_08": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_09": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_10": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_11": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_12": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_13": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_14": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_15": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_16": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_17": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_18": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_19": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_20": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_legs_21": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_00": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_01": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_02": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_03": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_04": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_05": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_06": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_07": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_08": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_09": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_10": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_11": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_12": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_13": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_14": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_15": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_16": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_17": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_18": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_19": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_20": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_vanguard_boots_21": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "gen_shared_ring_05": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_06": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_07": {
+      "sheet": "atlas-07.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_08": {
+      "sheet": "atlas-07.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_09": {
+      "sheet": "atlas-07.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_10": {
+      "sheet": "atlas-07.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_11": {
+      "sheet": "atlas-07.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_12": {
+      "sheet": "atlas-07.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_13": {
+      "sheet": "atlas-07.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_14": {
+      "sheet": "atlas-07.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_15": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_16": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_17": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_18": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_19": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_20": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_ring_21": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_earrings_03": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_earrings_04": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_earrings_05": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "gen_shared_earrings_06": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_07": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_08": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_09": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_10": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_11": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_12": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_13": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_14": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_15": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_16": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_17": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_18": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_19": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_20": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_earrings_21": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-06.jpg"
+    },
+    "gen_shared_consumable_15": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_shared_consumable_16": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_shared_consumable_17": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_shared_consumable_18": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_shared_consumable_19": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_shared_consumable_20": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "gen_shared_consumable_21": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "probability_stone": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "shop_plasma_katana": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "shop_void_katana": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-05.jpg"
+    },
+    "shop_aegis_armor": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "procedural-neon"
+    },
+    "striker_slash": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_phase_dash": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_overclock": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_executioner": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t2_grip": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t2_tempest": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t2_mastery": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t3_optics": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t3_shadow_strike": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t3_apex": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t4_reflex": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t4_siphon": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t4_immortal": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t5_capacitor": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t5_beam": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "striker_t5_core": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-skills-striker-4x4.jpg"
+    },
+    "techno_conduit": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_emp_blast": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_nanite_heal": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_singularity": {
+      "sheet": "atlas-08.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t2_ignite": {
+      "sheet": "atlas-08.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t2_meteor": {
+      "sheet": "atlas-08.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t2_nova": {
+      "sheet": "atlas-08.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t2_supernova": {
+      "sheet": "atlas-08.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t3_cryo_core": {
+      "sheet": "atlas-08.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t3_frost_nova": {
+      "sheet": "atlas-08.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t3_glacial": {
+      "sheet": "atlas-08.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t4_coil": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t4_chain": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t4_stormlord": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "techno_t5_uplink": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "techno_t5_orbital": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "techno_t5_omni": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "techno_t5_cataclysm": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_chitin": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_cleave": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_barrier": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_immortal": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t2_mass": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t2_shatter": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t2_colossus": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t3_edge": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t3_whirlwind": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t3_execution": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t4_alloy": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t4_fortify": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t4_titan": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t5_aura": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t5_heal": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "vanguard_t5_radiance": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-04.jpg"
+    },
+    "ui.login.signin": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.login.register": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.guest": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.login.submit": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.back": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.fullscreen": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.install": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.language": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.status_ok": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.status_taken": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.login.status_checking": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.mode_offline": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.mode_online": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.difficulty_normal": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.difficulty_hard": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.class_striker": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.class_technomancer": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.class_vanguard": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.start_run": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.title.continue_run": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.start_new_run": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.options": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.title.mute": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.unmute": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.fullscreen": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.exit_fullscreen": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.leaderboard": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.multiplayer": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.social": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.cloud_sync": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.coop_join": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.coop_ready": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.title.coop_start": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.hud.minimap": {
+      "sheet": "atlas-09.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.hud.inventory": {
+      "sheet": "atlas-09.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "ui.hud.skill_tree": {
+      "sheet": "atlas-09.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.hud.mute": {
+      "sheet": "atlas-09.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.hud.unmute": {
+      "sheet": "atlas-09.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.hud.pause": {
+      "sheet": "atlas-09.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "ui.hud.ranged": {
+      "sheet": "atlas-09.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "ui.hud.fps": {
+      "sheet": "atlas-09.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.touch.attack": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.touch.joystick": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.tab_bag": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.tab_gear": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.tab_upgrade": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.consume": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.inv.discard": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.inv.equip": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.unequip": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.close": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "ui.inv.forge": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.inv.stone_slot": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.inv.blocked_offhand": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.helmet": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.earrings": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.weapon": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.chest": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.offhand": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.gloves": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.ring1": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.ring2": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.legs": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.slot.boots": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.shop.buy": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.shop.sell": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.shop.preview": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-01.jpg"
+    },
+    "ui.shop.cat_all": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.shop.cat_potions": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.shop.cat_gear": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.shop.cat_utility": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.shop.close": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.shop.bag": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.skill.unlock": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.skill.locked": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "ui.skill.close": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.pause.resume": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.pause.options": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.pause.restart": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.pause.title": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.options.close": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.options.scanlines": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.options.glow": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.options.particles": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.options.logout": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.gameover.skull": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.gameover.revive": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.gameover.checkpoint": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.social.send": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 640,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.social.add": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.social.users": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.social.chat": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.social.bell": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.trade.close": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.leaderboard.close": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.leaderboard.trophy": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.mp.close": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 768,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "ui.admin.close": {
+      "sheet": "atlas-10.webp",
+      "x": 0,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "currency.coins": {
+      "sheet": "atlas-10.webp",
+      "x": 128,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "currency.soul_shards": {
+      "sheet": "atlas-10.webp",
+      "x": 256,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:style-bible-4x4.jpg"
+    },
+    "currency.skill_points": {
+      "sheet": "atlas-10.webp",
+      "x": 384,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "status.hp": {
+      "sheet": "atlas-10.webp",
+      "x": 512,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-hud-ui-a-4x4.jpg"
+    },
+    "status.energy": {
+      "sheet": "atlas-10.webp",
+      "x": 640,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.xp": {
+      "sheet": "atlas-10.webp",
+      "x": 768,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.shield": {
+      "sheet": "atlas-10.webp",
+      "x": 896,
+      "y": 896,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.overclock": {
+      "sheet": "atlas-11.webp",
+      "x": 0,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.burn": {
+      "sheet": "atlas-11.webp",
+      "x": 128,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.regen": {
+      "sheet": "atlas-11.webp",
+      "x": 256,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.cooldown": {
+      "sheet": "atlas-11.webp",
+      "x": 384,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "status.moved_lock": {
+      "sheet": "atlas-11.webp",
+      "x": 512,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.stairs_down": {
+      "sheet": "atlas-11.webp",
+      "x": 640,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.checkpoint_off": {
+      "sheet": "atlas-11.webp",
+      "x": 768,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.checkpoint_on": {
+      "sheet": "atlas-11.webp",
+      "x": 896,
+      "y": 0,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.chest": {
+      "sheet": "atlas-11.webp",
+      "x": 0,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.shrine": {
+      "sheet": "atlas-11.webp",
+      "x": 128,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.shop_npc": {
+      "sheet": "atlas-11.webp",
+      "x": 256,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "tile.hazard": {
+      "sheet": "atlas-11.webp",
+      "x": 384,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "tile.coin_copper": {
+      "sheet": "atlas-11.webp",
+      "x": 512,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "tile.coin_silver": {
+      "sheet": "atlas-11.webp",
+      "x": 640,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "tile.coin_gold": {
+      "sheet": "atlas-11.webp",
+      "x": 768,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "tile.coin_quantum": {
+      "sheet": "atlas-11.webp",
+      "x": 896,
+      "y": 128,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "tile.death_drop": {
+      "sheet": "atlas-11.webp",
+      "x": 0,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "event.glitch_storm": {
+      "sheet": "atlas-11.webp",
+      "x": 128,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "event.gravity_shift": {
+      "sheet": "atlas-11.webp",
+      "x": 256,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "event.black_market": {
+      "sheet": "atlas-11.webp",
+      "x": 384,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "event.emp_surge": {
+      "sheet": "atlas-11.webp",
+      "x": 512,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "event.shadow_veil": {
+      "sheet": "atlas-11.webp",
+      "x": 640,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "achievement.first_blood": {
+      "sheet": "atlas-11.webp",
+      "x": 768,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "achievement.floor_3": {
+      "sheet": "atlas-11.webp",
+      "x": 896,
+      "y": 256,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "achievement.boss_slayer": {
+      "sheet": "atlas-11.webp",
+      "x": 0,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "achievement.tech_master": {
+      "sheet": "atlas-11.webp",
+      "x": 128,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "achievement.shard_collector": {
+      "sheet": "atlas-11.webp",
+      "x": 256,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-03.jpg"
+    },
+    "frame.common": {
+      "sheet": "atlas-11.webp",
+      "x": 384,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "frame.rare": {
+      "sheet": "atlas-11.webp",
+      "x": 512,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "frame.epic": {
+      "sheet": "atlas-11.webp",
+      "x": 640,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "frame.legendary": {
+      "sheet": "atlas-11.webp",
+      "x": 768,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "frame.mythic": {
+      "sheet": "atlas-11.webp",
+      "x": 896,
+      "y": 384,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    },
+    "frame.cyber-relic": {
+      "sheet": "atlas-11.webp",
+      "x": 0,
+      "y": 512,
+      "w": 128,
+      "h": 128,
+      "source": "ai:sheet-large-02.jpg"
+    }
+  },
+  "counts": {
+    "total": 737,
+    "ai": 568,
+    "alias": 0,
+    "procedural": 169
+  }
+}
