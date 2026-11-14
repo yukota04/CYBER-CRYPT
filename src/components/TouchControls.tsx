@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { CanvasButton } from './CanvasButton';
 import { DungeonState, Player } from '../game/types';
 import { SKILL_DATABASE } from '../game/skills';
 import { getEffectiveSkillEnergyCost, getPlayerAttackRange } from '../game/combat';
 import { GameIcon } from './GameIcon';
+import { Language, t } from '../game/i18n';
 
 interface TouchControlsProps {
   player: Player;
@@ -13,28 +13,36 @@ interface TouchControlsProps {
   onWaitTurn: () => void;
   onCastSkill: (skillId: string) => void;
   onRangedAttack: () => void;
+  /** Hold/release attack for free-move melee when Auto is off */
+  onAttackHold?: (pressed: boolean) => void;
+  autoAttack: boolean;
+  onAutoAttackChange: (enabled: boolean) => void;
+  language: Language;
   hideDpad?: boolean;
 }
 
-const ORBIT_R = 78;
-const BUBBLE = 56;
-const VISIBLE = 3;
+const SKILL_BUBBLE = 54;
+const ATK_SIZE = 86;
+const AUTO_SIZE = 52;
 
 /**
- * Mobile combat cluster: big FIRE button with a rotatable skill orbit (3 visible).
- * BAG / TECH removed — inventory & skill tree stay on the top HUD.
+ * Mobile combat: horizontal skill slide (tap-to-cast) + spherical ATK + AUTO toggle.
  */
 export const TouchControls: React.FC<TouchControlsProps> = ({
   player,
   dungeon,
   onCastSkill,
-  onRangedAttack
+  onRangedAttack,
+  onAttackHold,
+  autoAttack,
+  onAutoAttackChange,
+  language
 }) => {
   const attackRange = getPlayerAttackRange(player);
-  const [orbitOffset, setOrbitOffset] = useState(0);
+  const [atkPressed, setAtkPressed] = useState(false);
   const [pressFx, setPressFx] = useState<{ id: string; key: number } | null>(null);
-  const dragRef = useRef<{ x: number; active: boolean } | null>(null);
   const pressKeyRef = useRef(0);
+  const castLockRef = useRef<Set<string>>(new Set());
 
   const unlockedSkills = useMemo(() => {
     return Object.values(SKILL_DATABASE)
@@ -42,18 +50,6 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
       .filter(s => player.unlockedSkills.includes(s.id))
       .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
   }, [player.characterClass, player.unlockedSkills]);
-
-  const n = Math.max(1, unlockedSkills.length);
-  const start = ((orbitOffset % n) + n) % n;
-
-  const visible = useMemo(() => {
-    if (unlockedSkills.length === 0) return [];
-    const out = [];
-    for (let i = 0; i < Math.min(VISIBLE, unlockedSkills.length); i++) {
-      out.push(unlockedSkills[(start + i) % unlockedSkills.length]);
-    }
-    return out;
-  }, [unlockedSkills, start]);
 
   const triggerPressFx = (id: string) => {
     pressKeyRef.current += 1;
@@ -63,28 +59,24 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
     }, 280);
   };
 
-  const onOrbitPointerDown = (e: React.PointerEvent) => {
-    dragRef.current = { x: e.clientX, active: true };
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-  };
-  const onOrbitPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current?.active || unlockedSkills.length <= VISIBLE) return;
-    const dx = e.clientX - dragRef.current.x;
-    if (Math.abs(dx) > 36) {
-      setOrbitOffset(prev => prev + (dx > 0 ? -1 : 1));
-      dragRef.current.x = e.clientX;
-    }
-  };
-  const onOrbitPointerUp = () => {
-    dragRef.current = null;
+  const castSkillNow = (skillId: string, isReady: boolean) => {
+    if (!isReady) return;
+    // Debounce double-fire from pointerdown + click on some devices
+    if (castLockRef.current.has(skillId)) return;
+    castLockRef.current.add(skillId);
+    window.setTimeout(() => castLockRef.current.delete(skillId), 220);
+    triggerPressFx(skillId);
+    onCastSkill(skillId);
   };
 
-  // Angles for 3 bubbles around the attack button (upper arc)
-  const angles = [-110, -70, -30].map(d => (d * Math.PI) / 180);
+  const releaseAttack = () => {
+    setAtkPressed(false);
+    onAttackHold?.(false);
+  };
 
   return (
     <div
-      className="sm:hidden fixed bottom-10 right-2 z-20 pointer-events-none select-none"
+      className="sm:hidden fixed bottom-8 right-2 z-20 pointer-events-none select-none"
       data-no-joystick
       data-testid="mobile-combat-cluster"
     >
@@ -102,110 +94,163 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
           100% { opacity: 0; }
         }
       `}</style>
-      <div
-        className="relative pointer-events-auto touch-none"
-        style={{ width: 168, height: 168 }}
-        onPointerDown={onOrbitPointerDown}
-        onPointerMove={onOrbitPointerMove}
-        onPointerUp={onOrbitPointerUp}
-        onPointerCancel={onOrbitPointerUp}
-      >
-        {visible.map((skill, idx) => {
-          const ang = angles[idx] ?? angles[angles.length - 1];
-          const cx = 84 + Math.cos(ang) * ORBIT_R;
-          const cy = 84 + Math.sin(ang) * ORBIT_R;
-          const cd = player.activeCooldowns[skill.id] || 0;
-          const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
-          const canAfford = player.stats.energy >= energyNeeded;
-          const isReady = cd <= 0 && canAfford;
-          const cdSec = Math.max(0, cd);
-          const showImpact = pressFx?.id === skill.id;
 
-          return (
-            <button
-              key={`${skill.id}_${idx}`}
-              type="button"
-              data-testid={`orbit-skill-${skill.id}`}
-              onPointerDown={e => {
-                e.stopPropagation();
-                if (!isReady) return;
-                triggerPressFx(skill.id);
-              }}
-              onClick={e => {
-                e.stopPropagation();
-                if (isReady) onCastSkill(skill.id);
-              }}
-              disabled={!isReady}
-              aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
-              className={`absolute flex items-center justify-center rounded-full border-2 text-xl transition-transform duration-100 active:scale-90 ${
-                isReady
-                  ? 'bg-cyan-950/90 border-cyan-300 text-white'
-                  : 'bg-slate-950/90 border-slate-600 text-slate-400 opacity-80'
-              }`}
-              style={{
-                width: BUBBLE,
-                height: BUBBLE,
-                left: cx - BUBBLE / 2,
-                top: cy - BUBBLE / 2,
-                animation: isReady ? 'skillReadyPulse 1.6s ease-in-out infinite' : undefined
-              }}
-            >
-              <GameIcon id={skill.id} fallback={skill.icon} size={28} className="relative z-[1]" />
-              {cdSec > 0 && (
-                <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300 z-[2]">
-                  {cdSec}
-                </span>
-              )}
-              {showImpact && (
-                <>
-                  <span
-                    className="absolute inset-0 rounded-full border-2 border-cyan-200 pointer-events-none z-[3]"
-                    style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
-                  />
-                  <span
-                    className="absolute inset-0 rounded-full bg-cyan-300/40 pointer-events-none z-[3]"
-                    style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
-                  />
-                </>
-              )}
-            </button>
-          );
-        })}
+      <div className="pointer-events-auto flex flex-col items-end gap-1.5">
+        {/* Horizontal skill slide — tap casts immediately */}
+        <div
+          className="max-w-[min(72vw,280px)] rounded-2xl border border-cyan-500/40 bg-[#0a0818]/88 backdrop-blur-sm px-1.5 pt-1.5 pb-1 shadow-[0_0_18px_rgba(0,240,255,0.18)]"
+          data-testid="skill-slide-rail"
+        >
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x pb-0.5 px-0.5"
+            style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
+          >
+            {unlockedSkills.length === 0 && (
+              <div className="text-[10px] text-slate-500 font-mono px-2 py-3 whitespace-nowrap">
+                —
+              </div>
+            )}
+            {unlockedSkills.map(skill => {
+              const cd = player.activeCooldowns[skill.id] || 0;
+              const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
+              const canAfford = player.stats.energy >= energyNeeded;
+              const isReady = cd <= 0 && canAfford;
+              const cdSec = Math.max(0, cd);
+              const showImpact = pressFx?.id === skill.id;
 
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div className="relative">
-            <CanvasButton
-              label={`ATK ${attackRange}`}
-              icon="🎯"
-              theme="amber"
-              width={88}
-              height={88}
-              aria-label={`Mobile Attack (${attackRange} tiles)`}
-              onClick={() => {
-                triggerPressFx('atk');
-                onRangedAttack();
-              }}
-            />
+              return (
+                <button
+                  key={skill.id}
+                  type="button"
+                  data-testid={`orbit-skill-${skill.id}`}
+                  data-no-ui-sfx="true"
+                  onPointerDown={e => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                    castSkillNow(skill.id, isReady);
+                  }}
+                  onClick={e => {
+                    // Fallback for devices that only emit click
+                    e.stopPropagation();
+                    castSkillNow(skill.id, isReady);
+                  }}
+                  disabled={!isReady}
+                  aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
+                  className={`relative shrink-0 flex items-center justify-center rounded-full border-2 transition-transform duration-75 ${
+                    isReady
+                      ? 'bg-cyan-950/95 border-cyan-300 text-white active:scale-[0.85]'
+                      : 'bg-slate-950/90 border-slate-600 text-slate-400 opacity-75'
+                  }`}
+                  style={{
+                    width: SKILL_BUBBLE,
+                    height: SKILL_BUBBLE,
+                    animation: isReady ? 'skillReadyPulse 1.6s ease-in-out infinite' : undefined,
+                    transform: showImpact ? 'scale(0.86)' : undefined
+                  }}
+                >
+                  <GameIcon id={skill.id} fallback={skill.icon} size={26} className="relative z-[1]" />
+                  {cdSec > 0 && (
+                    <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300 z-[2]">
+                      {cdSec}
+                    </span>
+                  )}
+                  {showImpact && (
+                    <>
+                      <span
+                        className="absolute inset-0 rounded-full border-2 border-cyan-200 pointer-events-none z-[3]"
+                        style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
+                      />
+                      <span
+                        className="absolute inset-0 rounded-full bg-cyan-300/40 pointer-events-none z-[3]"
+                        style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
+                      />
+                    </>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="text-center text-[9px] text-cyan-300/90 font-mono tracking-wide pt-0.5 pb-0.5 pointer-events-none"
+            data-testid="skill-slide-hint"
+          >
+            {t('skillSlideHint', language)}
+          </div>
+        </div>
+
+        {/* AUTO + spherical ATK */}
+        <div className="flex items-end gap-2.5 pr-0.5">
+          <button
+            type="button"
+            data-testid="auto-attack-toggle"
+            data-no-ui-sfx="true"
+            aria-pressed={autoAttack}
+            aria-label={autoAttack ? t('autoAttackOn', language) : t('autoAttackOff', language)}
+            onClick={() => onAutoAttackChange(!autoAttack)}
+            className={`relative flex flex-col items-center justify-center rounded-full border-2 font-mono font-bold transition-transform duration-100 active:scale-90 ${
+              autoAttack
+                ? 'bg-emerald-950/95 border-emerald-300 text-emerald-200 shadow-[0_0_14px_rgba(16,185,129,0.45)]'
+                : 'bg-slate-950/90 border-slate-500 text-slate-400'
+            }`}
+            style={{ width: AUTO_SIZE, height: AUTO_SIZE }}
+          >
+            <span className="text-[10px] leading-none tracking-wider">{t('autoAttackBtn', language)}</span>
+            <span className={`text-[8px] leading-none mt-0.5 ${autoAttack ? 'text-emerald-300' : 'text-slate-500'}`}>
+              {autoAttack ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            data-testid="mobile-attack-sphere"
+            data-no-ui-sfx="true"
+            aria-label={`${t('rangedStrikeBtn', language)} (${attackRange})`}
+            onPointerDown={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+              setAtkPressed(true);
+              triggerPressFx('atk');
+              onAttackHold?.(true);
+              // Online / ranged fallback still fires on press
+              onRangedAttack();
+            }}
+            onPointerUp={releaseAttack}
+            onPointerCancel={releaseAttack}
+            onPointerLeave={e => {
+              if (e.buttons === 0) releaseAttack();
+            }}
+            className={`relative flex flex-col items-center justify-center rounded-full border-[3px] font-mono font-bold text-amber-100 transition-[transform,box-shadow] duration-75 ${
+              atkPressed
+                ? 'bg-amber-700/95 border-amber-200 shadow-[0_0_22px_rgba(255,230,0,0.65)]'
+                : 'bg-amber-950/95 border-amber-400 shadow-[0_0_18px_rgba(255,230,0,0.4)]'
+            }`}
+            style={{
+              width: ATK_SIZE,
+              height: ATK_SIZE,
+              transform: atkPressed ? 'scale(0.86)' : 'scale(1)'
+            }}
+          >
+            <span className="text-2xl leading-none" aria-hidden>
+              🎯
+            </span>
+            <span className="text-[11px] leading-none mt-1 tracking-wide">ATK</span>
+            <span className="text-[9px] text-amber-300/90 leading-none mt-0.5">RNG {attackRange}</span>
             {pressFx?.id === 'atk' && (
               <>
                 <span
-                  className="absolute inset-0 rounded-full border-2 border-amber-200 pointer-events-none"
+                  className="absolute inset-0 rounded-full border-2 border-amber-100 pointer-events-none"
                   style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
                 />
                 <span
-                  className="absolute inset-0 rounded-full bg-amber-300/35 pointer-events-none"
+                  className="absolute inset-0 rounded-full bg-amber-200/35 pointer-events-none"
                   style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
                 />
               </>
             )}
-          </div>
+          </button>
         </div>
-
-        {unlockedSkills.length > VISIBLE && (
-          <div className="absolute bottom-1 left-0 right-0 text-center text-[9px] text-cyan-400/80 font-mono pointer-events-none">
-            ← slide skills →
-          </div>
-        )}
       </div>
     </div>
   );

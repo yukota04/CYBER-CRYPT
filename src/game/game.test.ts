@@ -1280,3 +1280,54 @@ test('realtime free-movement: entities can straddle two tiles and slide on walls
   assert.ok(tick.player.x > beforeX || tick.moved === false, 'Player advances continuously with held input');
   assert.ok(Number.isFinite(tick.player.x) && Number.isFinite(tick.player.y));
 });
+
+test('realtime melee respects Auto OFF until attackHeld, then swings like Auto ON', async () => {
+  const { tickRealtime, createRealtimeClock, PLAYER_MELEE_RANGE } = await import('./realtime');
+  const dungeon = generateDungeon(1, 44);
+  const room = dungeon.rooms[0];
+  const px = room.centerX;
+  const py = room.centerY;
+  dungeon.tiles[py][px].walkable = true;
+  dungeon.tiles[py][px + 1].walkable = true;
+  const player = createInitialPlayer('striker', px, py);
+  player.facing = 'right';
+  dungeon.monsters = [
+    {
+      id: 'auto_test_mob',
+      name: 'Dummy',
+      archetype: 'glitch_swarmer',
+      level: 1,
+      x: px + 1,
+      y: py,
+      hp: 200,
+      maxHp: 200,
+      attack: 1,
+      defense: 0,
+      expReward: 1,
+      shardReward: 0,
+      alerted: true,
+      color: '#f00',
+      symbol: 'X'
+    }
+  ];
+  assert.ok(
+    Math.hypot(0.5, 0) < PLAYER_MELEE_RANGE,
+    'sanity: adjacent monster is in melee reach'
+  );
+
+  const clock = createRealtimeClock();
+  // Auto OFF + no hold → no damage
+  tickRealtime(player, dungeon, { dx: 0, dy: 0, autoAttack: false, attackHeld: false }, 0.05, 1, clock);
+  assert.equal(dungeon.monsters[0].hp, 200, 'No auto-swing when Auto is OFF and ATK not held');
+
+  // Auto OFF + hold → damage
+  const clock2 = createRealtimeClock();
+  tickRealtime(player, dungeon, { dx: 1, dy: 0, autoAttack: false, attackHeld: true }, 0.05, 2, clock2);
+  assert.ok(dungeon.monsters[0].hp < 200, 'Holding ATK with Auto OFF should melee');
+
+  // Auto ON (default) → damage without hold
+  dungeon.monsters[0].hp = 200;
+  const clock3 = createRealtimeClock();
+  tickRealtime(player, dungeon, { dx: 1, dy: 0, autoAttack: true }, 0.05, 3, clock3);
+  assert.ok(dungeon.monsters[0].hp < 200, 'Auto ON swings without holding ATK');
+});
