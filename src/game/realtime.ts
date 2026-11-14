@@ -24,7 +24,7 @@ import {
 } from './combat';
 import { applyEnvironmentalTurnEffects } from './events';
 import { SoundEventType } from './audio';
-import { updateFOV } from './dungeon';
+import { updateFOVIncremental } from './dungeon';
 
 /** Footprint in tiles — < 1 so an entity can straddle two cells. */
 export const ENTITY_BODY = 0.72;
@@ -57,6 +57,11 @@ export interface RealtimeClock {
   statusAcc: number;
   /** Prevent re-triggering one-shot tiles every frame */
   triggeredTiles: Set<string>;
+  /** Incremental FOV: last visible cells to clear (avoids full-map wipe) */
+  lastVisible: Array<{ x: number; y: number }>;
+  lastFovTx: number;
+  lastFovTy: number;
+  fovAcc: number;
 }
 
 export function createRealtimeClock(): RealtimeClock {
@@ -64,7 +69,11 @@ export function createRealtimeClock(): RealtimeClock {
     playerAttackCd: 0,
     monsterAttackCd: {},
     statusAcc: 0,
-    triggeredTiles: new Set()
+    triggeredTiles: new Set(),
+    lastVisible: [],
+    lastFovTx: -9999,
+    lastFovTy: -9999,
+    fovAcc: 0
   };
 }
 
@@ -332,17 +341,17 @@ function clonePlayer(player: Player): Player {
   };
 }
 
-function cloneDungeon(dungeon: DungeonState): DungeonState {
-  return {
-    ...dungeon,
-    monsters: dungeon.monsters.map(m => ({ ...m })),
-    tiles: dungeon.tiles.map(row => row.map(t => ({ ...t }))),
-    groundCoins: dungeon.groundCoins ? dungeon.groundCoins.map(c => ({ ...c })) : [],
-    checkpoints: dungeon.checkpoints ? dungeon.checkpoints.map(cp => ({ ...cp })) : [],
-    deathDrops: dungeon.deathDrops
-      ? dungeon.deathDrops.map(d => ({ ...d, items: [...d.items], equipment: { ...d.equipment } }))
-      : []
-  };
+/**
+ * Hot-path dungeon handle: KEEP the same tile grid reference.
+ * Deep-cloning thousands of tiles every rAF frame was the main lag source
+ * (and the cause of music stutter via main-thread stalls).
+ * Mutate monsters/coins/FOV in place on the live dungeon owned by playerRef/dungeonRef.
+ */
+function liveDungeon(dungeon: DungeonState): DungeonState {
+  if (!dungeon.groundCoins) dungeon.groundCoins = [];
+  if (!dungeon.checkpoints) dungeon.checkpoints = [];
+  if (!dungeon.deathDrops) dungeon.deathDrops = [];
+  return dungeon;
 }
 
 function applyStatusTick(
@@ -528,6 +537,9 @@ function tickMonsters(
       soundEvents.push('monster_alert');
     }
     if (!monster.alerted) continue;
+
+    // Far-away alerted packs: skip heavy chase/collision until the player is near
+    if (dist > 14 && monster.archetype !== 'core_synthesizer') continue;
 
     const range = monsterAttackRange(monster);
     const cd = clock.monsterAttackCd[monster.id] || 0;
@@ -750,8 +762,10 @@ export function tickRealtime(
   turn: number,
   clock: RealtimeClock
 ): RealtimeTickResult {
+  // Mutate the live refs in place — clonePlayer only for a cheap shallow player copy
+  // so React can still receive a new object identity when we sync HUD.
   const player = clonePlayer(playerIn);
-  const dungeon = cloneDungeon(dungeonIn);
+  const dungeon = liveDungeon(dungeonIn);
   const logs: CombatLogEntry[] = [];
   const soundEvents: SoundEventType[] = [];
   const floatingTexts: RealtimeTickResult['floatingTexts'] = [];
@@ -857,9 +871,18 @@ export function tickRealtime(
     applyStatusTick(player, dungeon, turn + statusTicks, logs, soundEvents, floatingTexts);
   }
 
-  // FOV from continuous position (floor of center)
+  // FOV: incremental clear + throttle (~12 Hz) unless the player entered a new tile
   const center = entityCenter(player.x, player.y);
-  updateFOV(dungeon.tiles, Math.floor(center.cx), Math.floor(center.cy), getFovRadius(dungeon));
+  const fovTx = Math.floor(center.cx);
+  const fovTy = Math.floor(center.cy);
+  const fovMoved = fovTx !== clock.lastFovTx || fovTy !== clock.lastFovTy;
+  clock.fovAcc += dt;
+  if (fovMoved || clock.fovAcc >= 0.08) {
+    clock.fovAcc = 0;
+    clock.lastFovTx = fovTx;
+    clock.lastFovTy = fovTy;
+    updateFOVIncremental(dungeon.tiles, fovTx, fovTy, getFovRadius(dungeon), clock.lastVisible);
+  }
 
   if (!gameOver && player.stats.hp <= 0) {
     player.stats.hp = 0;

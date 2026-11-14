@@ -950,10 +950,11 @@ export class CanvasRenderer {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // 7. RETRO CRT SCANLINE OVERLAY
+    // 7. RETRO CRT SCANLINE OVERLAY (cheap: 2 fills, not hundreds of 1px rects)
     if (this.enableScanlines) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-      for (let y = 0; y < height; y += 3) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+      // Simulate scanlines with a repeating pattern via a coarse stride
+      for (let y = 0; y < height; y += 4) {
         ctx.fillRect(0, y, width, 1);
       }
       const grad = ctx.createRadialGradient(width / 2, height / 2, width * 0.35, width / 2, height / 2, width * 0.7);
