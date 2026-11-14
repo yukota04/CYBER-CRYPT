@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { GameItem, Player } from '../game/types';
 import { Language, t } from '../game/i18n';
 import { getRarityStyle } from '../game/rarity';
+import { getLocalizedItemName } from '../game/itemI18n';
 import { X } from 'lucide-react';
 
 const TRADE_SLOTS = 6;
@@ -98,7 +99,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     }`}
                   >
                     <span className="text-xl">{item.icon}</span>
-                    <span className={`text-[8px] truncate w-full text-center ${r.titleClass}`}>{item.name}</span>
+                    <span className={`text-[8px] truncate w-full text-center ${r.titleClass}`}>
+                      {getLocalizedItemName(item, language, { includeUpgrade: false, includeLevel: false })}
+                    </span>
                   </button>
                 );
               })}
@@ -129,7 +132,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     {item ? (
                       <>
                         <span className="text-lg">{item.icon}</span>
-                        <span className="text-[8px] truncate w-full text-center px-0.5">{item.name}</span>
+                        <span className="text-[8px] truncate w-full text-center px-0.5">
+                          {getLocalizedItemName(item, language)}
+                        </span>
                       </>
                     ) : (
                       <span className="text-[10px]">#{idx + 1}</span>
@@ -153,7 +158,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                     {item ? (
                       <>
                         <span className="text-lg">{item.icon}</span>
-                        <span className="text-[8px] truncate w-full text-center px-0.5">{item.name}</span>
+                        <span className="text-[8px] truncate w-full text-center px-0.5">
+                          {getLocalizedItemName(item, language)}
+                        </span>
                       </>
                     ) : (
                       <span className="text-[10px]">#{idx + 1}</span>
