@@ -67,15 +67,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const energyPercent = Math.max(0, Math.min(1, player.stats.energy / totals.maxEnergy));
   const expPercent = Math.max(0, Math.min(1, player.stats.exp / player.stats.expToNext));
 
-  // Prioritize unlocked active skills across all 5 trees (up to 8 hotbar buttons)
+  // Unlocked active skills only — slide rail shows 3 at a time
   const classActiveSkills = Object.values(SKILL_DATABASE)
     .filter(s => s.branch === player.characterClass && s.type === 'active')
-    .sort((a, b) => {
-      const aUn = player.unlockedSkills.includes(a.id) ? 1 : 0;
-      const bUn = player.unlockedSkills.includes(b.id) ? 1 : 0;
-      return bUn - aUn;
-    })
-    .slice(0, 8);
+    .filter(s => player.unlockedSkills.includes(s.id))
+    .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
 
   const localCoopSlot = coopRoom?.players.find(p => p.playerId === localPlayerId);
   const movedCount = coopRoom?.players.filter(p => p.alive && p.movedThisTurn).length || 0;
@@ -299,7 +295,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       {/* BOTTOM CLUSTER */}
       <div className="flex flex-col sm:flex-row items-end justify-between w-full gap-3">
-        <div className="cc-panel hidden sm:flex items-center gap-1.5 pointer-events-auto p-2">
+        <div
+          className="cc-panel hidden sm:flex items-center gap-3 pointer-events-auto px-3 py-3 min-h-[96px]"
+          data-testid="desktop-combat-hotbar"
+        >
           <button
             data-testid="hud-auto-attack-btn"
             type="button"
@@ -307,7 +306,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             aria-pressed={autoAttack}
             title={autoAttack ? t('autoAttackOn', language) : t('autoAttackOff', language)}
             aria-label={autoAttack ? t('autoAttackOn', language) : t('autoAttackOff', language)}
-            className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full border-2 transition cursor-pointer active:scale-90 ${
+            className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition cursor-pointer active:scale-90 shrink-0 ${
               autoAttack
                 ? 'border-emerald-300 bg-emerald-950/70 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
                 : 'border-slate-600 bg-slate-900/70 text-slate-400'
@@ -330,7 +329,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             disabled={!!localCoopSlot?.movedThisTurn}
             title={`${t('rangedStrikeBtn', language)} (${attackRange} tiles) — Click enemy or press F`}
             aria-label={`Ranged Attack (${attackRange} tiles)`}
-            className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition cursor-pointer active:scale-[0.86] active:brightness-125 ${
+            className={`relative flex flex-col items-center justify-center w-[4.5rem] h-[4.5rem] rounded-full border-2 transition cursor-pointer active:scale-[0.86] active:brightness-125 shrink-0 ${
               localCoopSlot?.movedThisTurn
                 ? 'opacity-50 border-slate-700 bg-slate-900/60 cursor-not-allowed'
                 : 'border-amber-400 bg-amber-950/70 text-amber-200 shadow-[0_0_14px_rgba(255,230,0,0.35)]'
@@ -341,53 +340,67 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <span className="text-[9px] font-bold leading-none">RNG {attackRange}</span>
           </button>
 
-          {classActiveSkills.map((skill, index) => {
-            const isUnlocked = player.unlockedSkills.includes(skill.id);
-            const cd = player.activeCooldowns[skill.id] || 0;
-            const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
-            const canAfford = player.stats.energy >= energyNeeded;
-            const isReady = isUnlocked && cd === 0 && canAfford && !localCoopSlot?.movedThisTurn;
+          <div
+            className="overflow-x-auto overscroll-x-contain"
+            data-testid="desktop-skill-slide"
+            style={{
+              width: 'calc(3 * 3.75rem + 2 * 0.5rem)',
+              scrollbarWidth: 'thin'
+            }}
+            title={t('skillSlideHint', language)}
+          >
+            <div className="flex items-center gap-2 min-h-[4.25rem] pr-1">
+              {classActiveSkills.length === 0 && (
+                <div className="text-[10px] text-slate-500 font-mono px-2">—</div>
+              )}
+              {classActiveSkills.map((skill, index) => {
+                const cd = player.activeCooldowns[skill.id] || 0;
+                const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
+                const canAfford = player.stats.energy >= energyNeeded;
+                const isReady = cd === 0 && canAfford && !localCoopSlot?.movedThisTurn;
 
-            return (
-              <button
-                key={skill.id}
-                type="button"
-                onPointerDown={e => {
-                  if (!isReady) return;
-                  if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-                    e.preventDefault();
-                    onCastSkill(skill.id);
-                  }
-                }}
-                onClick={() => isReady && onCastSkill(skill.id)}
-                disabled={!isReady}
-                aria-label={`${skill.name} (${energyNeeded} NRG)`}
-                data-ready={isReady ? 'true' : 'false'}
-                className={`cc-hotbar-slot relative w-13 h-14 rounded cursor-pointer active:scale-90 active:brightness-125 ${
-                  !isUnlocked ? 'opacity-40 cursor-not-allowed' : isReady ? 'skill-ready-glow' : 'cursor-not-allowed'
-                }`}
-                style={
-                  isReady
-                    ? { animation: 'skillReadyPulse 1.6s ease-in-out infinite' }
-                    : undefined
-                }
-                title={`${skill.name} (${energyNeeded} NRG) - ${skill.description}`}
-              >
-                <span className="absolute top-0.5 left-1 text-[9px] font-bold text-cyan-300">
-                  [{index + 1}]
-                </span>
-                <span className="absolute top-0.5 right-1 text-[9px] font-mono text-cyan-400">
-                  {energyNeeded}e
-                </span>
-                <GameIcon id={skill.id} fallback={skill.icon} size={28} className="mt-1" />
-                {cd > 0 && (
-                  <div className="absolute inset-0 bg-black/75 rounded flex items-center justify-center font-bold text-pink-400 text-sm">
-                    {cd}t
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                return (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onPointerDown={e => {
+                      if (!isReady) return;
+                      if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+                        e.preventDefault();
+                        onCastSkill(skill.id);
+                      }
+                    }}
+                    onClick={() => isReady && onCastSkill(skill.id)}
+                    disabled={!isReady}
+                    aria-label={`${skill.name} (${energyNeeded} NRG)`}
+                    data-ready={isReady ? 'true' : 'false'}
+                    className={`cc-hotbar-slot relative w-[3.75rem] h-[4.25rem] rounded cursor-pointer active:scale-90 active:brightness-125 shrink-0 ${
+                      isReady ? 'skill-ready-glow' : 'cursor-not-allowed'
+                    }`}
+                    style={
+                      isReady
+                        ? { animation: 'skillReadyPulse 1.6s ease-in-out infinite' }
+                        : undefined
+                    }
+                    title={`${skill.name} (${energyNeeded} NRG) - ${skill.description}`}
+                  >
+                    <span className="absolute top-1 left-1 text-[9px] font-bold text-cyan-300">
+                      [{index + 1}]
+                    </span>
+                    <span className="absolute top-1 right-1 text-[9px] font-mono text-cyan-400">
+                      {energyNeeded}e
+                    </span>
+                    <GameIcon id={skill.id} fallback={skill.icon} size={28} className="mt-1" />
+                    {cd > 0 && (
+                      <div className="absolute inset-0 bg-black/75 rounded flex items-center justify-center font-bold text-pink-400 text-sm">
+                        {cd}t
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="cc-panel w-full sm:max-w-md h-9 sm:h-24 overflow-hidden px-2 py-1 sm:p-2.5 text-[10px] sm:text-[11px] leading-relaxed flex flex-col-reverse justify-start pointer-events-auto">
