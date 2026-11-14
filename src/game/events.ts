@@ -93,6 +93,7 @@ export function generateShopItems(floor: number, includeBlackMarketBonus = false
 
   const stoneItem: GameItem = {
     id: uid('prob_stone'),
+    baseKey: 'probability_stone',
     name: 'Probability Stone (+60%)',
     type: 'consumable',
     rarity: 'legendary',
@@ -104,10 +105,12 @@ export function generateShopItems(floor: number, includeBlackMarketBonus = false
   };
 
   const gearLevel = Math.max(1, floor);
+  const wepKey = floor >= 5 ? 'shop_void_katana' : 'shop_plasma_katana';
   const shardGear: GameItem[] = [
     {
       id: uid('wep'),
-      name: `${floor >= 5 ? 'Void-Edge Plasma Katana' : 'Plasma Arc Katana'} [Lv.${gearLevel}]`,
+      baseKey: wepKey,
+      name: floor >= 5 ? 'Void-Edge Plasma Katana' : 'Plasma Arc Katana',
       type: 'weapon',
       weaponCategory: 'katana',
       allowedClasses: ['striker'],
@@ -123,7 +126,8 @@ export function generateShopItems(floor: number, includeBlackMarketBonus = false
     },
     {
       id: uid('arm'),
-      name: `Aegis Carbon Nano-Weave [Lv.${gearLevel}]`,
+      baseKey: 'shop_aegis_armor',
+      name: 'Aegis Carbon Nano-Weave',
       type: 'chest',
       rarity: floor >= 5 ? 'legendary' : 'epic',
       description: 'Hardened graphene composite armor with built-in kinetic dissipators.',
