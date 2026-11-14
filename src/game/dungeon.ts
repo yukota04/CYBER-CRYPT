@@ -20,6 +20,8 @@ export interface DungeonConfig {
   minRoomSize: number;
   maxRoomSize: number;
   floor: number;
+  /** Alive party size — scales creature HP/damage in co-op */
+  partySize?: number;
 }
 
 const DEFAULT_CONFIG: DungeonConfig = {
@@ -28,8 +30,21 @@ const DEFAULT_CONFIG: DungeonConfig = {
   maxRooms: 13,
   minRoomSize: 6,
   maxRoomSize: 12,
-  floor: 1
+  floor: 1,
+  partySize: 1
 };
+
+/** Extra toughness / damage when more operatives share a floor. */
+export function getPartyThreatMultipliers(partySize = 1): { hp: number; attack: number; defense: number } {
+  const n = Math.max(1, Math.min(3, Math.floor(partySize)));
+  if (n <= 1) return { hp: 1, attack: 1, defense: 1 };
+  // 2P ≈ +50% HP / +35% ATK; 3P ≈ +100% HP / +70% ATK
+  return {
+    hp: 1 + (n - 1) * 0.5,
+    attack: 1 + (n - 1) * 0.35,
+    defense: 1 + (n - 1) * 0.2
+  };
+}
 
 const EVOLVED_SHAPES: MonsterVisualVariant['bodyShape'][] = [
   'hex',
@@ -313,9 +328,12 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
   const monsters: Monster[] = [];
   const pendingSpawns: PendingMonsterSpawn[] = [];
   let monsterIdCount = 1;
-  const hpCurve = 1 + (floor - 1) * 0.25 + Math.pow(Math.max(0, floor - 1), 1.28) * 0.03;
-  const atkScale = Math.floor((floor - 1) * 2.1);
-  const defScale = Math.floor((floor - 1) * 1.1);
+  const partySize = Math.max(1, Math.min(3, config.partySize ?? 1));
+  const partyThreat = getPartyThreatMultipliers(partySize);
+  const hpCurve =
+    (1 + (floor - 1) * 0.25 + Math.pow(Math.max(0, floor - 1), 1.28) * 0.03) * partyThreat.hp;
+  const atkScale = Math.floor((floor - 1) * 2.1 * partyThreat.attack);
+  const defScale = Math.floor((floor - 1) * 1.1 * partyThreat.defense);
   const rewardScale = 1 + (floor - 1) * 0.24;
 
   const minPerRoom = 2 + Math.floor((floor - 1) / 3);
@@ -341,8 +359,8 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         y: Math.max(room.y + 1, room.centerY - 1),
         hp: bossHp,
         maxHp: bossHp,
-        attack: 16 + Math.floor(floor * 3.2),
-        defense: 9 + Math.floor(floor * 1.6),
+        attack: Math.round((16 + Math.floor(floor * 3.2)) * partyThreat.attack),
+        defense: Math.round((9 + Math.floor(floor * 1.6)) * partyThreat.defense),
         expReward: Math.round(145 * rewardScale),
         shardReward: Math.max(1, Math.round(40 * rewardScale * SHARD_DROP_MULT)),
         color: variant.primaryColor,
@@ -411,8 +429,9 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
       const idNum = monsterIdCount++;
       const variant = buildMonsterVisualVariant(floor, archetype, idNum);
       const hp = Math.round(baseHp * hpCurve);
-      const attack = baseAtk + atkScale;
-      const defense = baseDef + defScale;
+      // atkScale already includes party attack; baseAtk gets a light party bump too
+      const attackFinal = Math.round(baseAtk * partyThreat.attack + atkScale);
+      const defense = Math.round(baseDef * partyThreat.defense + defScale);
       const monsterLevel =
         archetype === 'cyber_behemoth'
           ? floor + 2
@@ -429,7 +448,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         y: my,
         hp,
         maxHp: hp,
-        attack,
+        attack: attackFinal,
         defense,
         expReward: Math.round(baseExp * rewardScale),
         shardReward: Math.max(1, Math.round(baseShard * rewardScale * SHARD_DROP_MULT)),

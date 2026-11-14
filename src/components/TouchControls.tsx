@@ -31,7 +31,9 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
 }) => {
   const attackRange = getPlayerAttackRange(player);
   const [orbitOffset, setOrbitOffset] = useState(0);
+  const [pressFx, setPressFx] = useState<{ id: string; key: number } | null>(null);
   const dragRef = useRef<{ x: number; active: boolean } | null>(null);
+  const pressKeyRef = useRef(0);
 
   const unlockedSkills = useMemo(() => {
     return Object.values(SKILL_DATABASE)
@@ -51,6 +53,14 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
     }
     return out;
   }, [unlockedSkills, start]);
+
+  const triggerPressFx = (id: string) => {
+    pressKeyRef.current += 1;
+    setPressFx({ id, key: pressKeyRef.current });
+    window.setTimeout(() => {
+      setPressFx(prev => (prev?.key === pressKeyRef.current ? null : prev));
+    }, 280);
+  };
 
   const onOrbitPointerDown = (e: React.PointerEvent) => {
     dragRef.current = { x: e.clientX, active: true };
@@ -77,6 +87,20 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
       data-no-joystick
       data-testid="mobile-combat-cluster"
     >
+      <style>{`
+        @keyframes skillReadyPulse {
+          0%, 100% { box-shadow: 0 0 10px rgba(0,240,255,0.35), 0 0 0 0 rgba(0,240,255,0.45); }
+          50% { box-shadow: 0 0 18px rgba(0,240,255,0.75), 0 0 0 8px rgba(0,240,255,0); }
+        }
+        @keyframes touchImpactRing {
+          0% { transform: scale(0.55); opacity: 0.85; }
+          100% { transform: scale(1.55); opacity: 0; }
+        }
+        @keyframes touchImpactFlash {
+          0% { opacity: 0.55; }
+          100% { opacity: 0; }
+        }
+      `}</style>
       <div
         className="relative pointer-events-auto touch-none"
         style={{ width: 168, height: 168 }}
@@ -94,50 +118,86 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
           const canAfford = player.stats.energy >= energyNeeded;
           const isReady = cd <= 0 && canAfford;
           const cdSec = Math.max(0, cd);
+          const showImpact = pressFx?.id === skill.id;
 
           return (
             <button
               key={`${skill.id}_${idx}`}
               type="button"
               data-testid={`orbit-skill-${skill.id}`}
+              onPointerDown={e => {
+                e.stopPropagation();
+                if (!isReady) return;
+                triggerPressFx(skill.id);
+              }}
               onClick={e => {
                 e.stopPropagation();
                 if (isReady) onCastSkill(skill.id);
               }}
               disabled={!isReady}
               aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
-              className={`absolute flex items-center justify-center rounded-full border-2 text-xl transition active:scale-95 ${
+              className={`absolute flex items-center justify-center rounded-full border-2 text-xl transition-transform duration-100 active:scale-90 ${
                 isReady
-                  ? 'bg-cyan-950/90 border-cyan-300 text-white shadow-[0_0_16px_rgba(0,240,255,0.45)]'
+                  ? 'bg-cyan-950/90 border-cyan-300 text-white'
                   : 'bg-slate-950/90 border-slate-600 text-slate-400 opacity-80'
               }`}
               style={{
                 width: BUBBLE,
                 height: BUBBLE,
                 left: cx - BUBBLE / 2,
-                top: cy - BUBBLE / 2
+                top: cy - BUBBLE / 2,
+                animation: isReady ? 'skillReadyPulse 1.6s ease-in-out infinite' : undefined
               }}
             >
-              <span>{skill.icon}</span>
+              <span className="relative z-[1]">{skill.icon}</span>
               {cdSec > 0 && (
-                <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300">
+                <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300 z-[2]">
                   {cdSec}
                 </span>
+              )}
+              {showImpact && (
+                <>
+                  <span
+                    className="absolute inset-0 rounded-full border-2 border-cyan-200 pointer-events-none z-[3]"
+                    style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
+                  />
+                  <span
+                    className="absolute inset-0 rounded-full bg-cyan-300/40 pointer-events-none z-[3]"
+                    style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
+                  />
+                </>
               )}
             </button>
           );
         })}
 
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <CanvasButton
-            label={`ATK ${attackRange}`}
-            icon="🎯"
-            theme="amber"
-            width={88}
-            height={88}
-            aria-label={`Mobile Attack (${attackRange} tiles)`}
-            onClick={onRangedAttack}
-          />
+          <div className="relative">
+            <CanvasButton
+              label={`ATK ${attackRange}`}
+              icon="🎯"
+              theme="amber"
+              width={88}
+              height={88}
+              aria-label={`Mobile Attack (${attackRange} tiles)`}
+              onClick={() => {
+                triggerPressFx('atk');
+                onRangedAttack();
+              }}
+            />
+            {pressFx?.id === 'atk' && (
+              <>
+                <span
+                  className="absolute inset-0 rounded-full border-2 border-amber-200 pointer-events-none"
+                  style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
+                />
+                <span
+                  className="absolute inset-0 rounded-full bg-amber-300/35 pointer-events-none"
+                  style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
+                />
+              </>
+            )}
+          </div>
         </div>
 
         {unlockedSkills.length > VISIBLE && (

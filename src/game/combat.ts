@@ -16,7 +16,7 @@ import {
 } from './types';
 import { SKILL_DATABASE } from './skills';
 import { applyEnvironmentalTurnEffects } from './events';
-import { canClassEquipItem, createItem, getEffectiveItemStats } from './items';
+import { canClassEquipItem, canMeetItemLevelRequirement, createItem, getEffectiveItemStats } from './items';
 import { SoundEventType } from './audio';
 
 export interface ActionResult {
@@ -275,7 +275,12 @@ export function collectDeathDropBagsAt(
       if (!eqItem) continue;
       totalItems++;
       const twoHandBlocked = slot === 'offhand' && player.equipment.weapon?.twoHanded;
-      if (!player.equipment[slot] && !twoHandBlocked && canClassEquipItem(player.characterClass, eqItem)) {
+      if (
+        !player.equipment[slot] &&
+        !twoHandBlocked &&
+        canClassEquipItem(player.characterClass, eqItem) &&
+        canMeetItemLevelRequirement(player.stats.level, eqItem)
+      ) {
         player.equipment[slot] = { ...eqItem };
       } else {
         player.inventory.push({ ...eqItem });
