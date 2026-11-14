@@ -435,6 +435,8 @@ export function createInitialPlayer(cls: 'striker' | 'technomancer' | 'vanguard'
       createItem('energy_cell', 'start_cell_1')
     ],
     maxInventory: 16,
+    inventoryBonusSlots: 0,
+    inventoryBonusExpiresAt: 0,
     activeCooldowns: {},
     unlockedSkills: [defaultStarterSkill],
     facing: 'down',

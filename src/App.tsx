@@ -61,6 +61,13 @@ import { preloadAdsBitvex } from './game/adsbitvex';
 import { CanvasRenderer, CoopRemoteRenderPlayer } from './game/canvasRenderer';
 import { createRealtimeClock, tickRealtime, type RealtimeClock } from './game/realtime';
 import { Language, t } from './game/i18n';
+import {
+  clearAuthSession,
+  loadStoredAuthSession,
+  readKeepSignedInPref,
+  saveAuthSession
+} from './game/authSession';
+import { refreshInventoryCapacity, unlockInventorySlotFromAd } from './game/inventorySlots';
 
 import { LoginScreen, type AuthCredentials, type RegisterPayload } from './components/LoginScreen';
 import { TitleScreen } from './components/TitleScreen';
@@ -486,9 +493,19 @@ export default function App() {
         if (screenShake > 0) rendererRef.current.addTrauma(Math.min(0.45, screenShake));
         // Visual hitstop freeze-frame + micro-shake (player movement keeps running in sim)
         if (hitstopSeconds > 0) rendererRef.current.triggerHitstop(Math.min(0.16, hitstopSeconds));
+        if (events.includes('player_hurt')) {
+          rendererRef.current.triggerDamageFeedback(0.95);
+        }
         const maxFx = 3;
         for (let i = 0; i < attackEffects.length && i < maxFx; i++) {
           rendererRef.current.spawnAttackEffect(attackEffects[i]);
+        }
+        if (
+          attackEffects.some(fx =>
+            fx.type === 'slash' || fx.type === 'crit_slash' || fx.type === 'smash' || fx.type === 'beam'
+          )
+        ) {
+          rendererRef.current.notifyMeleeSwing();
         }
       }
       for (const f of floaters) {
@@ -544,43 +561,51 @@ export default function App() {
   }, [requestNativeFullscreen]);
 
   const applyAuthSuccess = useCallback(
-    (token: string, user: { id: string; username: string; role: 'player' | 'moderator' | 'admin' }) => {
+    (
+      token: string,
+      user: { id: string; username: string; role: 'player' | 'moderator' | 'admin'; login?: string },
+      keepSignedIn = true
+    ) => {
       setUserToken(token);
       setUserProfile(user);
       setCloudSyncStatus('Encrypted Cloud Synced');
       setAuthNotice(null);
       setAuthScreenVisible(false);
+      saveAuthSession(token, user, keepSignedIn);
     },
     []
   );
 
-  const handleGuestLogin = useCallback(async () => {
-    if (window.innerWidth < 768 || 'ontouchstart' in window) {
-      requestNativeFullscreen();
-    }
-    setIsAuthLoading(true);
-    setAuthNotice(null);
-    try {
-      const res = await fetch('/api/auth/guest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
-        })
-      });
-      const data = await res.json();
-      if (data.token && data.user) {
-        applyAuthSuccess(data.token, data.user);
-        return;
+  const handleGuestLogin = useCallback(
+    async (opts: { keepSignedIn: boolean } = { keepSignedIn: true }) => {
+      if (window.innerWidth < 768 || 'ontouchstart' in window) {
+        requestNativeFullscreen();
       }
-      setAuthNotice(data.error || 'Guest login failed.');
-    } catch {
-      setCloudSyncStatus('Local Storage Only');
-      setAuthNotice('Guest login failed (offline).');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  }, [requestNativeFullscreen, applyAuthSuccess]);
+      setIsAuthLoading(true);
+      setAuthNotice(null);
+      try {
+        const res = await fetch('/api/auth/guest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
+          })
+        });
+        const data = await res.json();
+        if (data.token && data.user) {
+          applyAuthSuccess(data.token, data.user, opts.keepSignedIn);
+          return;
+        }
+        setAuthNotice(data.error || 'Guest login failed.');
+      } catch {
+        setCloudSyncStatus('Local Storage Only');
+        setAuthNotice('Guest login failed (offline).');
+      } finally {
+        setIsAuthLoading(false);
+      }
+    },
+    [requestNativeFullscreen, applyAuthSuccess]
+  );
 
   const handlePasswordLogin = useCallback(
     async (creds: AuthCredentials) => {
@@ -598,7 +623,7 @@ export default function App() {
         });
         const data = await res.json();
         if (res.ok && data.token && data.user) {
-          applyAuthSuccess(data.token, data.user);
+          applyAuthSuccess(data.token, data.user, creds.keepSignedIn);
           return;
         }
         setAuthNotice(data.error || t('authLoginFailed', language));
@@ -629,7 +654,7 @@ export default function App() {
         });
         const data = await res.json();
         if (res.ok && data.token && data.user) {
-          applyAuthSuccess(data.token, data.user);
+          applyAuthSuccess(data.token, data.user, payload.keepSignedIn);
           return;
         }
         if (data.code === 'LOGIN_TAKEN') setAuthNotice(t('authLoginTaken', language));
@@ -688,15 +713,46 @@ export default function App() {
     };
   }, []);
 
-  // Autostart + Firestore connectivity probe (no Google auth)
+  // Restore "keep signed in" session, then optional autostart / Firestore probe
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const autostart = params.get('autostart') === '1';
-    testFirestoreConnection();
-    if (autostart) {
-      setAuthScreenVisible(false);
-      handleStartGame();
-    }
+    let cancelled = false;
+    const boot = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const autostart = params.get('autostart') === '1';
+      testFirestoreConnection();
+
+      const stored = loadStoredAuthSession();
+      if (stored?.token && !autostart) {
+        setIsAuthLoading(true);
+        try {
+          const res = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${stored.token}` }
+          });
+          if (!cancelled && res.ok) {
+            const data = await res.json();
+            if (data.user) {
+              applyAuthSuccess(data.token || stored.token, data.user, true);
+              setIsAuthLoading(false);
+              return;
+            }
+          }
+          if (!cancelled) clearAuthSession();
+        } catch {
+          if (!cancelled) clearAuthSession();
+        } finally {
+          if (!cancelled) setIsAuthLoading(false);
+        }
+      }
+
+      if (!cancelled && autostart) {
+        setAuthScreenVisible(false);
+        handleStartGame();
+      }
+    };
+    boot();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1037,6 +1093,7 @@ export default function App() {
     }
     setUserToken('');
     setUserProfile(null);
+    clearAuthSession();
     setAuthNotice(null);
     setOnlineStashes({});
     setCloudSyncStatus('Local Device Save');
@@ -1903,8 +1960,13 @@ export default function App() {
         }
         if (e.key === 'i' || e.key === 'I') {
           setShowInventory(prev => {
-            if (prev) setUpgradeFeedback(null);
-            return !prev;
+            if (prev) {
+              setUpgradeFeedback(null);
+              return false;
+            }
+            // Capacity refresh happens in the openInventory path for HUD;
+            // keyboard open still refreshes via commit on next tick below.
+            return true;
           });
           return;
         }
@@ -2181,8 +2243,12 @@ export default function App() {
       if (prev.inventory.length < prev.maxInventory) {
         return { ...prev, inventory: [...prev.inventory, item] };
       }
-      // If bag happens to be full, expand temp capacity by 1 so recovery never fails
-      return { ...prev, maxInventory: prev.maxInventory + 1, inventory: [...prev.inventory, item] };
+      // If bag happens to be full, expand temp capacity by 1 so recovery never fails (cap 24)
+      return {
+        ...prev,
+        maxInventory: Math.min(24, prev.maxInventory + 1),
+        inventory: [...prev.inventory, item]
+      };
     });
 
     setUpgradeFeedback({
@@ -2205,6 +2271,55 @@ export default function App() {
   const handleDeclineRecoverDestroyedItem = useCallback(() => {
     setDestroyedItemRecovery(null);
   }, []);
+
+  const handleUnlockInventorySlot = useCallback(() => {
+    commitPlayer(prev => {
+      const next = {
+        ...prev,
+        inventory: [...prev.inventory],
+        inventoryBonusSlots: prev.inventoryBonusSlots || 0,
+        inventoryBonusExpiresAt: prev.inventoryBonusExpiresAt || 0
+      };
+      const result = unlockInventorySlotFromAd(next);
+      if (!result.ok) return prev;
+      return { ...result.player };
+    });
+    soundEngine.playSFX('level_up');
+    setCombatLogs(prev => [
+      {
+        id: `inv_slot_${Date.now()}`,
+        text: '📺 AD: +1 backpack slot unlocked (24h timer reset).',
+        type: 'level_up' as const,
+        turn: turnRef.current
+      },
+      ...prev
+    ].slice(0, 30));
+  }, [commitPlayer]);
+
+  const syncInventoryCapacity = useCallback(() => {
+    commitPlayer(prev => {
+      const next = { ...prev, inventory: [...prev.inventory] };
+      refreshInventoryCapacity(next);
+      if (
+        next.maxInventory === prev.maxInventory &&
+        (next.inventoryBonusSlots || 0) === (prev.inventoryBonusSlots || 0) &&
+        (next.inventoryBonusExpiresAt || 0) === (prev.inventoryBonusExpiresAt || 0)
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [commitPlayer]);
+
+  const openInventory = useCallback(() => {
+    syncInventoryCapacity();
+    soundEngine.playUI('open');
+    setShowInventory(true);
+  }, [syncInventoryCapacity]);
+
+  useEffect(() => {
+    if (showInventory) syncInventoryCapacity();
+  }, [showInventory, syncInventoryCapacity]);
 
   const handleUseItem = (item: GameItem) => {
     if (playMode === 'online' && coopRoom?.status === 'playing') {
@@ -2486,6 +2601,7 @@ export default function App() {
           canInstallPwa={canInstallPwa}
           onInstallPwa={handleInstallPwa}
           isInstallBusy={isInstallBusy}
+          initialKeepSignedIn={readKeepSignedInPref(true)}
         />
       )}
 
@@ -2549,10 +2665,7 @@ export default function App() {
             fps={fps}
             onToggleMinimap={() => setShowMinimap(prev => !prev)}
             onToggleMute={handleToggleMasterMute}
-            onOpenInventory={() => {
-              soundEngine.playUI('open');
-              setShowInventory(true);
-            }}
+            onOpenInventory={openInventory}
             onOpenSkillTree={() => {
               soundEngine.playUI('open');
               setShowSkillTree(true);
@@ -2668,6 +2781,7 @@ export default function App() {
           destroyedItemPendingRecovery={destroyedItemRecovery?.item || null}
           onRecoverDestroyedItem={handleRecoverDestroyedItem}
           onDeclineRecoverDestroyedItem={handleDeclineRecoverDestroyedItem}
+          onUnlockInventorySlot={handleUnlockInventorySlot}
           upgradeFeedback={upgradeFeedback}
           language={language}
         />

@@ -40,6 +40,12 @@ export class CanvasRenderer {
   private particles: Particle[] = [];
   private maxParticles = 160;
   private attackEffects: VisualAttackEffect[] = [];
+  private damageVignette = 0;
+  private attackAnim = 0;
+  private moveBlend = 0;
+  private prevPlayerX = Number.NaN;
+  private prevPlayerY = Number.NaN;
+  private remoteMove = new Map<string, { x: number; y: number; blend: number }>();
   public enableScanlines = true;
   public enableGlow = true;
   public enableParticles = true;
@@ -86,6 +92,18 @@ export class CanvasRenderer {
     if (seconds <= 0) return;
     const clamped = Math.max(0.03, Math.min(0.25, seconds));
     this.hitstopTimer = Math.max(this.hitstopTimer, clamped);
+  }
+
+  /** Full-screen fear/impact feedback when the player is hurt. */
+  public triggerDamageFeedback(intensity = 0.9) {
+    const i = Math.max(0.35, Math.min(1, intensity));
+    this.damageVignette = Math.max(this.damageVignette, i);
+    this.addTrauma(0.28 * i);
+  }
+
+  /** Kick a short melee swing pose on the local humanoid. */
+  public notifyMeleeSwing() {
+    this.attackAnim = 1;
   }
 
   public getHitstopRemaining(): number {
@@ -304,6 +322,7 @@ export class CanvasRenderer {
   /**
    * Humanoid operative silhouette — distinct from procedural creature shapes.
    * Layer order: boots → legs → torso → arms/gloves → head/helmet → weapon/offhand.
+   * Anim modes: idle breath, walk cycle, attack swing.
    */
   private drawPlayerCharacter(
     ctx: CanvasRenderingContext2D,
@@ -314,7 +333,8 @@ export class CanvasRenderer {
     shieldAmount: number,
     equipment?: Player['equipment'],
     label?: string,
-    movedLockPip?: boolean
+    movedLockPip?: boolean,
+    anim?: { nowSec: number; moveBlend: number; attackAnim: number }
   ) {
     const classColors: Record<string, { suit: string; skin: string; visor: string; glow: string }> = {
       striker: { suit: '#0e7490', skin: '#fcd9b0', visor: '#ff007f', glow: '#00f0ff' },
@@ -326,8 +346,20 @@ export class CanvasRenderer {
     const facingLeft = facing === 'left';
     const facingRight = facing === 'right';
     const facingUp = facing === 'up';
+    const nowSec = anim?.nowSec ?? 0;
+    const moveBlend = Math.max(0, Math.min(1, anim?.moveBlend ?? 0));
+    const attackT = Math.max(0, Math.min(1, anim?.attackAnim ?? 0));
+    const idleBob = Math.sin(nowSec * 2.4) * 0.7 * (1 - moveBlend);
+    const walkPhase = nowSec * 11;
+    const stride = Math.sin(walkPhase) * 3.2 * moveBlend;
+    const strideOpp = Math.sin(walkPhase + Math.PI) * 3.2 * moveBlend;
+    const bodyBob = Math.abs(Math.sin(walkPhase)) * 1.4 * moveBlend + idleBob;
+    const attackSwing = Math.sin((1 - attackT) * Math.PI) * attackT * 10;
+    const attackLunge = attackT * 2.2;
+
     // Mirror helper: x relative to tile when facing left
     const mx = (x: number, w = 0) => (facingLeft ? px + 32 - x - w : px + x);
+    const faceSign = facingLeft ? -1 : 1;
 
     const weaponRarity = eq?.weapon ? getRarityStyle(eq.weapon.rarity) : null;
     const chestHex = this.gearColor(eq?.chest, c.suit);
@@ -338,10 +370,14 @@ export class CanvasRenderer {
     const wepHex = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.hex : '#e2e8f0';
     const offHex = this.gearColor(eq?.offhand, '#38bdf8');
 
-    // Ground aura
+    const by = py - bodyBob;
+    const lungeX = facingLeft || facingRight ? faceSign * attackLunge : 0;
+    const lungeY = facingUp ? -attackLunge : facing === 'down' ? attackLunge * 0.4 : 0;
+
+    // Ground aura (stretches slightly while walking)
     ctx.fillStyle = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.glowHex : 'rgba(0, 240, 255, 0.16)';
     ctx.beginPath();
-    ctx.ellipse(px + 16, py + 30, 13, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(px + 16 + lungeX * 0.3, py + 30, 13 + moveBlend * 2, 5, 0, 0, Math.PI * 2);
     ctx.fill();
     if (weaponRarity && weaponRarity.tierNumber >= 3) {
       ctx.strokeStyle = weaponRarity.hex;
@@ -358,146 +394,154 @@ export class CanvasRenderer {
 
     // --- BOOTS ---
     ctx.fillStyle = eq?.boots ? bootHex : '#475569';
-    ctx.fillRect(mx(9, 6), py + 26, 6, 5);
-    ctx.fillRect(mx(17, 6), py + 26, 6, 5);
+    ctx.fillRect(mx(9, 6) + lungeX * 0.2, by + 26 + stride * 0.35 + lungeY * 0.2, 6, 5);
+    ctx.fillRect(mx(17, 6) + lungeX * 0.2, by + 26 + strideOpp * 0.35 + lungeY * 0.2, 6, 5);
     if (eq?.boots) {
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(mx(9, 6), py + 29, 6, 2);
-      ctx.fillRect(mx(17, 6), py + 29, 6, 2);
+      ctx.fillRect(mx(9, 6) + lungeX * 0.2, by + 29 + stride * 0.35 + lungeY * 0.2, 6, 2);
+      ctx.fillRect(mx(17, 6) + lungeX * 0.2, by + 29 + strideOpp * 0.35 + lungeY * 0.2, 6, 2);
     }
 
     // --- LEGS ---
     ctx.fillStyle = eq?.legs ? legHex : c.suit;
-    ctx.fillRect(mx(10, 5), py + 18, 5, 9);
-    ctx.fillRect(mx(17, 5), py + 18, 5, 9);
+    ctx.fillRect(mx(10, 5) + lungeX * 0.25, by + 18 + stride * 0.25 + lungeY * 0.25, 5, 9);
+    ctx.fillRect(mx(17, 5) + lungeX * 0.25, by + 18 + strideOpp * 0.25 + lungeY * 0.25, 5, 9);
     if (eq?.legs) {
       ctx.strokeStyle = '#020617';
       ctx.lineWidth = 1;
-      ctx.strokeRect(mx(10, 5) + 0.5, py + 18.5, 4, 8);
-      ctx.strokeRect(mx(17, 5) + 0.5, py + 18.5, 4, 8);
+      ctx.strokeRect(mx(10, 5) + 0.5 + lungeX * 0.25, by + 18.5 + stride * 0.25, 4, 8);
+      ctx.strokeRect(mx(17, 5) + 0.5 + lungeX * 0.25, by + 18.5 + strideOpp * 0.25, 4, 8);
     }
 
     // --- TORSO (undersuit) ---
     ctx.fillStyle = c.suit;
-    ctx.fillRect(mx(10, 12), py + 10, 12, 9);
+    ctx.fillRect(mx(10, 12) + lungeX, by + 10 + lungeY, 12, 9);
 
     // Chest armor plate — large & readable
     if (eq?.chest) {
       ctx.fillStyle = chestHex;
-      ctx.fillRect(mx(9, 14), py + 10, 14, 10);
+      ctx.fillRect(mx(9, 14) + lungeX, by + 10 + lungeY, 14, 10);
       ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
-      ctx.fillRect(mx(11, 10), py + 12, 10, 3);
+      ctx.fillRect(mx(11, 10) + lungeX, by + 12 + lungeY, 10, 3);
       ctx.strokeStyle = '#f8fafc';
       ctx.lineWidth = eq.chest && getRarityStyle(eq.chest.rarity).tierNumber >= 4 ? 1.6 : 1.1;
-      ctx.strokeRect(mx(9, 14) + 0.5, py + 10.5, 13, 9);
-      // Collar / pauldrons
+      ctx.strokeRect(mx(9, 14) + 0.5 + lungeX, by + 10.5 + lungeY, 13, 9);
       ctx.fillStyle = chestHex;
-      ctx.fillRect(mx(7, 4), py + 10, 4, 4);
-      ctx.fillRect(mx(21, 4), py + 10, 4, 4);
+      ctx.fillRect(mx(7, 4) + lungeX, by + 10 + lungeY, 4, 4);
+      ctx.fillRect(mx(21, 4) + lungeX, by + 10 + lungeY, 4, 4);
     }
 
-    // --- ARMS ---
+    // --- ARMS (weapon arm swings on attack / opposite arm counters walk) ---
+    const armWalk = Math.sin(walkPhase) * 2.2 * moveBlend;
+    const weaponArmY = by + 11 + lungeY - attackSwing * 0.55 - armWalk * 0.3;
+    const offArmY = by + 11 + lungeY + armWalk * 0.35;
     ctx.fillStyle = c.suit;
-    ctx.fillRect(mx(6, 4), py + 11, 4, 8);
-    ctx.fillRect(mx(22, 4), py + 11, 4, 8);
+    ctx.fillRect(mx(6, 4) + lungeX - faceSign * attackSwing * 0.15, weaponArmY, 4, 8);
+    ctx.fillRect(mx(22, 4) + lungeX, offArmY, 4, 8);
 
     // Gloves / hands
     ctx.fillStyle = eq?.gloves ? gloveHex : c.skin;
-    ctx.fillRect(mx(5, 5), py + 17, 5, 4);
-    ctx.fillRect(mx(22, 5), py + 17, 5, 4);
+    ctx.fillRect(mx(5, 5) + lungeX - faceSign * attackSwing * 0.25, weaponArmY + 6, 5, 4);
+    ctx.fillRect(mx(22, 5) + lungeX, offArmY + 6, 5, 4);
     if (eq?.gloves) {
       ctx.strokeStyle = '#0f172a';
       ctx.lineWidth = 1;
-      ctx.strokeRect(mx(5, 5) + 0.5, py + 17.5, 4, 3);
-      ctx.strokeRect(mx(22, 5) + 0.5, py + 17.5, 4, 3);
+      ctx.strokeRect(mx(5, 5) + 0.5 + lungeX, weaponArmY + 6.5, 4, 3);
+      ctx.strokeRect(mx(22, 5) + 0.5 + lungeX, offArmY + 6.5, 4, 3);
     }
 
     // --- HEAD ---
+    const headY = by + 6 + lungeY * 0.6;
     ctx.fillStyle = c.skin;
     ctx.beginPath();
-    ctx.arc(px + 16, py + 6, 5.2, 0, Math.PI * 2);
+    ctx.arc(px + 16 + lungeX, headY, 5.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Helmet overlays head when equipped
     if (eq?.helmet) {
       ctx.fillStyle = helmHex;
       ctx.beginPath();
-      ctx.ellipse(px + 16, py + 5.5, 6.2, 5.4, 0, Math.PI, 0);
+      ctx.ellipse(px + 16 + lungeX, headY - 0.5, 6.2, 5.4, 0, Math.PI, 0);
       ctx.fill();
-      ctx.fillRect(px + 10, py + 5, 12, 4);
-      // Crest / antenna by rarity
+      ctx.fillRect(px + 10 + lungeX, headY - 1, 12, 4);
       const ht = getRarityStyle(eq.helmet.rarity).tierNumber;
       ctx.fillStyle = ht >= 3 ? helmHex : '#e2e8f0';
-      ctx.fillRect(px + 15, py + 0, 2, 4);
+      ctx.fillRect(px + 15 + lungeX, headY - 6, 2, 4);
       if (ht >= 4) {
-        ctx.fillRect(px + 12, py + 1, 2, 3);
-        ctx.fillRect(px + 18, py + 1, 2, 3);
+        ctx.fillRect(px + 12 + lungeX, headY - 5, 2, 3);
+        ctx.fillRect(px + 18 + lungeX, headY - 5, 2, 3);
       }
     }
 
-    // Visor / eyes — always readable on humanoid face
     ctx.fillStyle = c.visor;
     if (facingUp) {
-      ctx.fillRect(px + 12, py + 4, 8, 2);
+      ctx.fillRect(px + 12 + lungeX, headY - 2, 8, 2);
     } else if (facingLeft) {
-      ctx.fillRect(px + 10, py + 5, 5, 2.5);
+      ctx.fillRect(px + 10 + lungeX, headY - 1, 5, 2.5);
     } else if (facingRight) {
-      ctx.fillRect(px + 17, py + 5, 5, 2.5);
+      ctx.fillRect(px + 17 + lungeX, headY - 1, 5, 2.5);
     } else {
-      ctx.fillRect(px + 11, py + 5, 4, 2.5);
-      ctx.fillRect(px + 17, py + 5, 4, 2.5);
+      ctx.fillRect(px + 11 + lungeX, headY - 1, 4, 2.5);
+      ctx.fillRect(px + 17 + lungeX, headY - 1, 4, 2.5);
     }
 
     // --- WEAPON (dominant hand side) ---
     if (eq?.weapon) {
       const cat = eq.weapon.weaponCategory || 'sword';
-      const handX = facingLeft ? px + 3 : px + 24;
+      const handX = (facingLeft ? px + 3 : px + 24) + lungeX - faceSign * attackSwing * 0.35;
+      const wepY = weaponArmY - 4 - attackSwing * 0.8;
+      ctx.save();
+      if (attackT > 0.05) {
+        const pivotX = handX + 1.5;
+        const pivotY = weaponArmY + 8;
+        ctx.translate(pivotX, pivotY);
+        ctx.rotate(faceSign * attackSwing * 0.09);
+        ctx.translate(-pivotX, -pivotY);
+      }
       ctx.fillStyle = wepHex;
       if (cat === 'greatsword') {
-        ctx.fillRect(handX, py + 1, 4, 24);
+        ctx.fillRect(handX, wepY, 4, 24);
         ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(handX - 1, py + 16, 6, 3);
+        ctx.fillRect(handX - 1, wepY + 15, 6, 3);
       } else if (cat === 'staff' || cat === 'focus') {
-        ctx.fillRect(handX + 0.5, py + 2, 3, 24);
+        ctx.fillRect(handX + 0.5, wepY + 1, 3, 24);
         ctx.fillStyle = '#ffe600';
         ctx.beginPath();
-        ctx.arc(handX + 2, py + 3, 3.5, 0, Math.PI * 2);
+        ctx.arc(handX + 2, wepY + 2, 3.5, 0, Math.PI * 2);
         ctx.fill();
       } else if (cat === 'pistol') {
-        ctx.fillRect(handX, py + 14, 8, 4);
-        ctx.fillRect(handX + (facingLeft ? 0 : 5), py + 12, 3, 6);
+        ctx.fillRect(handX, wepY + 13, 8, 4);
+        ctx.fillRect(handX + (facingLeft ? 0 : 5), wepY + 11, 3, 6);
       } else if (cat === 'daggers') {
-        ctx.fillRect(handX, py + 10, 2.5, 12);
-        ctx.fillRect(handX + (facingLeft ? 4 : -4), py + 12, 2.5, 10);
+        ctx.fillRect(handX, wepY + 9, 2.5, 12);
+        ctx.fillRect(handX + (facingLeft ? 4 : -4), wepY + 11, 2.5, 10);
       } else if (cat === 'katana') {
-        ctx.fillRect(handX + 0.5, py + 4, 2.5, 20);
+        ctx.fillRect(handX + 0.5, wepY + 3, 2.5, 20);
         ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(handX - 0.5, py + 18, 4.5, 2);
+        ctx.fillRect(handX - 0.5, wepY + 17, 4.5, 2);
       } else {
-        // sword / default blade
-        ctx.fillRect(handX, py + 6, 3, 18);
+        ctx.fillRect(handX, wepY + 5, 3, 18);
         ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(handX - 1, py + 17, 5, 2);
+        ctx.fillRect(handX - 1, wepY + 16, 5, 2);
       }
-      // Rarity spark on tip for epic+
       if (weaponRarity && weaponRarity.tierNumber >= 3) {
         ctx.fillStyle = weaponRarity.hex;
-        ctx.fillRect(handX, py + 2, 3, 3);
+        ctx.fillRect(handX, wepY + 1, 3, 3);
       }
+      ctx.restore();
     }
 
     // --- OFFHAND (opposite side) ---
     if (eq?.offhand) {
-      const ox = facingLeft ? px + 24 : px + 2;
+      const ox = (facingLeft ? px + 24 : px + 2) + lungeX;
       const offCat = eq.offhand.weaponCategory;
       ctx.fillStyle = offHex;
       if (offCat === 'shield') {
         ctx.beginPath();
-        ctx.moveTo(ox + 3, py + 9);
-        ctx.lineTo(ox + 8, py + 11);
-        ctx.lineTo(ox + 8, py + 20);
-        ctx.lineTo(ox + 3, py + 22);
-        ctx.lineTo(ox, py + 16);
+        ctx.moveTo(ox + 3, offArmY - 2);
+        ctx.lineTo(ox + 8, offArmY);
+        ctx.lineTo(ox + 8, offArmY + 9);
+        ctx.lineTo(ox + 3, offArmY + 11);
+        ctx.lineTo(ox, offArmY + 5);
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = '#0f172a';
@@ -505,10 +549,10 @@ export class CanvasRenderer {
         ctx.stroke();
       } else if (offCat === 'focus') {
         ctx.beginPath();
-        ctx.arc(ox + 3, py + 14, 4, 0, Math.PI * 2);
+        ctx.arc(ox + 3, offArmY + 3, 4, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.fillRect(ox, py + 11, 3, 12);
+        ctx.fillRect(ox, offArmY, 3, 12);
       }
     }
 
@@ -516,7 +560,7 @@ export class CanvasRenderer {
       ctx.strokeStyle = '#00f0ff';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(px + 16, py + 16, 17, 0, Math.PI * 2);
+      ctx.arc(px + 16 + lungeX, by + 16 + lungeY, 17, 0, Math.PI * 2);
       ctx.stroke();
     }
 
@@ -526,9 +570,9 @@ export class CanvasRenderer {
       ctx.font = 'bold 9px ui-monospace, monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#060410';
-      ctx.fillText(label, px + 17, py - 5);
+      ctx.fillText(label, px + 17 + lungeX, by - 5);
       ctx.fillStyle = movedLockPip ? '#10b981' : '#f59e0b';
-      ctx.fillText(label, px + 16, py - 6);
+      ctx.fillText(label, px + 16 + lungeX, by - 6);
     }
   }
 
@@ -882,13 +926,47 @@ export class CanvasRenderer {
       }
     }
 
+    // Local movement / attack animation clocks
+    if (!isFrozen) {
+      if (Number.isFinite(this.prevPlayerX)) {
+        const movedDist = Math.hypot(player.x - this.prevPlayerX, player.y - this.prevPlayerY);
+        if (movedDist > 0.0015) {
+          this.moveBlend = Math.min(1, this.moveBlend + simDt * 9);
+        } else {
+          this.moveBlend = Math.max(0, this.moveBlend - simDt * 7);
+        }
+      }
+      this.prevPlayerX = player.x;
+      this.prevPlayerY = player.y;
+      if (this.attackAnim > 0) this.attackAnim = Math.max(0, this.attackAnim - simDt / 0.28);
+      if (this.damageVignette > 0) this.damageVignette = Math.max(0, this.damageVignette - simDt * 1.65);
+    }
+
     // 3. RENDER REMOTE CO-OP PLAYERS (if in 3P Group Session)
     if (remotePlayers && remotePlayers.length > 0) {
       for (const rp of remotePlayers) {
         if (!rp.alive) continue;
+        const prev = this.remoteMove.get(rp.playerId) || { x: rp.x, y: rp.y, blend: 0 };
+        let blend = prev.blend;
+        if (!isFrozen) {
+          const md = Math.hypot(rp.x - prev.x, rp.y - prev.y);
+          blend = md > 0.0015 ? Math.min(1, blend + simDt * 9) : Math.max(0, blend - simDt * 7);
+          this.remoteMove.set(rp.playerId, { x: rp.x, y: rp.y, blend });
+        }
         const rpx = rp.x * this.tileSize;
         const rpy = rp.y * this.tileSize;
-        this.drawPlayerCharacter(ctx, rpx, rpy, rp.characterClass, rp.facing, 0, undefined, rp.username, rp.movedThisTurn);
+        this.drawPlayerCharacter(
+          ctx,
+          rpx,
+          rpy,
+          rp.characterClass,
+          rp.facing,
+          0,
+          undefined,
+          rp.username,
+          rp.movedThisTurn,
+          { nowSec, moveBlend: blend, attackAnim: 0 }
+        );
       }
     }
 
@@ -902,7 +980,10 @@ export class CanvasRenderer {
       player.characterClass,
       player.facing,
       player.buffs.shieldAmount,
-      player.equipment
+      player.equipment,
+      undefined,
+      undefined,
+      { nowSec, moveBlend: this.moveBlend, attackAnim: this.attackAnim }
     );
 
     // 4. RENDER ATTACK & SKILL VISUAL EFFECTS
@@ -1078,6 +1159,35 @@ export class CanvasRenderer {
     if (isFrozen) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
       ctx.fillRect(0, 0, width, height);
+    }
+
+    // Player-hurt fear vignette — pulsing crimson screen edges
+    if (this.damageVignette > 0.01) {
+      const v = this.damageVignette;
+      const pulse = 0.75 + Math.sin(nowSec * 28) * 0.25;
+      const edge = Math.min(width, height) * (0.42 - v * 0.08);
+      const fear = ctx.createRadialGradient(
+        width / 2,
+        height / 2,
+        edge,
+        width / 2,
+        height / 2,
+        Math.max(width, height) * 0.72
+      );
+      fear.addColorStop(0, 'rgba(120, 0, 0, 0)');
+      fear.addColorStop(0.55, `rgba(160, 0, 20, ${0.12 * v * pulse})`);
+      fear.addColorStop(0.82, `rgba(200, 0, 30, ${0.45 * v * pulse})`);
+      fear.addColorStop(1, `rgba(255, 0, 40, ${0.72 * v})`);
+      ctx.fillStyle = fear;
+      ctx.fillRect(0, 0, width, height);
+
+      // Hard border streaks for impact punch
+      const border = Math.max(10, Math.min(width, height) * 0.045) * (0.65 + v * 0.55);
+      ctx.fillStyle = `rgba(255, 20, 40, ${0.35 * v * pulse})`;
+      ctx.fillRect(0, 0, width, border);
+      ctx.fillRect(0, height - border, width, border);
+      ctx.fillRect(0, 0, border, height);
+      ctx.fillRect(width - border, 0, border, height);
     }
 
     // 7. RETRO CRT SCANLINE OVERLAY (cheap: 2 fills, not hundreds of 1px rects)
