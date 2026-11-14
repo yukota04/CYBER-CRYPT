@@ -105,6 +105,10 @@ export default function App() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [googleNotice, setGoogleNotice] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [canInstallPwa, setCanInstallPwa] = useState(false);
+  const [isInstallBusy, setIsInstallBusy] = useState(false);
+  const deferredInstallPromptRef = useRef<any>(null);
+  const pendingGoogleUsernameRef = useRef<string | null>(null);
 
   const [appSettings, setAppSettings] = useState<AppSettings>(() => loadAppSettings());
   const [selectedClass, setSelectedClass] = useState<CharacterClass>('striker');
@@ -417,35 +421,43 @@ export default function App() {
     if (window.innerWidth < 768 || 'ontouchstart' in window) {
       requestNativeFullscreen();
     }
-    if (!userToken) {
-      try {
-        const res = await fetch('/api/auth/guest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web' })
-        });
-        const data = await res.json();
-        if (data.token) {
-          setUserToken(data.token);
-          setUserProfile(data.user);
-          setCloudSyncStatus('Encrypted Cloud Synced');
-        }
-      } catch {
-        setCloudSyncStatus('Local Storage Only');
+    try {
+      const res = await fetch('/api/auth/guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
+        })
+      });
+      const data = await res.json();
+      if (data.token) {
+        setUserToken(data.token);
+        setUserProfile(data.user);
+        setCloudSyncStatus('Encrypted Cloud Synced');
+        setAuthScreenVisible(false);
+        return;
       }
+      setGoogleNotice(data.error || 'Guest login failed.');
+    } catch {
+      setCloudSyncStatus('Local Storage Only');
+      setGoogleNotice('Guest login failed (offline).');
     }
-    setAuthScreenVisible(false);
-  }, [userToken, requestNativeFullscreen]);
+  }, [requestNativeFullscreen]);
 
   const finalizeFirebaseUserSession = useCallback(
-    async (fbUser: NonNullable<typeof auth.currentUser>) => {
+    async (fbUser: NonNullable<typeof auth.currentUser>, chosenUsername?: string | null) => {
       try {
+        const stored =
+          chosenUsername ||
+          pendingGoogleUsernameRef.current ||
+          (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('cc_pending_google_username') : null);
         const idToken = await fbUser.getIdToken();
         const res = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             idToken,
+            username: stored || undefined,
             platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web'
           })
         });
@@ -455,41 +467,109 @@ export default function App() {
           setUserProfile(data.user);
           setCloudSyncStatus('Google Cloud Synced');
           syncFirebaseUserProfile(fbUser, userStats.highestFloor, userStats.bestScore).catch(() => {});
+          pendingGoogleUsernameRef.current = null;
+          try {
+            sessionStorage.removeItem('cc_pending_google_username');
+          } catch {}
+          setGoogleNotice(null);
           setAuthScreenVisible(false);
           return true;
         }
-        setGoogleNotice(data.error || 'Google authentication failed.');
+        const errMsg =
+          data.code === 'USERNAME_TAKEN'
+            ? t('loginNameTakenError', language)
+            : data.code === 'USERNAME_REQUIRED'
+              ? t('loginNameRequiredError', language)
+              : data.error || 'Google authentication failed.';
+        setGoogleNotice(errMsg);
         return false;
       } catch {
         setGoogleNotice('Could not complete Google Sign-In sync.');
         return false;
       }
     },
-    [userStats.bestScore, userStats.highestFloor]
+    [userStats.bestScore, userStats.highestFloor, language]
   );
 
-  const handleGoogleLogin = useCallback(async () => {
-    setIsGoogleLoading(true);
-    setGoogleNotice(null);
-    if (window.innerWidth < 768 || 'ontouchstart' in window) {
-      requestNativeFullscreen();
-    }
-    try {
-      const fbUser = await signInWithGoogleNativeMobile();
-      if (fbUser) {
-        await finalizeFirebaseUserSession(fbUser);
+  const handleGoogleLogin = useCallback(
+    async (username: string) => {
+      const clean = username.trim();
+      if (!/^[a-zA-Z0-9_-]{3,20}$/.test(clean)) {
+        setGoogleNotice(t('loginNameRequiredError', language));
+        return;
       }
-    } catch (err: any) {
-      const msg = err?.code === 'auth/popup-closed-by-user'
-        ? 'Google sign-in popup was closed before finishing.'
-        : err?.message || 'Google sign-in failed.';
-      setGoogleNotice(msg);
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  }, [finalizeFirebaseUserSession, requestNativeFullscreen]);
+      setIsGoogleLoading(true);
+      setGoogleNotice(null);
+      pendingGoogleUsernameRef.current = clean;
+      try {
+        sessionStorage.setItem('cc_pending_google_username', clean);
+      } catch {}
+      if (window.innerWidth < 768 || 'ontouchstart' in window) {
+        requestNativeFullscreen();
+      }
+      try {
+        const fbUser = await signInWithGoogleNativeMobile();
+        if (fbUser) {
+          await finalizeFirebaseUserSession(fbUser, clean);
+        }
+        // If redirect flow: page will reload and resume via sessionStorage
+      } catch (err: any) {
+        const msg =
+          err?.code === 'auth/popup-closed-by-user'
+            ? 'Google sign-in popup was closed before finishing.'
+            : err?.message || 'Google sign-in failed.';
+        setGoogleNotice(msg);
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    },
+    [finalizeFirebaseUserSession, requestNativeFullscreen, language]
+  );
 
-  // Firebase connection test, Google redirect check & Guest bootstrap
+  const handleInstallPwa = useCallback(async () => {
+    const promptEvent = deferredInstallPromptRef.current;
+    if (!promptEvent) {
+      setGoogleNotice(t('installAppManualHint', language));
+      return;
+    }
+    setIsInstallBusy(true);
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+      deferredInstallPromptRef.current = null;
+      setCanInstallPwa(false);
+    } catch {
+      setGoogleNotice(t('installAppManualHint', language));
+    } finally {
+      setIsInstallBusy(false);
+    }
+  }, [language]);
+
+  // PWA beforeinstallprompt + service worker
+  useEffect(() => {
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      deferredInstallPromptRef.current = e;
+      setCanInstallPwa(true);
+    };
+    window.addEventListener('beforeinstallprompt', onBip);
+    const onInstalled = () => {
+      deferredInstallPromptRef.current = null;
+      setCanInstallPwa(false);
+    };
+    window.addEventListener('appinstalled', onInstalled);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBip);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  // Firebase redirect resume — only finalize when a pending operative name exists
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const autostart = params.get('autostart') === '1';
@@ -497,36 +577,36 @@ export default function App() {
     testFirestoreConnection();
 
     let handledFirebase = false;
+    const resumeGoogle = async (fbUser: NonNullable<typeof auth.currentUser>) => {
+      if (handledFirebase) return;
+      let pending: string | null = pendingGoogleUsernameRef.current;
+      try {
+        pending = pending || sessionStorage.getItem('cc_pending_google_username');
+      } catch {}
+      // Returning users without a pending name may still finalize (server keeps existing username)
+      handledFirebase = true;
+      setIsGoogleLoading(true);
+      await finalizeFirebaseUserSession(fbUser, pending);
+      setIsGoogleLoading(false);
+    };
+
     checkGoogleRedirectSignIn().then(fbUser => {
-      if (fbUser) {
-        handledFirebase = true;
-        finalizeFirebaseUserSession(fbUser);
-      }
+      if (fbUser) resumeGoogle(fbUser);
     });
 
     const unsubAuth = onAuthStateChanged(auth, fbUser => {
-      if (fbUser && !handledFirebase) {
-        handledFirebase = true;
-        finalizeFirebaseUserSession(fbUser);
+      if (!fbUser || handledFirebase) return;
+      let pending: string | null = null;
+      try {
+        pending = sessionStorage.getItem('cc_pending_google_username');
+      } catch {}
+      // Only auto-complete login when the user just initiated Google with a chosen name,
+      // or they already have a Firebase session from a previous Google account on this device
+      // and we can resume without leaving them stuck on the login screen.
+      if (pending || pendingGoogleUsernameRef.current) {
+        resumeGoogle(fbUser);
       }
     });
-
-    fetch('/api/auth/guest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platform: navigator.userAgent.includes('Mobile') ? 'mobile_web' : 'desktop_web' })
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (!handledFirebase && data.token) {
-          setUserToken(prev => prev || data.token);
-          setUserProfile(prev => prev || data.user);
-          setCloudSyncStatus('Encrypted Cloud Synced');
-        }
-      })
-      .catch(() => {
-        setCloudSyncStatus('Local Storage Only');
-      });
 
     if (autostart) {
       setAuthScreenVisible(false);
@@ -534,7 +614,7 @@ export default function App() {
     }
 
     return () => unsubAuth();
-  }, []);
+  }, [finalizeFirebaseUserSession]);
 
   // Initialize Canvas Renderer and configurable 60/30 FPS render loop
   useEffect(() => {
@@ -1933,6 +2013,9 @@ export default function App() {
           googleNotice={googleNotice}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
+          canInstallPwa={canInstallPwa}
+          onInstallPwa={handleInstallPwa}
+          isInstallBusy={isInstallBusy}
         />
       )}
 
