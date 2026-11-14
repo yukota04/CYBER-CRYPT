@@ -4008,7 +4008,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-05-boots.jpg"
     },
     "gen_vanguard_boots_13": {
       "sheet": "atlas-07.webp",
@@ -4016,7 +4016,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-05-boots.jpg"
     },
     "gen_vanguard_boots_14": {
       "sheet": "atlas-07.webp",
@@ -4024,7 +4024,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-05-boots.jpg"
     },
     "gen_vanguard_boots_15": {
       "sheet": "atlas-07.webp",
@@ -4032,7 +4032,7 @@
       "y": 640,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-05-boots.jpg"
     },
     "gen_vanguard_boots_16": {
       "sheet": "atlas-07.webp",
@@ -4040,7 +4040,7 @@
       "y": 768,
       "w": 128,
       "h": 128,
-      "source": "procedural-neon"
+      "source": "ai:sheet-armor-ai-05-boots.jpg"
     },
     "gen_vanguard_boots_17": {
       "sheet": "atlas-07.webp",
@@ -5965,8 +5965,8 @@
   },
   "counts": {
     "total": 737,
-    "ai": 732,
+    "ai": 737,
     "alias": 0,
-    "procedural": 5
+    "procedural": 0
   }
 }
