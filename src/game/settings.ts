@@ -11,7 +11,7 @@ export interface AppSettings {
   audio: AudioConfig;
 }
 
-export const APP_SETTINGS_STORAGE_KEY = 'cyber_crypt_settings_v3';
+export const APP_SETTINGS_STORAGE_KEY = 'cyber_crypt_settings_v4';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   performanceMode: 'high',
@@ -22,9 +22,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   audio: {
     masterMuted: false,
     musicEnabled: true,
-    musicVolume: 0.7,
+    musicVolume: 1.0,
     sfxEnabled: true,
-    sfxVolume: 0.85,
+    sfxVolume: 1.0,
     ambientReverbEnabled: true
   }
 };

@@ -329,10 +329,17 @@ class HybridAcousticAudioEngine {
 
   private isMuted: boolean = false;
   private musicEnabled: boolean = true;
-  private musicVolume: number = 0.7;
+  private musicVolume: number = 1.0;
   private sfxEnabled: boolean = true;
-  private sfxVolume: number = 0.85;
+  private sfxVolume: number = 1.0;
   private ambientReverbEnabled: boolean = true;
+
+  /** Master bus level (unmuted). Raised so slider 100% is actually loud. */
+  private static readonly MASTER_GAIN = 1.35;
+  private static readonly MUSIC_DRY = 0.78;
+  private static readonly MUSIC_WET = 0.42;
+  private static readonly SFX_DRY = 1.15;
+  private static readonly SFX_WET = 0.48;
 
   private isMusicPlaying: boolean = false;
   private isMusicPaused: boolean = false;
@@ -361,14 +368,18 @@ class HybridAcousticAudioEngine {
 
       // Master dynamics compressor keeps dense granular/wavetable mixes punchy and clip-free
       this.masterCompressor = this.ctx.createDynamicsCompressor();
-      this.masterCompressor.threshold.setValueAtTime(-14, this.ctx.currentTime);
-      this.masterCompressor.knee.setValueAtTime(18, this.ctx.currentTime);
-      this.masterCompressor.ratio.setValueAtTime(4, this.ctx.currentTime);
+      // Milder compression so full-volume mixes stay loud instead of squashed quiet
+      this.masterCompressor.threshold.setValueAtTime(-10, this.ctx.currentTime);
+      this.masterCompressor.knee.setValueAtTime(12, this.ctx.currentTime);
+      this.masterCompressor.ratio.setValueAtTime(2.8, this.ctx.currentTime);
       this.masterCompressor.attack.setValueAtTime(0.004, this.ctx.currentTime);
-      this.masterCompressor.release.setValueAtTime(0.18, this.ctx.currentTime);
+      this.masterCompressor.release.setValueAtTime(0.16, this.ctx.currentTime);
 
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.78, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(
+        this.isMuted ? 0 : HybridAcousticAudioEngine.MASTER_GAIN,
+        this.ctx.currentTime
+      );
 
       this.masterCompressor.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
@@ -387,19 +398,19 @@ class HybridAcousticAudioEngine {
       const sScale = this.sfxEnabled ? this.sfxVolume : 0;
 
       this.musicDryGain = this.ctx.createGain();
-      this.musicDryGain.gain.setValueAtTime(0.36 * mScale, this.ctx.currentTime);
+      this.musicDryGain.gain.setValueAtTime(HybridAcousticAudioEngine.MUSIC_DRY * mScale, this.ctx.currentTime);
       this.musicDryGain.connect(this.masterCompressor);
 
       this.musicWetSend = this.ctx.createGain();
-      this.musicWetSend.gain.setValueAtTime(0.30 * mScale, this.ctx.currentTime);
+      this.musicWetSend.gain.setValueAtTime(HybridAcousticAudioEngine.MUSIC_WET * mScale, this.ctx.currentTime);
       this.musicWetSend.connect(this.reverbConvolver);
 
       this.sfxDryGain = this.ctx.createGain();
-      this.sfxDryGain.gain.setValueAtTime(0.68 * sScale, this.ctx.currentTime);
+      this.sfxDryGain.gain.setValueAtTime(HybridAcousticAudioEngine.SFX_DRY * sScale, this.ctx.currentTime);
       this.sfxDryGain.connect(this.masterCompressor);
 
       this.sfxWetSend = this.ctx.createGain();
-      this.sfxWetSend.gain.setValueAtTime(0.34 * sScale, this.ctx.currentTime);
+      this.sfxWetSend.gain.setValueAtTime(HybridAcousticAudioEngine.SFX_WET * sScale, this.ctx.currentTime);
       this.sfxWetSend.connect(this.reverbConvolver);
 
       // Synthesis Banks
@@ -420,7 +431,11 @@ class HybridAcousticAudioEngine {
   public setMuted(muted: boolean) {
     this.isMuted = muted;
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.78, this.ctx.currentTime, 0.03);
+      this.masterGain.gain.setTargetAtTime(
+        muted ? 0 : HybridAcousticAudioEngine.MASTER_GAIN,
+        this.ctx.currentTime,
+        0.03
+      );
     }
   }
 
@@ -441,11 +456,15 @@ class HybridAcousticAudioEngine {
       const now = this.ctx.currentTime;
       const mScale = this.musicEnabled ? this.musicVolume : 0;
       const sScale = this.sfxEnabled ? this.sfxVolume : 0;
-      this.masterGain?.gain.setTargetAtTime(this.isMuted ? 0 : 0.78, now, 0.03);
-      this.musicDryGain?.gain.setTargetAtTime(0.36 * mScale, now, 0.03);
-      this.musicWetSend?.gain.setTargetAtTime(0.30 * mScale, now, 0.03);
-      this.sfxDryGain?.gain.setTargetAtTime(0.68 * sScale, now, 0.03);
-      this.sfxWetSend?.gain.setTargetAtTime(0.34 * sScale, now, 0.03);
+      this.masterGain?.gain.setTargetAtTime(
+        this.isMuted ? 0 : HybridAcousticAudioEngine.MASTER_GAIN,
+        now,
+        0.03
+      );
+      this.musicDryGain?.gain.setTargetAtTime(HybridAcousticAudioEngine.MUSIC_DRY * mScale, now, 0.03);
+      this.musicWetSend?.gain.setTargetAtTime(HybridAcousticAudioEngine.MUSIC_WET * mScale, now, 0.03);
+      this.sfxDryGain?.gain.setTargetAtTime(HybridAcousticAudioEngine.SFX_DRY * sScale, now, 0.03);
+      this.sfxWetSend?.gain.setTargetAtTime(HybridAcousticAudioEngine.SFX_WET * sScale, now, 0.03);
       this.reverbReturnGain?.gain.setTargetAtTime(this.ambientReverbEnabled ? 0.45 : 0, now, 0.04);
     }
 

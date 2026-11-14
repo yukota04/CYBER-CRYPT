@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { EquipSlot, GameItem, Player } from '../game/types';
 import { Language, t } from '../game/i18n';
 import { CanvasButton } from './CanvasButton';
@@ -54,28 +54,55 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const [selectedSlotKey, setSelectedSlotKey] = useState<EquipSlot | null>(null);
   const [stoneInserted, setStoneInserted] = useState<boolean>(false);
   const [adPlaying, setAdPlaying] = useState<boolean>(false);
+  const [adPhase, setAdPhase] = useState<'loading' | 'playing'>('loading');
   const [adProgress, setAdProgress] = useState<number>(0);
+  const [adError, setAdError] = useState<string | null>(null);
 
   const stoneCount = player.stats.probabilityStones || 0;
   const stoneActive = stoneInserted && stoneCount > 0;
   const stoneCost = getProbabilityStoneCost(floor);
 
-  const handleWatchRecoveryAd = () => {
+  useEffect(() => {
+    if (!adPlaying) return;
+    const interval = setInterval(() => {
+      setAdProgress(prev => {
+        if (adPhase === 'playing') return Math.min(96, prev + 1.2);
+        return Math.min(88, prev + (prev < 40 ? 4 : prev < 70 ? 2 : 0.6));
+      });
+    }, 120);
+    return () => clearInterval(interval);
+  }, [adPlaying, adPhase]);
+
+  const handleWatchRecoveryAd = async () => {
     if (adPlaying) return;
+    setAdError(null);
     setAdPlaying(true);
-    setAdProgress(0);
-    const start = Date.now();
-    const duration = 1200;
-    const timer = setInterval(() => {
-      const pct = Math.min(100, Math.round(((Date.now() - start) / duration) * 100));
-      setAdProgress(pct);
-      if (pct >= 100) {
-        clearInterval(timer);
-        setAdPlaying(false);
-        setAdProgress(0);
-        onRecoverDestroyedItem();
+    setAdPhase('loading');
+    setAdProgress(6);
+
+    const { showAdsBitvexRewarded } = await import('../game/adsbitvex');
+    const result = await showAdsBitvexRewarded({
+      onAdLaunching: () => {
+        setAdPhase('playing');
+        setAdProgress(prev => Math.max(prev, 55));
       }
-    }, 50);
+    });
+
+    if (result.ok) {
+      setAdProgress(100);
+      setAdPlaying(false);
+      setAdProgress(0);
+      onRecoverDestroyedItem();
+      return;
+    }
+
+    setAdPlaying(false);
+    setAdProgress(0);
+    setAdError(
+      language === 'es'
+        ? 'Anuncio no disponible. Inténtalo de nuevo.'
+        : 'Ad unavailable. Please try again.'
+    );
   };
 
   const totals = getTotalStats(player);
@@ -702,39 +729,56 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               </p>
 
               {adPlaying ? (
-                <div className="w-full flex flex-col items-center gap-2 py-2">
+                <div className="w-full flex flex-col items-center gap-2 py-2" data-testid="ad-loading-overlay">
                   <div className="flex items-center gap-2 text-xs text-cyan-300 font-bold">
                     <Tv className="w-4 h-4 animate-pulse" />
-                    <span>{t('adLoadingTitle', language)} ({adProgress}%)</span>
+                    <span>
+                      {t('adLoadingTitle', language)} ({Math.round(adProgress)}%)
+                    </span>
                   </div>
-                  <p className="text-[11px] text-slate-400">{t('recoverItemLoading', language)}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {adPhase === 'loading'
+                      ? language === 'es'
+                        ? 'Esperando a que aparezca el anuncio…'
+                        : 'Waiting for the ad to appear…'
+                      : t('recoverItemLoading', language)}
+                  </p>
                   <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-cyan-500/40">
                     <div
-                      className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-75"
+                      className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-100"
                       style={{ width: `${adProgress}%` }}
                     />
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-3 w-full">
-                  <button
-                    type="button"
-                    data-testid="recover-item-watch-ad-btn"
-                    onClick={handleWatchRecoveryAd}
-                    className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_0_16px_rgba(16,185,129,0.4)] cursor-pointer transition active:scale-95"
-                  >
-                    <Tv className="w-4 h-4" />
-                    <span>{t('recoverItemWatchAd', language)}</span>
-                  </button>
+                <div className="flex flex-col items-center gap-3 w-full">
+                  {adError && (
+                    <div className="w-full px-3 py-2 rounded-lg bg-rose-950/60 border border-rose-400/50 text-[11px] text-rose-200">
+                      {adError}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-center gap-3 w-full">
+                    <button
+                      type="button"
+                      data-testid="recover-item-watch-ad-btn"
+                      onClick={() => {
+                        void handleWatchRecoveryAd();
+                      }}
+                      className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_0_16px_rgba(16,185,129,0.4)] cursor-pointer transition active:scale-95"
+                    >
+                      <Tv className="w-4 h-4" />
+                      <span>{t('recoverItemWatchAd', language)}</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    data-testid="recover-item-decline-btn"
-                    onClick={onDeclineRecoverDestroyedItem}
-                    className="py-3 px-5 rounded-xl bg-slate-800 hover:bg-red-950 border border-slate-600 hover:border-red-500/60 text-slate-200 font-bold text-xs cursor-pointer transition active:scale-95"
-                  >
-                    {t('recoverItemNo', language)}
-                  </button>
+                    <button
+                      type="button"
+                      data-testid="recover-item-decline-btn"
+                      onClick={onDeclineRecoverDestroyedItem}
+                      className="py-3 px-5 rounded-xl bg-slate-800 hover:bg-red-950 border border-slate-600 hover:border-red-500/60 text-slate-200 font-bold text-xs cursor-pointer transition active:scale-95"
+                    >
+                      {t('recoverItemNo', language)}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
