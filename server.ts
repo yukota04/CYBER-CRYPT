@@ -326,12 +326,40 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Auth: Guest Quick Play (accepts player-chosen operative name)
+// Username availability (case-insensitive). Optional excludeUserId for own Google account re-login.
+app.get('/api/auth/check-username', authLimiter, (req, res) => {
+  const raw = typeof req.query.username === 'string' ? req.query.username : '';
+  const excludeUserId =
+    typeof req.query.excludeUserId === 'string' ? sanitizeText(req.query.excludeUserId, 80) : '';
+  const uCheck = validateUsername(raw);
+  if (!uCheck.valid) {
+    return res.json({ available: false, valid: false, error: uCheck.error || 'Invalid username', clean: uCheck.clean });
+  }
+  const takenBy = Array.from(users.values()).find(
+    u => u.username.toLowerCase() === uCheck.clean.toLowerCase() && (!excludeUserId || u.id !== excludeUserId)
+  );
+  if (takenBy) {
+    return res.json({
+      available: false,
+      valid: true,
+      error: 'Username already taken',
+      clean: uCheck.clean
+    });
+  }
+  return res.json({ available: true, valid: true, clean: uCheck.clean });
+});
+
+// Auth: Guest Quick Play — ALWAYS assigns a random operative name (typed name is ignored)
 app.post('/api/auth/guest', authLimiter, (req, res) => {
   const platform = sanitizeText(req.body?.platform || 'desktop_web', 40) || 'desktop_web';
-  const requestedRaw = typeof req.body?.username === 'string' ? sanitizeText(req.body.username, 20).trim() : '';
   const guestId = `guest_${Date.now().toString(36)}_${crypto.randomBytes(2).toString('hex')}`;
-  const guestName = requestedRaw.length >= 2 ? requestedRaw : `Operative_${crypto.randomInt(1000, 9999)}`;
+  let guestName = `Operative_${crypto.randomInt(1000, 9999)}`;
+  // Ensure uniqueness among live sessions
+  for (let i = 0; i < 12; i++) {
+    const clash = Array.from(users.values()).some(u => u.username.toLowerCase() === guestName.toLowerCase());
+    if (!clash) break;
+    guestName = `Operative_${crypto.randomInt(1000, 9999)}`;
+  }
   const token = generateSessionToken('tok_guest');
 
   const guestUser: ServerUser = {
@@ -347,6 +375,7 @@ app.post('/api/auth/guest', authLimiter, (req, res) => {
 
   users.set(guestId, guestUser);
   friends.set(guestId, new Set());
+  schedulePersist();
   logAudit(guestId, guestName, 'GUEST_SIGNIN', req.ip || '127.0.0.1', 'low', `Guest session generated on ${platform}`);
 
   res.json({
@@ -493,19 +522,47 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
 
     const userId = `goog_${fbUser.localId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48)}`;
     const safePlatform = sanitizeText(platform, 40) || 'mobile_web';
-    const cleanChosen = typeof chosenUsername === 'string' ? sanitizeText(chosenUsername, 20).trim() : '';
-    const fallbackRawName = (fbUser.displayName || fbUser.email?.split('@')[0] || 'GoogleOperative').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const cleanName = cleanChosen.length >= 2 ? cleanChosen : (sanitizeText(fallbackRawName, 24) || `Op_${fbUser.localId.slice(0, 6)}`);
+    const uCheck = validateUsername(chosenUsername);
     const cleanEmail = sanitizeText(fbUser.email || `${userId}@google.local`, 120);
 
     let existingUser = users.get(userId);
     const token = generateSessionToken('tok_goog');
 
+    // Returning Google user may omit username and keep their existing operative name
+    if (existingUser && !uCheck.valid) {
+      existingUser.token = token;
+      existingUser.email = cleanEmail;
+      existingUser.devices.push({ deviceId: `dev_${Date.now()}`, platform: safePlatform, lastSeen: Date.now() });
+      if (existingUser.devices.length > 10) existingUser.devices.shift();
+      logAudit(existingUser.id, existingUser.username, 'GOOGLE_SIGNIN', req.ip || '127.0.0.1', 'low', `Google login from ${safePlatform}`);
+      schedulePersist();
+      return res.json({
+        user: { id: existingUser.id, username: existingUser.username, role: existingUser.role, email: existingUser.email },
+        token
+      });
+    }
+
+    if (!uCheck.valid) {
+      return res.status(400).json({
+        error: uCheck.error || 'Operative name is required for Google sign-in',
+        code: 'USERNAME_REQUIRED'
+      });
+    }
+
+    const cleanName = uCheck.clean;
+    const nameTaken = Array.from(users.values()).find(
+      u => u.username.toLowerCase() === cleanName.toLowerCase() && u.id !== userId
+    );
+    if (nameTaken) {
+      return res.status(409).json({
+        error: 'Username already taken',
+        code: 'USERNAME_TAKEN'
+      });
+    }
+
     if (existingUser) {
       existingUser.token = token;
-      if (cleanChosen.length >= 2 || !existingUser.username) {
-        existingUser.username = cleanName;
-      }
+      existingUser.username = cleanName;
       existingUser.email = cleanEmail;
       existingUser.devices.push({ deviceId: `dev_${Date.now()}`, platform: safePlatform, lastSeen: Date.now() });
       if (existingUser.devices.length > 10) existingUser.devices.shift();
