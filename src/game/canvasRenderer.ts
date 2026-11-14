@@ -16,6 +16,7 @@ export interface Particle {
 export interface VisualAttackEffect extends AttackEffect {
   life: number;
   maxLife: number;
+  active: boolean;
 }
 
 export interface CoopRemoteRenderPlayer {
@@ -29,6 +30,65 @@ export interface CoopRemoteRenderPlayer {
   alive: boolean;
 }
 
+/** Unit-space Path2D cache keyed by bodyShape (drawn at origin, translate per monster). */
+const MONSTER_BODY_PATHS = new Map<string, Path2D>();
+
+function getMonsterBodyPath(shape: string): Path2D {
+  const cached = MONSTER_BODY_PATHS.get(shape);
+  if (cached) return cached;
+  const p = new Path2D();
+  if (shape === 'diamond' || shape === 'core') {
+    const r = shape === 'core' ? 14 : 11;
+    p.moveTo(0, -r);
+    p.lineTo(r, 0);
+    p.lineTo(0, r);
+    p.lineTo(-r, 0);
+    p.closePath();
+  } else if (shape === 'hex' || shape === 'octo') {
+    const sides = shape === 'octo' ? 8 : 6;
+    const r = 11.5;
+    for (let i = 0; i < sides; i++) {
+      const ang = (i * Math.PI * 2) / sides - Math.PI / 2;
+      const vx = Math.cos(ang) * r;
+      const vy = Math.sin(ang) * r;
+      if (i === 0) p.moveTo(vx, vy);
+      else p.lineTo(vx, vy);
+    }
+    p.closePath();
+  } else if (shape === 'spiked') {
+    for (let i = 0; i < 10; i++) {
+      const ang = (i * Math.PI * 2) / 10;
+      const r = i % 2 === 0 ? 13.5 : 7.5;
+      const vx = Math.cos(ang) * r;
+      const vy = Math.sin(ang) * r;
+      if (i === 0) p.moveTo(vx, vy);
+      else p.lineTo(vx, vy);
+    }
+    p.closePath();
+  } else if (shape === 'serpent') {
+    // Relative to body center (cx, cy) with tile origin at (-16, -16)
+    p.moveTo(0, -12);
+    p.lineTo(11, -2);
+    p.lineTo(6, 11);
+    p.lineTo(-6, 11);
+    p.lineTo(-11, -2);
+    p.closePath();
+  }
+  // 'titan' and unknown shapes use fillRect — no Path2D
+  MONSTER_BODY_PATHS.set(shape, p);
+  return p;
+}
+
+function acquire2dContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  // desynchronized helps Chrome; willReadFrequently:false is the safe cross-browser hint
+  const preferred =
+    canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false }) ||
+    canvas.getContext('2d', { alpha: false, willReadFrequently: false }) ||
+    canvas.getContext('2d');
+  if (!preferred) throw new Error('2D canvas context unavailable');
+  return preferred;
+}
+
 export class CanvasRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -37,9 +97,13 @@ export class CanvasRenderer {
   private cameraY = 0;
   private trauma = 0;
   private hitstopTimer = 0;
-  private particles: Particle[] = [];
+  /** Only active particles are iterated each frame. */
+  private activeParticles: Particle[] = [];
+  private freeParticles: Particle[] = [];
   private maxParticles = 160;
-  private attackEffects: VisualAttackEffect[] = [];
+  private activeAttackEffects: VisualAttackEffect[] = [];
+  private freeAttackEffects: VisualAttackEffect[] = [];
+  private maxAttackEffects = 32;
   private damageVignette = 0;
   private attackAnim = 0;
   private moveBlend = 0;
@@ -53,6 +117,9 @@ export class CanvasRenderer {
   public simpleEntities = false;
   public detailTiles = true;
   private scanlinePattern: CanvasPattern | null = null;
+  private scanlineCacheKey = '';
+  /** Auto-downgrade when FPS stays low (set by App loop). */
+  public autoQualityActive = false;
 
   public applyPerformanceOptions(opts: {
     enableScanlines?: boolean;
@@ -69,18 +136,30 @@ export class CanvasRenderer {
     if (typeof opts.detailTiles === 'boolean') this.detailTiles = opts.detailTiles;
     if (typeof opts.enableParticles === 'boolean') {
       this.enableParticles = opts.enableParticles;
-      if (!opts.enableParticles) {
-        for (const p of this.particles) p.active = false;
-      }
+      if (!opts.enableParticles) this.clearActiveParticles();
     }
+  }
+
+  /** Force simple entities + drop glow/particles after sustained low FPS. */
+  public applyAutoQualityDowngrade() {
+    if (this.autoQualityActive) return;
+    this.autoQualityActive = true;
+    this.applyPerformanceOptions({
+      simpleEntities: true,
+      enableGlow: false,
+      enableParticles: false,
+      enablePostFx: false,
+      enableScanlines: false,
+      detailTiles: false
+    });
   }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true }) || canvas.getContext('2d')!;
+    this.ctx = acquire2dContext(canvas);
 
     for (let i = 0; i < this.maxParticles; i++) {
-      this.particles.push({
+      this.freeParticles.push({
         active: false,
         x: 0,
         y: 0,
@@ -91,6 +170,33 @@ export class CanvasRenderer {
         color: '#00f0ff',
         size: 2
       });
+    }
+    for (let i = 0; i < this.maxAttackEffects; i++) {
+      this.freeAttackEffects.push({
+        type: 'slash',
+        x: 0,
+        y: 0,
+        color: '#fff',
+        life: 0,
+        maxLife: 0.28,
+        active: false
+      });
+    }
+  }
+
+  private clearActiveParticles() {
+    while (this.activeParticles.length > 0) {
+      const p = this.activeParticles.pop()!;
+      p.active = false;
+      this.freeParticles.push(p);
+    }
+  }
+
+  private clearActiveAttackEffects() {
+    while (this.activeAttackEffects.length > 0) {
+      const fx = this.activeAttackEffects.pop()!;
+      fx.active = false;
+      this.freeAttackEffects.push(fx);
     }
   }
 
@@ -105,9 +211,9 @@ export class CanvasRenderer {
     this.damageVignette = 0;
     this.attackAnim = 0;
     this.moveBlend = 0;
-    this.attackEffects.length = 0;
+    this.clearActiveAttackEffects();
+    this.clearActiveParticles();
     this.remoteMove.clear();
-    for (const p of this.particles) p.active = false;
     this.prevPlayerX = Number.NaN;
     this.prevPlayerY = Number.NaN;
   }
@@ -154,35 +260,45 @@ export class CanvasRenderer {
   }
 
   public spawnAttackEffect(effect: AttackEffect) {
-    this.attackEffects.push({
-      ...effect,
-      life: 0,
-      maxLife: effect.type === 'crit_slash' || effect.type === 'meteor' ? 0.36 : 0.28
-    });
+    let fx = this.freeAttackEffects.pop();
+    if (!fx) {
+      // Pool exhausted — recycle oldest active
+      if (this.activeAttackEffects.length === 0) return;
+      fx = this.activeAttackEffects.shift()!;
+    }
+    fx.type = effect.type;
+    fx.x = effect.x;
+    fx.y = effect.y;
+    fx.targetX = effect.targetX;
+    fx.targetY = effect.targetY;
+    fx.color = effect.color;
+    fx.radius = effect.radius;
+    fx.life = 0;
+    fx.maxLife = effect.type === 'crit_slash' || effect.type === 'meteor' ? 0.36 : 0.28;
+    fx.active = true;
+    this.activeAttackEffects.push(fx);
   }
 
   public spawnParticles(worldX: number, worldY: number, color: string, count = 10) {
     if (!this.enableParticles) return;
-    let spawned = 0;
     const px = worldX * this.tileSize + this.tileSize / 2;
     const py = worldY * this.tileSize + this.tileSize / 2;
 
-    for (const p of this.particles) {
-      if (!p.active) {
-        p.active = true;
-        p.x = px;
-        p.y = py;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 3.5 + 1;
-        p.vx = Math.cos(angle) * speed;
-        p.vy = Math.sin(angle) * speed;
-        p.life = 0;
-        p.maxLife = 18 + Math.random() * 14;
-        p.color = color;
-        p.size = Math.random() * 3 + 1.5;
-        spawned++;
-        if (spawned >= count) break;
-      }
+    for (let spawned = 0; spawned < count; spawned++) {
+      const p = this.freeParticles.pop();
+      if (!p) break;
+      p.active = true;
+      p.x = px;
+      p.y = py;
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 3.5 + 1;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed;
+      p.life = 0;
+      p.maxLife = 18 + Math.random() * 14;
+      p.color = color;
+      p.size = Math.random() * 3 + 1.5;
+      this.activeParticles.push(p);
     }
   }
 
@@ -244,56 +360,18 @@ export class CanvasRenderer {
       ctx.shadowBlur = 0;
     }
 
-    if (shape === 'diamond' || shape === 'core') {
-      const r = shape === 'core' ? 14 : 11;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - r);
-      ctx.lineTo(cx + r, cy);
-      ctx.lineTo(cx, cy + r);
-      ctx.lineTo(cx - r, cy);
-      ctx.closePath();
-      ctx.fill();
-    } else if (shape === 'hex' || shape === 'octo') {
-      const sides = shape === 'octo' ? 8 : 6;
-      const r = 11.5;
-      ctx.beginPath();
-      for (let i = 0; i < sides; i++) {
-        const ang = (i * Math.PI * 2) / sides - Math.PI / 2;
-        const vx = cx + Math.cos(ang) * r;
-        const vy = cy + Math.sin(ang) * r;
-        if (i === 0) ctx.moveTo(vx, vy);
-        else ctx.lineTo(vx, vy);
-      }
-      ctx.closePath();
-      ctx.fill();
-    } else if (shape === 'spiked') {
-      ctx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const ang = (i * Math.PI * 2) / 10;
-        const r = i % 2 === 0 ? 13.5 : 7.5;
-        const vx = cx + Math.cos(ang) * r;
-        const vy = cy + Math.sin(ang) * r;
-        if (i === 0) ctx.moveTo(vx, vy);
-        else ctx.lineTo(vx, vy);
-      }
-      ctx.closePath();
-      ctx.fill();
-    } else if (shape === 'serpent') {
-      ctx.beginPath();
-      ctx.moveTo(cx, my + 4);
-      ctx.lineTo(mx + 27, my + 14);
-      ctx.lineTo(mx + 22, my + 27);
-      ctx.lineTo(mx + 10, my + 27);
-      ctx.lineTo(mx + 5, my + 14);
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      // Titan chassis
+    if (shape === 'titan') {
       ctx.fillRect(mx + 4, my + 5, 24, 22);
       ctx.fillStyle = secColor;
       ctx.fillRect(mx + 2, my + 8, 4, 14);
       ctx.fillRect(mx + 26, my + 8, 4, 14);
       ctx.fillStyle = bodyColor;
+    } else {
+      const bodyPath = getMonsterBodyPath(shape);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.fill(bodyPath);
+      ctx.restore();
     }
 
     // Procedural Armor Plates
@@ -880,12 +958,17 @@ export class CanvasRenderer {
       }
     }
 
-    // 2. RENDER MONSTERS (Procedurally Evolving)
+    // 2. RENDER MONSTERS — collect visible, sort by fill color to cut style thrashing
+    const visibleMonsters: Monster[] = [];
     for (const monster of dungeon.monsters) {
       const mTileX = Math.floor(monster.x + 0.41);
       const mTileY = Math.floor(monster.y + 0.41);
       if (!dungeon.tiles[mTileY]?.[mTileX]?.visible) continue;
+      visibleMonsters.push(monster);
+    }
+    visibleMonsters.sort((a, b) => (a.color < b.color ? -1 : a.color > b.color ? 1 : 0));
 
+    for (const monster of visibleMonsters) {
       const mx = monster.x * this.tileSize;
       const my = monster.y * this.tileSize;
 
@@ -1018,20 +1101,33 @@ export class CanvasRenderer {
       { nowSec, moveBlend: this.moveBlend, attackAnim: this.attackAnim }
     );
 
-    // 4. RENDER ATTACK & SKILL VISUAL EFFECTS
-    for (let i = this.attackEffects.length - 1; i >= 0; i--) {
-      const fx = this.attackEffects[i];
+    // 4. RENDER ATTACK & SKILL VISUAL EFFECTS (fixed pool, max 32)
+    for (let i = this.activeAttackEffects.length - 1; i >= 0; i--) {
+      const fx = this.activeAttackEffects[i];
       if (!isFrozen) {
         fx.life += simDt;
       }
       if (fx.life >= fx.maxLife) {
-        this.attackEffects.splice(i, 1);
+        fx.active = false;
+        this.activeAttackEffects.splice(i, 1);
+        this.freeAttackEffects.push(fx);
+        continue;
+      }
+      // Camera culling — skip off-screen FX
+      const worldPx = fx.x * this.tileSize;
+      const worldPy = fx.y * this.tileSize;
+      if (
+        worldPx < this.cameraX - 64 ||
+        worldPx > this.cameraX + width + 64 ||
+        worldPy < this.cameraY - 64 ||
+        worldPy > this.cameraY + height + 64
+      ) {
         continue;
       }
       const p = fx.life / fx.maxLife;
       const alpha = 1 - p;
-      const sx = fx.x * this.tileSize + 16;
-      const sy = fx.y * this.tileSize + 16;
+      const sx = worldPx + 16;
+      const sy = worldPy + 16;
       const tx = (fx.targetX ?? fx.x) * this.tileSize + 16;
       const ty = (fx.targetY ?? fx.y) * this.tileSize + 16;
 
@@ -1051,7 +1147,6 @@ export class CanvasRenderer {
         ctx.arc(tx, ty, radius * (0.6 + p * 0.5), angle - 1.1, angle + 1.1);
         ctx.stroke();
 
-        // Cross slash flash for crits
         if (fx.type === 'crit_slash') {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2.5;
@@ -1084,7 +1179,6 @@ export class CanvasRenderer {
         ctx.lineWidth = 3;
         ctx.stroke();
       } else {
-        // emp_ring, nova, heal, shield, smash
         const maxRad = (fx.radius || 1.5) * this.tileSize;
         ctx.strokeStyle = fx.color;
         ctx.lineWidth = 3.5 * (1 - p * 0.4);
@@ -1096,25 +1190,26 @@ export class CanvasRenderer {
       ctx.restore();
     }
 
-    // 5. RENDER PARTICLES
+    // 5. RENDER PARTICLES — only active list
     if (this.enableParticles) {
-      for (const p of this.particles) {
-        if (p.active) {
-          if (!isFrozen) {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life++;
-            if (p.life >= p.maxLife) {
-              p.active = false;
-              continue;
-            }
+      for (let i = this.activeParticles.length - 1; i >= 0; i--) {
+        const p = this.activeParticles[i];
+        if (!isFrozen) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life++;
+          if (p.life >= p.maxLife) {
+            p.active = false;
+            this.activeParticles.splice(i, 1);
+            this.freeParticles.push(p);
+            continue;
           }
-          const alpha = 1 - p.life / p.maxLife;
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = alpha;
-          ctx.fillRect(p.x, p.y, p.size, p.size);
-          ctx.globalAlpha = 1.0;
         }
+        const alpha = 1 - p.life / p.maxLife;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+        ctx.globalAlpha = 1.0;
       }
     }
 
@@ -1220,9 +1315,10 @@ export class CanvasRenderer {
       }
     }
 
-    // 7. CRT overlay — cached pattern (not hundreds of 1px fills)
+    // 7. CRT overlay — pattern cached by canvas size key
     if (this.enableScanlines) {
-      if (!this.scanlinePattern) {
+      const cacheKey = `${width}x${height}`;
+      if (!this.scanlinePattern || this.scanlineCacheKey !== cacheKey) {
         const off = document.createElement('canvas');
         off.width = 4;
         off.height = 4;
@@ -1231,6 +1327,7 @@ export class CanvasRenderer {
           octx.fillStyle = 'rgba(0,0,0,0.22)';
           octx.fillRect(0, 0, 4, 1);
           this.scanlinePattern = ctx.createPattern(off, 'repeat');
+          this.scanlineCacheKey = cacheKey;
         }
       }
       if (this.scanlinePattern) {

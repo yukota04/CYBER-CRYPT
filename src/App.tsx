@@ -20,7 +20,7 @@ import {
   RunSnapshot,
   SavedPlayerLoadout
 } from './game/types';
-import { createEmptyDungeonStub, generateDungeon, updateFOV } from './game/dungeon';
+import { createEmptyDungeonStub, generateDungeon, generateDungeonAsync, updateFOV } from './game/dungeon';
 import { loadIconAtlas } from './game/iconAtlas';
 import {
   collectDeathDropBagsAt,
@@ -36,6 +36,7 @@ import {
 import {
   clearOfflineSave,
   flushCloudRunPushes,
+  flushScheduledOfflineSave,
   getOfflineSaveSlotKey,
   pullAndMergeCloudRuns,
   setCloudRunSyncToken,
@@ -43,7 +44,8 @@ import {
   loadOfflineSave,
   OfflineSaveSlotKey,
   OfflineSaveState,
-  saveOfflineRun
+  saveOfflineRun,
+  scheduleSaveOfflineRun
 } from './game/offlineSave';
 import {
   AppSettings,
@@ -216,6 +218,8 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const targetFpsRef = useRef<30 | 60>(appSettings.targetFps);
+  const appSettingsRef = useRef(appSettings);
+  appSettingsRef.current = appSettings;
   const canvasScaleRef = useRef<1>(1);
   const floatingTextsRef = useRef<{ text: string; x: number; y: number; color: string; isCrit?: boolean; life: number }[]>([]);
   const lastFovPosRef = useRef<{ x: number; y: number; floor: number } | null>(null);
@@ -265,6 +269,8 @@ export default function App() {
   const hudSyncAccRef = useRef(0);
   /** When true, freeze offline sim so inventory/skills aren't stomped mid-edit */
   const uiBlockedRef = useRef(false);
+  /** True while async floor generation is in progress (blocks sim). */
+  const floorTransitionRef = useRef(false);
   const applyRealtimeResultRef = useRef<(result: ReturnType<typeof tickRealtime>, dt: number) => void>(() => {});
 
   /** Apply a player mutation to BOTH the live sim ref and React state (offline-safe). */
@@ -868,6 +874,9 @@ export default function App() {
     let animId: number;
     let fpsFrames = 0;
     let fpsLast = performance.now();
+    let simAccumulator = 0;
+    let lowFpsSeconds = 0;
+    const FIXED_STEP = 1 / 60;
 
     const renderLoop = (time: number) => {
       animId = requestAnimationFrame(renderLoop);
@@ -879,32 +888,44 @@ export default function App() {
       }
 
       const rawDt = elapsedMs / 1000;
-      const dt = Math.min(Math.max(rawDt, 0.001), 0.08);
+      const frameDt = Math.min(Math.max(rawDt, 0.001), 0.08);
       lastTime = time;
 
       fpsFrames += 1;
       if (time - fpsLast >= 500) {
-        setFps(Math.round((fpsFrames * 1000) / (time - fpsLast)));
+        const measured = Math.round((fpsFrames * 1000) / (time - fpsLast));
+        setFps(measured);
         fpsFrames = 0;
         fpsLast = time;
+        // Auto quality: fps < 30 for ~3s consecutive → downgrade VFX
+        if (measured < 30 && appSettingsRef.current.performanceMode !== 'performance') {
+          lowFpsSeconds += 0.5;
+          if (lowFpsSeconds >= 3) {
+            renderer.applyAutoQualityDowngrade();
+          }
+        } else {
+          lowFpsSeconds = 0;
+        }
       }
 
       // Freeze floating text decay during hitstop
       if (renderer.getHitstopRemaining() <= 0) {
         const ftList = floatingTextsRef.current;
         for (let i = ftList.length - 1; i >= 0; i--) {
-          ftList[i].life += dt * 30;
+          ftList[i].life += frameDt * 30;
           if (ftList[i].life > 40) ftList.splice(i, 1);
         }
       }
 
-      // Offline free-movement simulation (player + mobs).
-      // Hitstop pauses monsters + freezes the camera/VFX; player movement stays free.
-      // Pause only while inventory / skills / shop / options are open.
-      if (
+      // Fixed timestep sim (16.67ms) — stable across 60/120/144 Hz displays
+      simAccumulator += frameDt;
+      if (simAccumulator > 0.25) simAccumulator = 0.25;
+      while (
+        simAccumulator >= FIXED_STEP &&
         gameStateRef.current === 'playing' &&
         playModeRef.current === 'offline' &&
         !uiBlockedRef.current &&
+        !floorTransitionRef.current &&
         playerRef.current &&
         dungeonRef.current
       ) {
@@ -916,11 +937,24 @@ export default function App() {
             autoAttack: autoAttackRef.current,
             attackHeld: attackHeldRef.current
           },
-          dt,
+          FIXED_STEP,
           turnRef.current,
           realtimeClockRef.current
         );
-        applyRealtimeResultRef.current(result, dt);
+        applyRealtimeResultRef.current(result, FIXED_STEP);
+        simAccumulator -= FIXED_STEP;
+      }
+      if (
+        !(
+          gameStateRef.current === 'playing' &&
+          playModeRef.current === 'offline' &&
+          !uiBlockedRef.current &&
+          !floorTransitionRef.current &&
+          playerRef.current &&
+          dungeonRef.current
+        )
+      ) {
+        simAccumulator = 0;
       }
 
       // Title/hub: do not burn CPU rendering a full dungeon behind the menu
@@ -935,7 +969,7 @@ export default function App() {
           dungeonRef.current,
           playerRef.current,
           floatingTextsRef.current,
-          dt,
+          frameDt,
           remotePlayersRef.current,
           hoveredTileRef.current
         );
@@ -1327,11 +1361,11 @@ export default function App() {
     []
   );
 
-  // Auto-persist offline run strictly locally on the device (per difficulty + role)
+  // Auto-persist offline run (debounced 2s) — flush on hide/unload
   useEffect(() => {
     if (playMode !== 'offline') return;
     if (gameState !== 'playing' && gameState !== 'paused') return;
-    const saved = saveOfflineRun({
+    scheduleSaveOfflineRun({
       difficultyMode,
       player,
       dungeon,
@@ -1341,13 +1375,23 @@ export default function App() {
       combatLogs,
       checkpointSnapshot
     });
-    if (saved) {
-      const slotKey = getOfflineSaveSlotKey(saved.difficultyMode, saved.player.characterClass);
-      setSavedOfflineRuns(prev => ({
-        ...prev,
-        [slotKey]: saved
-      }));
-    }
+    const slotKey = getOfflineSaveSlotKey(difficultyMode, player.characterClass);
+    // Optimistic slot mark so Continue stays available without waiting for debounce
+    setSavedOfflineRuns(prev => ({
+      ...prev,
+      [slotKey]: {
+        version: 1,
+        savedAt: Date.now(),
+        difficultyMode,
+        player,
+        dungeon,
+        turn,
+        score,
+        monstersSlain,
+        combatLogs: combatLogs.slice(0, 100),
+        checkpointSnapshot
+      }
+    }));
   }, [
     playMode,
     gameState,
@@ -1360,6 +1404,23 @@ export default function App() {
     combatLogs,
     checkpointSnapshot
   ]);
+
+  useEffect(() => {
+    const flush = () => {
+      flushScheduledOfflineSave();
+      flushCloudRunPushes();
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVis);
+      flush();
+    };
+  }, []);
 
   const triggerGameOver = useCallback(
     (
@@ -1509,7 +1570,7 @@ export default function App() {
         turn: turnRef.current
       },
       ...prev
-    ].slice(0, 30));
+    ].slice(0, 100));
     setGameState('playing');
     soundEngine.playSFX('shrine');
   }, [checkpointSnapshot, refreshFOVIfNeeded, sendCoopWs]);
@@ -1566,7 +1627,7 @@ export default function App() {
         turn: turnRef.current
       },
       ...prev
-    ].slice(0, 30));
+    ].slice(0, 100));
     setGameState('playing');
     soundEngine.playSFX('level_up');
   }, [refreshFOVIfNeeded]);
@@ -1595,7 +1656,7 @@ export default function App() {
 
     setPlayer(result.player);
     setDungeon(result.dungeon);
-    setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+    setCombatLogs(prev => [...result.logs, ...prev].slice(0, 100));
     setTurn(curTurn + 1);
 
     handleSoundAndVisuals(
@@ -1625,32 +1686,52 @@ export default function App() {
 
     if (result.floorCompleted) {
       const nextFloor = curDungeon.floor + 1;
-      const newDungeonState = generateDungeon(nextFloor);
-      const startRoom = newDungeonState.rooms[0];
-      const nextStartCp = newDungeonState.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
+      const transitioningPlayer = result.player;
+      floorTransitionRef.current = true;
+      setSessionLoad({ kind: 'run', progress: 6 });
+      void (async () => {
+        try {
+          const newDungeonState = await generateDungeonAsync(nextFloor, undefined, undefined, p =>
+            setSessionLoad({ kind: 'run', progress: Math.max(6, Math.min(96, p)) })
+          );
+          const startRoom = newDungeonState.rooms[0];
+          const nextStartCp =
+            newDungeonState.checkpoints[0] || {
+              x: startRoom.centerX,
+              y: startRoom.centerY,
+              activated: true
+            };
 
-      result.player.x = startRoom.centerX;
-      result.player.y = startRoom.centerY;
-      result.player.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
-      refreshFOVIfNeeded(newDungeonState, result.player.x, result.player.y, true);
+          transitioningPlayer.x = startRoom.centerX;
+          transitioningPlayer.y = startRoom.centerY;
+          transitioningPlayer.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
+          refreshFOVIfNeeded(newDungeonState, transitioningPlayer.x, transitioningPlayer.y, true);
 
-      setDungeon(newDungeonState);
-      setShowShop(false);
-      setScore(nextScore + 500);
-      saveCheckpoint(result.player, newDungeonState, nextScore + 500, nextTotalKills, curTurn + 1);
+          setDungeon(newDungeonState);
+          setPlayer(transitioningPlayer);
+          playerRef.current = transitioningPlayer;
+          dungeonRef.current = newDungeonState;
+          setShowShop(false);
+          setScore(nextScore + 500);
+          saveCheckpoint(transitioningPlayer, newDungeonState, nextScore + 500, nextTotalKills, curTurn + 1);
 
-      if (newDungeonState.activeEvent) {
-        setCombatLogs(prev => [
-          {
-            id: `env_banner_${Date.now()}`,
-            text: `${newDungeonState.activeEvent!.icon} EVENT TRIGGERED: ${newDungeonState.activeEvent!.name} — ${newDungeonState.activeEvent!.effectText}`,
-            type: 'level_up' as const,
-            turn: curTurn + 1
-          },
-          ...prev
-        ].slice(0, 30));
-      }
-      checkAchievements(nextFloor, nextTotalKills, result.player.stats.soulShards);
+          if (newDungeonState.activeEvent) {
+            setCombatLogs(prev => [
+              {
+                id: `env_banner_${Date.now()}`,
+                text: `${newDungeonState.activeEvent!.icon} EVENT TRIGGERED: ${newDungeonState.activeEvent!.name} — ${newDungeonState.activeEvent!.effectText}`,
+                type: 'level_up' as const,
+                turn: curTurn + 1
+              },
+              ...prev
+            ].slice(0, 100));
+          }
+          checkAchievements(nextFloor, nextTotalKills, transitioningPlayer.stats.soulShards);
+        } finally {
+          floorTransitionRef.current = false;
+          setSessionLoad(null);
+        }
+      })();
     }
 
     if (result.gameOver) {
@@ -1706,7 +1787,7 @@ export default function App() {
       }
 
       if (result.logs.length > 0) {
-        setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+        setCombatLogs(prev => [...result.logs, ...prev].slice(0, 100));
       }
 
       handleSoundAndVisuals(
@@ -1740,44 +1821,56 @@ export default function App() {
 
       if (result.floorCompleted) {
         const nextFloor = result.dungeon.floor + 1;
-        const newDungeonState = generateDungeon(nextFloor);
-        const startRoom = newDungeonState.rooms[0];
-        const nextStartCp =
-          newDungeonState.checkpoints[0] || {
-            x: startRoom.centerX,
-            y: startRoom.centerY,
-            activated: true
-          };
+        const transitioningPlayer = result.player;
+        floorTransitionRef.current = true;
+        setSessionLoad({ kind: 'run', progress: 6 });
+        void (async () => {
+          try {
+            const newDungeonState = await generateDungeonAsync(nextFloor, undefined, undefined, p =>
+              setSessionLoad({ kind: 'run', progress: Math.max(6, Math.min(96, p)) })
+            );
+            const startRoom = newDungeonState.rooms[0];
+            const nextStartCp =
+              newDungeonState.checkpoints[0] || {
+                x: startRoom.centerX,
+                y: startRoom.centerY,
+                activated: true
+              };
 
-        result.player.x = startRoom.centerX;
-        result.player.y = startRoom.centerY;
-        result.player.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
-        refreshFOVIfNeeded(newDungeonState, result.player.x, result.player.y, true);
+            transitioningPlayer.x = startRoom.centerX;
+            transitioningPlayer.y = startRoom.centerY;
+            transitioningPlayer.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
+            refreshFOVIfNeeded(newDungeonState, transitioningPlayer.x, transitioningPlayer.y, true);
 
-        realtimeClockRef.current = createRealtimeClock();
-        playerRef.current = result.player;
-        dungeonRef.current = newDungeonState;
-        setDungeon(newDungeonState);
-        setPlayer(result.player);
-        setShowShop(false);
-        setScore(nextScore + 500);
-        setTurn(t => t + 1);
-        saveCheckpoint(result.player, newDungeonState, nextScore + 500, nextTotalKills, curTurn + 1);
+            realtimeClockRef.current = createRealtimeClock();
+            playerRef.current = transitioningPlayer;
+            dungeonRef.current = newDungeonState;
+            setDungeon(newDungeonState);
+            setPlayer(transitioningPlayer);
+            setShowShop(false);
+            setScore(nextScore + 500);
+            setTurn(t => t + 1);
+            saveCheckpoint(transitioningPlayer, newDungeonState, nextScore + 500, nextTotalKills, curTurn + 1);
 
-        if (newDungeonState.activeEvent) {
-          setCombatLogs(prev =>
-            [
-              {
-                id: `env_banner_${Date.now()}`,
-                text: `${newDungeonState.activeEvent!.icon} EVENT TRIGGERED: ${newDungeonState.activeEvent!.name} — ${newDungeonState.activeEvent!.effectText}`,
-                type: 'level_up' as const,
-                turn: curTurn + 1
-              },
-              ...prev
-            ].slice(0, 30)
-          );
-        }
-        checkAchievements(nextFloor, nextTotalKills, result.player.stats.soulShards);
+            if (newDungeonState.activeEvent) {
+              setCombatLogs(prev =>
+                [
+                  {
+                    id: `env_banner_${Date.now()}`,
+                    text: `${newDungeonState.activeEvent!.icon} EVENT TRIGGERED: ${newDungeonState.activeEvent!.name} — ${newDungeonState.activeEvent!.effectText}`,
+                    type: 'level_up' as const,
+                    turn: curTurn + 1
+                  },
+                  ...prev
+                ].slice(0, 100)
+              );
+            }
+            checkAchievements(nextFloor, nextTotalKills, transitioningPlayer.stats.soulShards);
+          } finally {
+            floorTransitionRef.current = false;
+            setSessionLoad(null);
+          }
+        })();
         return;
       }
 
@@ -1831,7 +1924,7 @@ export default function App() {
     dungeonRef.current = result.dungeon;
     setPlayer(result.player);
     setDungeon(result.dungeon);
-    setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+    setCombatLogs(prev => [...result.logs, ...prev].slice(0, 100));
     setTurn(curTurn + 1);
 
     handleSoundAndVisuals(
@@ -1880,7 +1973,7 @@ export default function App() {
       const result = resolveRangedAttack(curPlayer, curDungeon, targetX, targetY, curTurn);
       if (result.player === curPlayer && result.dungeon === curDungeon) {
         // Out of range / no target: surface feedback log without consuming turn
-        setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+        setCombatLogs(prev => [...result.logs, ...prev].slice(0, 100));
         return;
       }
 
@@ -1889,7 +1982,7 @@ export default function App() {
       dungeonRef.current = result.dungeon;
       setPlayer(result.player);
       setDungeon(result.dungeon);
-      setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+      setCombatLogs(prev => [...result.logs, ...prev].slice(0, 100));
       setTurn(curTurn + 1);
 
       handleSoundAndVisuals(
@@ -1972,7 +2065,7 @@ export default function App() {
         turn: saved.turn || 1
       },
       ...(saved.combatLogs || [])
-    ].slice(0, 30));
+    ].slice(0, 100));
 
     const nearby = restoredDungeon.monsters.filter(
       m => m.alerted || Math.hypot(m.x - restoredPlayer.x, m.y - restoredPlayer.y) <= 7
@@ -2019,11 +2112,11 @@ export default function App() {
       }));
 
       setSessionLoad({ kind: 'run', progress: 35 });
-      // Real generation work (procedural dungeon) — this is the expensive step
-      const newDungeon = await new Promise<DungeonState>(resolve => {
-        window.setTimeout(() => resolve(generateDungeon(1)), 0);
-      });
-      setSessionLoad({ kind: 'run', progress: 62 });
+      // Chunked generation — yields to main so LoadingScreen can paint
+      const newDungeon = await generateDungeonAsync(1, undefined, undefined, p =>
+        setSessionLoad({ kind: 'run', progress: 35 + Math.floor(p * 0.4) })
+      );
+      setSessionLoad({ kind: 'run', progress: 78 });
 
       const startRoom = newDungeon.rooms[0];
       const startCp = newDungeon.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
@@ -2031,7 +2124,7 @@ export default function App() {
       newPlayer.lastCheckpoint = { floor: 1, x: startCp.x, y: startCp.y };
 
       refreshFOVIfNeeded(newDungeon, newPlayer.x, newPlayer.y, true);
-      setSessionLoad({ kind: 'run', progress: 78 });
+      setSessionLoad({ kind: 'run', progress: 85 });
 
       setDungeon(newDungeon);
       setPlayer(newPlayer);
@@ -2331,7 +2424,7 @@ export default function App() {
         turn: turnRef.current
       },
       ...prev
-    ].slice(0, 30));
+    ].slice(0, 100));
     soundEngine.playSFX('pickup');
   }, [sendCoopWs, commitPlayer]);
 
@@ -2397,7 +2490,7 @@ export default function App() {
       setCombatLogs(prev => [
         { id: `forge_brk_${Date.now()}`, text: `💥 ${msg}`, type: 'enemy_attack' as const, turn: turnRef.current },
         ...prev
-      ].slice(0, 30));
+      ].slice(0, 100));
       soundEngine.playSFX('forge_destroy');
     } else if (outcome.item) {
       const msg = `${t('upgradeSuccessMsg', language)} → ${outcome.item.name}`;
@@ -2405,7 +2498,7 @@ export default function App() {
       setCombatLogs(prev => [
         { id: `forge_ok_${Date.now()}`, text: `🔨 ${msg}`, type: 'item' as const, turn: turnRef.current },
         ...prev
-      ].slice(0, 30));
+      ].slice(0, 100));
       soundEngine.playSFX('forge_success');
     }
   };
@@ -2443,7 +2536,7 @@ export default function App() {
         turn: turnRef.current
       },
       ...prev
-    ].slice(0, 30));
+    ].slice(0, 100));
     setDestroyedItemRecovery(null);
     soundEngine.playSFX('level_up');
   }, [destroyedItemRecovery, language, commitPlayer]);
@@ -2473,7 +2566,7 @@ export default function App() {
         turn: turnRef.current
       },
       ...prev
-    ].slice(0, 30));
+    ].slice(0, 100));
   }, [commitPlayer]);
 
   const syncInventoryCapacity = useCallback(() => {
@@ -2518,7 +2611,7 @@ export default function App() {
     dungeonRef.current = result.dungeon;
     setPlayer(result.player);
     setDungeon(result.dungeon);
-    setCombatLogs(prev => [...result.logs, ...prev].slice(0, 30));
+    setCombatLogs(prev => [...result.logs, ...prev].slice(0, 100));
 
     handleSoundAndVisuals(
       result.soundEvents,
@@ -2609,7 +2702,7 @@ export default function App() {
         turn: turnRef.current
       },
       ...prev
-    ].slice(0, 30));
+    ].slice(0, 100));
 
     soundEngine.playSFX('chest');
   }, [sendCoopWs, commitPlayer]);
@@ -2639,7 +2732,7 @@ export default function App() {
             turn: turnRef.current
           },
           ...prev
-        ].slice(0, 30)
+        ].slice(0, 100)
       );
       soundEngine.playSFX('pickup');
     },

@@ -566,11 +566,17 @@ function tickMonsters(
   const envDmgMult = dungeon.activeEvent?.id === 'emp_surge' ? 1.15 : 1.0;
   const pTotals = getTotalStats(player);
 
-  // Build spatial hash once per tick (player + monsters)
+  // Spatial hash only for nearby entities (visionRange+pad) — far packs never collide/path
+  const AI_ACTIVE_RANGE = 12;
+  const HASH_PAD = 5;
+  const HASH_RANGE = AI_ACTIVE_RANGE + HASH_PAD;
   const blockerList: Blocker[] = [{ x: player.x, y: player.y, id: 'player' }];
   for (let i = 0; i < dungeon.monsters.length; i++) {
     const m = dungeon.monsters[i];
-    blockerList.push({ x: m.x, y: m.y, id: m.id });
+    const d = distanceCenters(m.x, m.y, player.x, player.y);
+    if (d <= HASH_RANGE || m.archetype === 'core_synthesizer') {
+      blockerList.push({ x: m.x, y: m.y, id: m.id });
+    }
   }
   const spatial = buildSpatialHash(blockerList);
 
@@ -578,9 +584,14 @@ function tickMonsters(
   let attackSfxBudget = 2;
 
   for (const monster of dungeon.monsters) {
+    const dist = distanceCenters(monster.x, monster.y, player.x, player.y);
+    // Far dormant packs: skip CD + AI entirely (bosses always tick)
+    if (dist > HASH_RANGE && monster.archetype !== 'core_synthesizer' && !monster.alerted) {
+      continue;
+    }
+
     clock.monsterAttackCd[monster.id] = Math.max(0, (clock.monsterAttackCd[monster.id] || 0) - dt);
 
-    const dist = distanceCenters(monster.x, monster.y, player.x, player.y);
     const tileX = Math.floor(monster.x + ENTITY_BODY * 0.5);
     const tileY = Math.floor(monster.y + ENTITY_BODY * 0.5);
     const isVisible = !!dungeon.tiles[tileY]?.[tileX]?.visible;
@@ -595,7 +606,7 @@ function tickMonsters(
     if (!monster.alerted) continue;
 
     // Far packs: skip chase until near (bosses always active)
-    if (dist > 12 && monster.archetype !== 'core_synthesizer') continue;
+    if (dist > AI_ACTIVE_RANGE && monster.archetype !== 'core_synthesizer') continue;
 
     const range = monsterAttackRange(monster);
     const cd = clock.monsterAttackCd[monster.id] || 0;

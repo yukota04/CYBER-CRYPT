@@ -160,6 +160,41 @@ export function createEmptyGrid(width: number, height: number): Tile[][] {
   return tiles;
 }
 
+/** Row-chunked grid fill so the main thread can paint LoadingScreen between slices. */
+export async function createEmptyGridAsync(
+  width: number,
+  height: number,
+  onProgress?: (pct: number) => void
+): Promise<Tile[][]> {
+  const tiles: Tile[][] = [];
+  const chunk = Math.max(4, Math.ceil(height / 12));
+  for (let y = 0; y < height; y++) {
+    const row: Tile[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push({
+        x,
+        y,
+        type: 'wall',
+        walkable: false,
+        transparent: false,
+        explored: false,
+        visible: false
+      });
+    }
+    tiles.push(row);
+    if (y > 0 && y % chunk === 0) {
+      onProgress?.(Math.floor((y / height) * 100));
+      await new Promise<void>(r => setTimeout(r, 0));
+    }
+  }
+  onProgress?.(100);
+  return tiles;
+}
+
+function yieldToMain(): Promise<void> {
+  return new Promise(r => setTimeout(r, 0));
+}
+
 // Pseudo-random number generator for seeded or unseeded runs
 function makeRng(seed?: number) {
   let s = seed !== undefined ? seed : Math.floor(Math.random() * 1000000);
@@ -169,12 +204,11 @@ function makeRng(seed?: number) {
   };
 }
 
-export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial<DungeonConfig>): DungeonState {
+function resolveDungeonConfig(floor: number, customConfig?: Partial<DungeonConfig>): DungeonConfig {
   const scaledWidth = DEFAULT_CONFIG.width + Math.min(24, Math.max(0, floor - 1) * 3);
   const scaledHeight = DEFAULT_CONFIG.height + Math.min(16, Math.max(0, floor - 1) * 2);
   const scaledRooms = DEFAULT_CONFIG.maxRooms + Math.min(8, Math.floor(Math.max(0, floor - 1) / 2));
-
-  const config: DungeonConfig = {
+  return {
     ...DEFAULT_CONFIG,
     width: scaledWidth,
     height: scaledHeight,
@@ -182,10 +216,42 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     floor,
     ...customConfig
   };
+}
+
+/**
+ * Async dungeon build: chunked tile alloc + yields between carve / loot / spawn phases
+ * so LoadingScreen can update without a multi-hundred-ms freeze.
+ */
+export async function generateDungeonAsync(
+  floor = 1,
+  seed?: number,
+  customConfig?: Partial<DungeonConfig>,
+  onProgress?: (pct: number) => void
+): Promise<DungeonState> {
+  const config = resolveDungeonConfig(floor, customConfig);
+  onProgress?.(4);
+  await yieldToMain();
+  const tiles = await createEmptyGridAsync(config.width, config.height, p =>
+    onProgress?.(4 + Math.floor(p * 0.36))
+  );
+  onProgress?.(42);
+  await yieldToMain();
+  const dungeon = generateDungeon(floor, seed, customConfig, tiles);
+  onProgress?.(100);
+  return dungeon;
+}
+
+export function generateDungeon(
+  floor = 1,
+  seed?: number,
+  customConfig?: Partial<DungeonConfig>,
+  prebuiltTiles?: Tile[][]
+): DungeonState {
+  const config = resolveDungeonConfig(floor, customConfig);
   const rng = makeRng(seed);
   const { width, height, maxRooms, minRoomSize, maxRoomSize } = config;
 
-  const tiles = createEmptyGrid(width, height);
+  const tiles = prebuiltTiles ?? createEmptyGrid(width, height);
   const rooms: Room[] = [];
 
   for (let r = 0; r < maxRooms; r++) {
@@ -513,8 +579,11 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
 /** Tiny placeholder dungeon used while the title/hub is active so combat memory can be released. */
 export function createEmptyDungeonStub(): DungeonState {
   const tile = {
+    x: 0,
+    y: 0,
     type: 'floor' as const,
     walkable: true,
+    transparent: true,
     visible: false,
     explored: false
   };

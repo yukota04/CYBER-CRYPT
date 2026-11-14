@@ -84,6 +84,13 @@ export function loadAllOfflineSaves(): Record<OfflineSaveSlotKey, OfflineSaveSta
   };
 }
 
+const LOCAL_SAVE_DEBOUNCE_MS = 2000;
+let pendingLocalSave: {
+  state: Omit<OfflineSaveState, 'version' | 'savedAt'>;
+  timer: ReturnType<typeof setTimeout>;
+} | null = null;
+
+/** Immediate localStorage write (game over / explicit flush). Truncates combat log to 100. */
 export function saveOfflineRun(state: Omit<OfflineSaveState, 'version' | 'savedAt'>): OfflineSaveState | null {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return null;
@@ -91,7 +98,7 @@ export function saveOfflineRun(state: Omit<OfflineSaveState, 'version' | 'savedA
       version: 1,
       savedAt: Date.now(),
       ...state,
-      combatLogs: (state.combatLogs || []).slice(0, 30)
+      combatLogs: (state.combatLogs || []).slice(0, 100)
     };
     const key = getOfflineSaveStorageKey(state.difficultyMode, state.player.characterClass);
     window.localStorage.setItem(key, JSON.stringify(payload));
@@ -102,10 +109,49 @@ export function saveOfflineRun(state: Omit<OfflineSaveState, 'version' | 'savedA
   }
 }
 
+/**
+ * Debounced persist during play — coalesces rapid player/dungeon React updates
+ * into one localStorage write every ~2s (avoids 5–15ms blocking every turn).
+ */
+export function scheduleSaveOfflineRun(
+  state: Omit<OfflineSaveState, 'version' | 'savedAt'>,
+  delayMs = LOCAL_SAVE_DEBOUNCE_MS
+): void {
+  if (pendingLocalSave) {
+    pendingLocalSave.state = state;
+    return;
+  }
+  pendingLocalSave = {
+    state,
+    timer: setTimeout(() => {
+      const pending = pendingLocalSave;
+      pendingLocalSave = null;
+      if (pending) saveOfflineRun(pending.state);
+    }, delayMs)
+  };
+}
+
+/** Flush any debounced local save now (tab hide / unload / leave run). */
+export function flushScheduledOfflineSave(): OfflineSaveState | null {
+  if (!pendingLocalSave) return null;
+  clearTimeout(pendingLocalSave.timer);
+  const state = pendingLocalSave.state;
+  pendingLocalSave = null;
+  return saveOfflineRun(state);
+}
+
 export function clearOfflineSave(
   difficulty: DifficultyMode = 'normal',
   characterClass: CharacterClass = 'striker'
 ): void {
+  if (pendingLocalSave) {
+    const pendingClass = pendingLocalSave.state.player.characterClass;
+    const pendingDiff = pendingLocalSave.state.difficultyMode;
+    if (pendingClass === characterClass && pendingDiff === difficulty) {
+      clearTimeout(pendingLocalSave.timer);
+      pendingLocalSave = null;
+    }
+  }
   try {
     if (typeof window === 'undefined' || !window.localStorage) return;
     window.localStorage.removeItem(getOfflineSaveStorageKey(difficulty, characterClass));
