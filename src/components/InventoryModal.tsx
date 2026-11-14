@@ -315,14 +315,28 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                       if (!onUnlockInventorySlot || !canAddSlot || slotAdPlaying) return;
                       setSlotAdPlaying(true);
                       setAdError(null);
+                      setAdPlaying(true);
+                      setAdPhase('loading');
+                      setAdProgress(8);
                       try {
-                        const result = await showAdsBitvexRewarded({});
-                        if (result.ok) onUnlockInventorySlot();
-                        else setAdError(result.message || result.reason);
+                        const result = await showAdsBitvexRewarded({
+                          onAdLaunching: () => {
+                            setAdPhase('playing');
+                            setAdProgress(prev => Math.max(prev, 55));
+                          }
+                        });
+                        if (result.ok) {
+                          setAdProgress(100);
+                          onUnlockInventorySlot();
+                        } else {
+                          setAdError(result.message || result.reason);
+                        }
                       } catch {
                         setAdError('Ad failed');
                       } finally {
                         setSlotAdPlaying(false);
+                        setAdPlaying(false);
+                        setAdProgress(0);
                       }
                     }}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition ${
@@ -728,6 +742,34 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
             )}
           </div>
         </div>
+
+        {/* Full-screen ad loading gate (inventory slot unlock) — must show BEFORE the ad appears */}
+        {slotAdPlaying && (
+          <div
+            data-testid="inventory-slot-ad-loading"
+            className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 backdrop-blur-md"
+          >
+            <div className="flex items-center gap-2 text-sm font-bold text-cyan-300">
+              <Tv className="w-5 h-5 animate-pulse" />
+              <span>
+                {t('adLoadingTitle', language)} ({Math.round(adProgress)}%)
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 px-6 text-center max-w-xs">
+              {adPhase === 'loading'
+                ? language === 'es'
+                  ? 'Esperando a que aparezca el anuncio…'
+                  : 'Waiting for the ad to appear…'
+                : t('adLoadingDesc', language)}
+            </p>
+            <div className="w-[min(70vw,260px)] h-2.5 bg-slate-900 rounded-full overflow-hidden border border-cyan-500/40">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-100"
+                style={{ width: `${Math.max(adProgress, 8)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Destroyed Item Ad Recovery Overlay */}
         {destroyedItemPendingRecovery && (() => {

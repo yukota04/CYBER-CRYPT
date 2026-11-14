@@ -1106,9 +1106,13 @@ test('appSettings performance presets and soundEngine audio settings apply clean
   assert.equal(perf.enableParticles, false);
   assert.equal(perf.enablePostFx, false);
   assert.equal(perf.simpleEntities, true);
-  assert.equal(perf.canvasScale, 0.5);
+  assert.equal(perf.canvasScale, 1, 'canvasScale must stay 1 — scaling zooms the playfield');
   assert.equal(perf.targetFps, 60, 'performance preset must stay at 60Hz (30Hz made fights worse)');
   assert.equal(perf.audio.ambientReverbEnabled, false);
+
+  const balanced = applyPerformancePreset('balanced', DEFAULT_APP_SETTINGS);
+  assert.equal(balanced.canvasScale, 1);
+  assert.equal(balanced.enableGlow, false, 'balanced must not pay for shadowBlur glow on mobile');
 
   const high = applyPerformancePreset('high', perf);
   assert.equal(high.enableScanlines, true);
@@ -1279,6 +1283,22 @@ test('realtime free-movement: entities can straddle two tiles and slide on walls
   const tick = tickRealtime(player, dungeon, { dx: 1, dy: 0 }, 0.05, 1, clock);
   assert.ok(tick.player.x > beforeX || tick.moved === false, 'Player advances continuously with held input');
   assert.ok(Number.isFinite(tick.player.x) && Number.isFinite(tick.player.y));
+});
+
+test('executeSkill works with free-move float coords without deep-cloning tiles (realtime)', () => {
+  const dungeon = generateDungeon(1, 55);
+  const room = dungeon.rooms[0];
+  const player = createInitialPlayer('striker', room.centerX + 0.42, room.centerY + 0.31);
+  // Use a real active skill (starter unlock is often a passive)
+  const skillId = 'striker_overclock';
+  player.unlockedSkills = [...player.unlockedSkills, skillId];
+  player.stats.energy = 99;
+  const tilesBefore = dungeon.tiles;
+  const beforeEnergy = player.stats.energy;
+  const result = executeSkill(player, dungeon, skillId, 1, { realtime: true });
+  assert.ok(result.player.stats.energy < beforeEnergy, 'active skill spends energy');
+  assert.equal(result.dungeon.tiles, tilesBefore, 'realtime skills must reuse tile grid (no deep clone)');
+  assert.ok(result.logs.some(l => l.type === 'skill' || l.type === 'info'), 'skill should emit feedback');
 });
 
 test('realtime melee respects Auto OFF until attackHeld, then swings like Auto ON', async () => {

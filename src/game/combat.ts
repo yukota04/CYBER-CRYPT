@@ -1480,13 +1480,24 @@ export function applyMonsterDamageToPlayer(
   });
 }
 
+/** Snap continuous free-move coords onto the tile grid (skills / LOS). */
+function skillTile(x: number): number {
+  return Math.floor(x + 0.36);
+}
+
+function skillEntitiesTouch(ax: number, ay: number, bx: number, by: number, radius = 0.92): boolean {
+  return Math.hypot(ax - bx, ay - by) <= radius;
+}
+
 // Active skill execution supporting all 15 skill trees
 export function executeSkill(
   player: Player,
   dungeon: DungeonState,
   skillId: string,
-  turn: number
+  turn: number,
+  opts?: { /** Offline free-move: skip turn-based monster retaliation + avoid deep tile clones */ realtime?: boolean }
 ): ActionResult {
+  const realtime = !!opts?.realtime;
   const skill = SKILL_DATABASE[skillId];
   if (!skill) {
     return {
@@ -1543,16 +1554,28 @@ export function executeSkill(
     equipment: { ...player.equipment },
     inventory: [...player.inventory]
   };
-  const newDungeon: DungeonState = {
-    ...dungeon,
-    monsters: dungeon.monsters.map(m => ({ ...m })),
-    tiles: dungeon.tiles.map(row => row.map(t => ({ ...t }))),
-    groundCoins: dungeon.groundCoins ? dungeon.groundCoins.map(c => ({ ...c })) : [],
-    checkpoints: dungeon.checkpoints ? dungeon.checkpoints.map(cp => ({ ...cp })) : [],
-    deathDrops: dungeon.deathDrops
-      ? dungeon.deathDrops.map(d => ({ ...d, items: [...d.items], equipment: { ...d.equipment } }))
-      : []
-  };
+  // Never deep-clone the whole tile grid — that stalls mobile for hundreds of ms and
+  // makes skills look like they "do nothing". Reuse tiles; copy only combat entities.
+  const newDungeon: DungeonState = realtime
+    ? {
+        ...dungeon,
+        monsters: dungeon.monsters.map(m => ({ ...m })),
+        groundCoins: dungeon.groundCoins ? dungeon.groundCoins.slice() : [],
+        checkpoints: dungeon.checkpoints ? dungeon.checkpoints.slice() : [],
+        deathDrops: dungeon.deathDrops
+          ? dungeon.deathDrops.map(d => ({ ...d, items: [...d.items], equipment: { ...d.equipment } }))
+          : []
+      }
+    : {
+        ...dungeon,
+        monsters: dungeon.monsters.map(m => ({ ...m })),
+        tiles: dungeon.tiles.map(row => row.map(t => ({ ...t }))),
+        groundCoins: dungeon.groundCoins ? dungeon.groundCoins.map(c => ({ ...c })) : [],
+        checkpoints: dungeon.checkpoints ? dungeon.checkpoints.map(cp => ({ ...cp })) : [],
+        deathDrops: dungeon.deathDrops
+          ? dungeon.deathDrops.map(d => ({ ...d, items: [...d.items], equipment: { ...d.equipment } }))
+          : []
+      };
 
   newPlayer.stats.energy -= energyCost;
   newPlayer.activeCooldowns[skillId] = skill.cooldown || 3;
@@ -1605,15 +1628,19 @@ export function executeSkill(
 
     const originX = newPlayer.x;
     const originY = newPlayer.y;
+    let cursorX = skillTile(newPlayer.x);
+    let cursorY = skillTile(newPlayer.y);
     for (let step = 1; step <= (skill.effect.range || 3); step++) {
-      const stepX = newPlayer.x + dx;
-      const stepY = newPlayer.y + dy;
+      const stepX = cursorX + dx;
+      const stepY = cursorY + dy;
       if (stepX < 0 || stepX >= dungeon.width || stepY < 0 || stepY >= dungeon.height) break;
-      if (!newDungeon.tiles[stepY][stepX].walkable) break;
+      if (!newDungeon.tiles[stepY]?.[stepX]?.walkable) break;
+      cursorX = stepX;
+      cursorY = stepY;
       newPlayer.x = stepX;
       newPlayer.y = stepY;
 
-      const hitIdx = newDungeon.monsters.findIndex(m => m.x === stepX && m.y === stepY);
+      const hitIdx = newDungeon.monsters.findIndex(m => skillEntitiesTouch(stepX, stepY, m.x, m.y));
       if (hitIdx !== -1) {
         const hitMonster = newDungeon.monsters[hitIdx];
         const dmg = computeSkillDamage(newPlayer, hitMonster, skill.effect.power || 1.8, newDungeon.activeEvent);
@@ -1714,21 +1741,23 @@ export function executeSkill(
     logs.unshift({ id: `skill_${Date.now()}`, text: `${skill.name.toUpperCase()}: Restored ${healAmt} HP to core systems!`, type: 'skill', turn });
   } else if (actionType === 'plasma_cleave') {
     let hits = 0;
+    const px = skillTile(newPlayer.x);
+    const py = skillTile(newPlayer.y);
     const targets: { x: number; y: number }[] = [];
     if (newPlayer.facing === 'right') {
-      targets.push({ x: newPlayer.x + 1, y: newPlayer.y - 1 }, { x: newPlayer.x + 1, y: newPlayer.y }, { x: newPlayer.x + 1, y: newPlayer.y + 1 });
+      targets.push({ x: px + 1, y: py - 1 }, { x: px + 1, y: py }, { x: px + 1, y: py + 1 });
     } else if (newPlayer.facing === 'left') {
-      targets.push({ x: newPlayer.x - 1, y: newPlayer.y - 1 }, { x: newPlayer.x - 1, y: newPlayer.y }, { x: newPlayer.x - 1, y: newPlayer.y + 1 });
+      targets.push({ x: px - 1, y: py - 1 }, { x: px - 1, y: py }, { x: px - 1, y: py + 1 });
     } else if (newPlayer.facing === 'up') {
-      targets.push({ x: newPlayer.x - 1, y: newPlayer.y - 1 }, { x: newPlayer.x, y: newPlayer.y - 1 }, { x: newPlayer.x + 1, y: newPlayer.y - 1 });
+      targets.push({ x: px - 1, y: py - 1 }, { x: px, y: py - 1 }, { x: px + 1, y: py - 1 });
     } else {
-      targets.push({ x: newPlayer.x - 1, y: newPlayer.y + 1 }, { x: newPlayer.x, y: newPlayer.y + 1 }, { x: newPlayer.x + 1, y: newPlayer.y + 1 });
+      targets.push({ x: px - 1, y: py + 1 }, { x: px, y: py + 1 }, { x: px + 1, y: py + 1 });
     }
 
     for (const target of targets) {
       for (let i = newDungeon.monsters.length - 1; i >= 0; i--) {
         const m = newDungeon.monsters[i];
-        if (m.x === target.x && m.y === target.y) {
+        if (skillEntitiesTouch(target.x, target.y, m.x, m.y)) {
           const dmg = computeSkillDamage(newPlayer, m, skill.effect.power || 1.9, newDungeon.activeEvent);
           m.hp -= dmg;
           m.alerted = true;
@@ -1756,18 +1785,20 @@ export function executeSkill(
     else if (newPlayer.facing === 'up') dy = -1;
     else dy = 1;
 
-    let endX = newPlayer.x;
-    let endY = newPlayer.y;
+    const originTX = skillTile(newPlayer.x);
+    const originTY = skillTile(newPlayer.y);
+    let endX = originTX;
+    let endY = originTY;
     const range = skill.effect.range || 6;
     for (let s = 1; s <= range; s++) {
-      const tx = newPlayer.x + dx * s;
-      const ty = newPlayer.y + dy * s;
+      const tx = originTX + dx * s;
+      const ty = originTY + dy * s;
       if (!newDungeon.tiles[ty]?.[tx]?.walkable) break;
       endX = tx;
       endY = ty;
       for (let i = newDungeon.monsters.length - 1; i >= 0; i--) {
         const m = newDungeon.monsters[i];
-        if (m.x === tx && m.y === ty) {
+        if (skillEntitiesTouch(tx, ty, m.x, m.y)) {
           const dmg = computeSkillDamage(newPlayer, m, skill.effect.power || 2.1, newDungeon.activeEvent);
           m.hp -= dmg;
           m.alerted = true;
@@ -1842,7 +1873,7 @@ export function executeSkill(
     let totalDrained = 0;
     for (let i = newDungeon.monsters.length - 1; i >= 0; i--) {
       const m = newDungeon.monsters[i];
-      if (Math.abs(m.x - newPlayer.x) <= 1 && Math.abs(m.y - newPlayer.y) <= 1) {
+      if (skillEntitiesTouch(newPlayer.x, newPlayer.y, m.x, m.y, 1.55)) {
         const dmg = computeSkillDamage(newPlayer, m, skill.effect.power || 1.7, newDungeon.activeEvent);
         m.hp -= dmg;
         m.alerted = true;
@@ -1866,7 +1897,11 @@ export function executeSkill(
     newPlayer.stats.energy = Math.min(pTotals.maxEnergy, newPlayer.stats.energy + refund);
   }
 
-  resolveMonsterTurns(newPlayer, newDungeon, logs, soundEvents, floatingTexts, turn);
+  // Free-move already runs monster AI every frame — a full turn retaliation here
+  // made skills feel broken (instant counter-attack / freeze from tile clones).
+  if (!realtime) {
+    resolveMonsterTurns(newPlayer, newDungeon, logs, soundEvents, floatingTexts, turn);
+  }
 
   const gameOver = newPlayer.stats.hp <= 0;
   let deathDropCreated = false;

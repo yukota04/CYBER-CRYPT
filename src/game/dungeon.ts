@@ -510,6 +510,31 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
   return dungeon;
 }
 
+/** Tiny placeholder dungeon used while the title/hub is active so combat memory can be released. */
+export function createEmptyDungeonStub(): DungeonState {
+  const tile = {
+    type: 'floor' as const,
+    walkable: true,
+    visible: false,
+    explored: false
+  };
+  return {
+    floor: 0,
+    width: 1,
+    height: 1,
+    tiles: [[tile]],
+    rooms: [],
+    monsters: [],
+    pendingSpawns: [],
+    stairsPos: { x: 0, y: 0 },
+    activeEvent: null,
+    shopItems: [],
+    groundCoins: [],
+    checkpoints: [],
+    deathDrops: []
+  };
+}
+
 /** Activate pending monsters within `radius` tiles of the player. */
 export function activateNearbySpawns(
   dungeon: DungeonState,

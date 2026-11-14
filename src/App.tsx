@@ -20,7 +20,8 @@ import {
   RunSnapshot,
   SavedPlayerLoadout
 } from './game/types';
-import { generateDungeon, updateFOV } from './game/dungeon';
+import { createEmptyDungeonStub, generateDungeon, updateFOV } from './game/dungeon';
+import { loadIconAtlas } from './game/iconAtlas';
 import {
   collectDeathDropBagsAt,
   createInitialPlayer,
@@ -89,6 +90,7 @@ import { Minimap } from './components/Minimap';
 import { ShopModal } from './components/ShopModal';
 import { OptionsModal } from './components/OptionsModal';
 import { TradeModal, TradeRequestBanner } from './components/TradeModal';
+import { LoadingScreen } from './components/LoadingScreen';
 import { testFirestoreConnection } from './firebase';
 
 const DEFAULT_ACHIEVEMENTS: Achievement[] = [
@@ -101,6 +103,9 @@ const DEFAULT_ACHIEVEMENTS: Achievement[] = [
 
 export default function App() {
   const [gameState, setGameState] = useState<'title' | 'playing' | 'paused' | 'gameover'>('title');
+  const [bootReady, setBootReady] = useState(false);
+  const [bootProgress, setBootProgress] = useState(4);
+  const [sessionLoad, setSessionLoad] = useState<null | { kind: 'run' | 'menu'; progress: number }>(null);
   const [authScreenVisible, setAuthScreenVisible] = useState<boolean>(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -203,15 +208,15 @@ export default function App() {
   const [coopError, setCoopError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // React State for HUD & Canvas
+  // React State for HUD & Canvas — hub starts with a tiny stub (no full dungeon in memory)
   const [player, setPlayer] = useState<Player>(() => createInitialPlayer('striker'));
-  const [dungeon, setDungeon] = useState<DungeonState>(() => generateDungeon(1, 100));
+  const [dungeon, setDungeon] = useState<DungeonState>(() => createEmptyDungeonStub());
 
   // Canvas Refs & Renderer
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const targetFpsRef = useRef<30 | 60>(appSettings.targetFps);
-  const canvasScaleRef = useRef<1 | 0.75 | 0.5>(appSettings.canvasScale);
+  const canvasScaleRef = useRef<1>(1);
   const floatingTextsRef = useRef<{ text: string; x: number; y: number; color: string; isCrit?: boolean; life: number }[]>([]);
   const lastFovPosRef = useRef<{ x: number; y: number; floor: number } | null>(null);
   const remotePlayersRef = useRef<CoopRemoteRenderPlayer[]>([]);
@@ -354,26 +359,26 @@ export default function App() {
   }, [showInventory, showSkillTree, showShop, showOptions, tradePartnerId, tradeIncoming, gameState]);
 
   const handleUpdateSettings = useCallback((next: AppSettings) => {
-    setAppSettings(next);
-    saveAppSettings(next);
-    soundEngine.setAudioSettings(next.audio);
-    setIsMuted(next.audio.masterMuted);
-    targetFpsRef.current = next.targetFps;
-    canvasScaleRef.current = next.canvasScale;
+    // canvasScale is locked at 1 — never zoom the playfield via resolution hacks
+    const locked = { ...next, canvasScale: 1 as const };
+    setAppSettings(locked);
+    saveAppSettings(locked);
+    soundEngine.setAudioSettings(locked.audio);
+    setIsMuted(locked.audio.masterMuted);
+    targetFpsRef.current = locked.targetFps;
+    canvasScaleRef.current = 1;
     rendererRef.current?.applyPerformanceOptions({
-      enableScanlines: next.enableScanlines,
-      enableGlow: next.enableGlow,
-      enableParticles: next.enableParticles,
-      enablePostFx: next.enablePostFx,
-      simpleEntities: next.simpleEntities,
-      detailTiles: next.performanceMode === 'high'
+      enableScanlines: locked.enableScanlines,
+      enableGlow: locked.enableGlow,
+      enableParticles: locked.enableParticles,
+      enablePostFx: locked.enablePostFx,
+      simpleEntities: locked.simpleEntities,
+      detailTiles: locked.performanceMode === 'high'
     });
-    // Re-apply canvas resolution when scale preset changes
     const canvas = canvasRef.current;
     if (canvas) {
-      const scale = next.canvasScale;
-      canvas.width = Math.max(1, Math.floor(window.innerWidth * scale));
-      canvas.height = Math.max(1, Math.floor(window.innerHeight * scale));
+      canvas.width = Math.max(1, Math.floor(window.innerWidth));
+      canvas.height = Math.max(1, Math.floor(window.innerHeight));
       canvas.style.width = `${window.innerWidth}px`;
       canvas.style.height = `${window.innerHeight}px`;
     }
@@ -393,6 +398,39 @@ export default function App() {
   // Apply persisted audio settings on initial mount
   useEffect(() => {
     soundEngine.setAudioSettings(appSettings.audio);
+  }, []);
+
+  // Real boot load: icon atlas + fonts + ad SDK warm-up (not a fake timer)
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setBootProgress(8);
+      const fontReady =
+        typeof document !== 'undefined' && document.fonts?.ready
+          ? document.fonts.ready.catch(() => undefined)
+          : Promise.resolve();
+      setBootProgress(22);
+      await loadIconAtlas();
+      if (cancelled) return;
+      setBootProgress(55);
+      await fontReady;
+      if (cancelled) return;
+      setBootProgress(72);
+      // Warm AdsBitvex SDK so inventory ads can show a real loading gate
+      await new Promise<void>(resolve => {
+        preloadAdsBitvex();
+        window.setTimeout(resolve, 40);
+      });
+      if (cancelled) return;
+      setBootProgress(100);
+      // Yield so the 100% paint can show before unmounting the gate
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      if (!cancelled) setBootReady(true);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch server-saved online stashes per role whenever entering Online hub or account changes
@@ -817,9 +855,9 @@ export default function App() {
     rendererRef.current = renderer;
 
     const resizeCanvas = () => {
-      const scale = canvasScaleRef.current;
-      canvas.width = Math.max(1, Math.floor(window.innerWidth * scale));
-      canvas.height = Math.max(1, Math.floor(window.innerHeight * scale));
+      // Always 1× — CSS size == backing store size (no zoom from canvasScale)
+      canvas.width = Math.max(1, Math.floor(window.innerWidth));
+      canvas.height = Math.max(1, Math.floor(window.innerHeight));
       canvas.style.width = `${window.innerWidth}px`;
       canvas.style.height = `${window.innerHeight}px`;
     };
@@ -885,7 +923,14 @@ export default function App() {
         applyRealtimeResultRef.current(result, dt);
       }
 
-      if (dungeonRef.current && playerRef.current) {
+      // Title/hub: do not burn CPU rendering a full dungeon behind the menu
+      const gs = gameStateRef.current;
+      if (
+        (gs === 'playing' || gs === 'paused' || gs === 'gameover') &&
+        dungeonRef.current &&
+        playerRef.current &&
+        (dungeonRef.current.floor > 0 || dungeonRef.current.width > 1)
+      ) {
         renderer.render(
           dungeonRef.current,
           playerRef.current,
@@ -1121,18 +1166,57 @@ export default function App() {
     });
   }, [tradePartnerId, tradeLocked, partnerTradeReady, tradePartnerOffer, myTradeOffer, sendCoopWs]);
 
-  const handleReturnToTitle = useCallback(() => {
-    if (playModeRef.current === 'online') {
-      sendCoopWs({ type: 'coop:leave' });
-      setCoopRoom(null);
-      setTimeout(() => fetchOnlineStashes(), 150);
-    }
+  const releasePlaySessionMemory = useCallback(() => {
+    floatingTextsRef.current = [];
+    remotePlayersRef.current = [];
+    hoveredTileRef.current = null;
+    realtimeClockRef.current = createRealtimeClock();
+    moveInputRef.current = { dx: 0, dy: 0 };
+    heldMoveKeysRef.current.clear();
+    attackHeldRef.current = false;
+    joystickActiveRef.current = false;
+    rendererRef.current?.releaseSession();
+    const stub = createEmptyDungeonStub();
+    const hubPlayer = createInitialPlayer(selectedClassRef.current, 0, 0);
+    dungeonRef.current = stub;
+    playerRef.current = hubPlayer;
+    setDungeon(stub);
+    setPlayer(hubPlayer);
+    setCombatLogs([]);
+    setRunSnapshot(null);
+    setCheckpointSnapshot(null);
+    setDestroyedItemRecovery(null);
     setShowShop(false);
     setShowInventory(false);
     setShowSkillTree(false);
-    soundEngine.setMusicContext({ scene: 'title' });
-    setGameState('title');
-  }, [sendCoopWs, fetchOnlineStashes]);
+    setShowMinimap(false);
+    // Hint GC after dropping the large dungeon graph
+    try {
+      (window as unknown as { gc?: () => void }).gc?.();
+    } catch {
+      /* optional */
+    }
+  }, []);
+
+  const handleReturnToTitle = useCallback(() => {
+    void (async () => {
+      setSessionLoad({ kind: 'menu', progress: 12 });
+      if (playModeRef.current === 'online') {
+        sendCoopWs({ type: 'coop:leave' });
+        setCoopRoom(null);
+        setTimeout(() => fetchOnlineStashes(), 150);
+      }
+      setSessionLoad({ kind: 'menu', progress: 45 });
+      // Yield so the loading screen paints before we tear down the run
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      releasePlaySessionMemory();
+      setSessionLoad({ kind: 'menu', progress: 85 });
+      soundEngine.setMusicContext({ scene: 'title' });
+      setGameState('title');
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      setSessionLoad(null);
+    })();
+  }, [sendCoopWs, fetchOnlineStashes, releasePlaySessionMemory]);
 
   const handleLogout = useCallback(async () => {
     if (playModeRef.current === 'online') {
@@ -1738,7 +1822,9 @@ export default function App() {
     const curDungeon = dungeonRef.current;
     const curTurn = turnRef.current;
 
-    const result = executeSkill(curPlayer, curDungeon, skillId, curTurn);
+    const result = executeSkill(curPlayer, curDungeon, skillId, curTurn, {
+      realtime: playModeRef.current === 'offline'
+    });
     refreshFOVIfNeeded(result.dungeon, result.player.x, result.player.y);
 
     playerRef.current = result.player;
@@ -1913,54 +1999,85 @@ export default function App() {
 
   // Start New Offline Run (Deletes only the active difficulty + role saved run)
   const handleStartGame = useCallback(() => {
-    if (window.innerWidth < 768 || 'ontouchstart' in window) {
-      requestNativeFullscreen();
-    }
-    const activeDiff = difficultyModeRef.current;
-    const activeClass = selectedClassRef.current;
-    const slotKey = getOfflineSaveSlotKey(activeDiff, activeClass);
-    clearOfflineSave(activeDiff, activeClass);
-    setSavedOfflineRuns(prev => ({
-      ...prev,
-      [slotKey]: null
-    }));
+    void (async () => {
+      if (window.innerWidth < 768 || 'ontouchstart' in window) {
+        requestNativeFullscreen();
+      }
+      setSessionLoad({ kind: 'run', progress: 8 });
+      // Drop hub stub / prior run before allocating a new floor
+      releasePlaySessionMemory();
+      setSessionLoad({ kind: 'run', progress: 18 });
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    const newDungeon = generateDungeon(1);
-    const startRoom = newDungeon.rooms[0];
-    const startCp = newDungeon.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
-    const newPlayer = createInitialPlayer(activeClass, startRoom.centerX, startRoom.centerY);
-    newPlayer.lastCheckpoint = { floor: 1, x: startCp.x, y: startCp.y };
+      const activeDiff = difficultyModeRef.current;
+      const activeClass = selectedClassRef.current;
+      const slotKey = getOfflineSaveSlotKey(activeDiff, activeClass);
+      clearOfflineSave(activeDiff, activeClass);
+      setSavedOfflineRuns(prev => ({
+        ...prev,
+        [slotKey]: null
+      }));
 
-    refreshFOVIfNeeded(newDungeon, newPlayer.x, newPlayer.y, true);
+      setSessionLoad({ kind: 'run', progress: 35 });
+      // Real generation work (procedural dungeon) — this is the expensive step
+      const newDungeon = await new Promise<DungeonState>(resolve => {
+        window.setTimeout(() => resolve(generateDungeon(1)), 0);
+      });
+      setSessionLoad({ kind: 'run', progress: 62 });
 
-    setDungeon(newDungeon);
-    setPlayer(newPlayer);
-    setTurn(1);
-    setScore(0);
-    setMonstersSlain(0);
-    setShowShop(false);
-    setDestroyedItemRecovery(null);
-    setRunSnapshot(null);
-    setCombatLogs([
-      { id: 'start_run', text: `DEPLOYED: Operative ${newPlayer.characterClass.toUpperCase()} initialized on Floor 1 (${activeDiff.toUpperCase()}).`, type: 'info', turn: 1 }
-    ]);
-    saveCheckpoint(newPlayer, newDungeon, 0, 0, 1);
+      const startRoom = newDungeon.rooms[0];
+      const startCp = newDungeon.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
+      const newPlayer = createInitialPlayer(activeClass, startRoom.centerX, startRoom.centerY);
+      newPlayer.lastCheckpoint = { floor: 1, x: startCp.x, y: startCp.y };
 
-    realtimeClockRef.current = createRealtimeClock();
-    moveInputRef.current = { dx: 0, dy: 0 };
-    playerRef.current = newPlayer;
-    dungeonRef.current = newDungeon;
+      refreshFOVIfNeeded(newDungeon, newPlayer.x, newPlayer.y, true);
+      setSessionLoad({ kind: 'run', progress: 78 });
 
-    soundEngine.setMusicContext({
-      scene: 'playing',
-      floor: 1,
-      nearbyEnemies: 0,
-      bossVisible: false,
-      lowHp: false
-    });
-    setGameState('playing');
-    soundEngine.startMusic();
-  }, [refreshFOVIfNeeded, saveCheckpoint, requestNativeFullscreen]);
+      setDungeon(newDungeon);
+      setPlayer(newPlayer);
+      setTurn(1);
+      setScore(0);
+      setMonstersSlain(0);
+      setShowShop(false);
+      setDestroyedItemRecovery(null);
+      setRunSnapshot(null);
+      setShowMinimap(true);
+      setCombatLogs([
+        {
+          id: 'start_run',
+          text: `DEPLOYED: Operative ${newPlayer.characterClass.toUpperCase()} initialized on Floor 1 (${activeDiff.toUpperCase()}).`,
+          type: 'info',
+          turn: 1
+        }
+      ]);
+      saveCheckpoint(newPlayer, newDungeon, 0, 0, 1);
+
+      realtimeClockRef.current = createRealtimeClock();
+      moveInputRef.current = { dx: 0, dy: 0 };
+      playerRef.current = newPlayer;
+      dungeonRef.current = newDungeon;
+
+      // Warm first paint into the canvas while the gate is still up
+      if (rendererRef.current && canvasRef.current) {
+        rendererRef.current.releaseSession();
+        rendererRef.current.render(newDungeon, newPlayer, [], 0.016, [], null);
+      }
+      setSessionLoad({ kind: 'run', progress: 94 });
+
+      soundEngine.setMusicContext({
+        scene: 'playing',
+        floor: 1,
+        nearbyEnemies: 0,
+        bossVisible: false,
+        lowHp: false
+      });
+      setGameState('playing');
+      soundEngine.startMusic();
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      setSessionLoad({ kind: 'run', progress: 100 });
+      setSessionLoad(null);
+    })();
+  }, [refreshFOVIfNeeded, saveCheckpoint, requestNativeFullscreen, releasePlaySessionMemory]);
 
   // Global Keyboard Listener
   useEffect(() => {
@@ -2576,10 +2693,22 @@ export default function App() {
 
   return (
     <div className="relative w-screen h-[100dvh] overflow-hidden bg-[#060410] select-none">
+      {!bootReady && (
+        <LoadingScreen kind="boot" language={language} progress={bootProgress} />
+      )}
+      {sessionLoad && (
+        <LoadingScreen
+          kind={sessionLoad.kind === 'run' ? 'run' : 'menu'}
+          language={language}
+          progress={sessionLoad.progress}
+        />
+      )}
       <canvas
         ref={canvasRef}
         data-testid="game-canvas"
-        className="absolute inset-0 w-full h-full block cursor-crosshair"
+        className={`absolute inset-0 w-full h-full block cursor-crosshair ${
+          gameState === 'title' || !bootReady ? 'opacity-0 pointer-events-none' : ''
+        }`}
         onMouseMove={e => {
           if (gameStateRef.current !== 'playing' || !rendererRef.current) return;
           hoveredTileRef.current = rendererRef.current.screenToTile(
@@ -2650,7 +2779,7 @@ export default function App() {
         }}
       />
 
-      {authScreenVisible && gameState === 'title' && (
+      {bootReady && authScreenVisible && gameState === 'title' && (
         <LoginScreen
           language={language}
           onLanguageChange={handleLanguageChange}
@@ -2668,7 +2797,7 @@ export default function App() {
         />
       )}
 
-      {!authScreenVisible && gameState === 'title' && (
+      {bootReady && !authScreenVisible && gameState === 'title' && (
         <TitleScreen
           selectedClass={selectedClass}
           onSelectClass={setSelectedClass}
