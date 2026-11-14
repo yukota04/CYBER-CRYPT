@@ -18,6 +18,7 @@ import {
   createRateLimiter
 } from './src/server/security';
 import { CoopRoomManager } from './src/server/coopRooms';
+import { PostgresStore, PersistedSnapshot } from './src/server/persistence';
 
 dotenv.config();
 
@@ -28,7 +29,9 @@ const ROOT_DIR = process.cwd();
 const ENCRYPTION_SECRET =
   process.env.CLOUD_SAVE_SECRET || crypto.randomBytes(32).toString('hex');
 
-app.use(express.json({ limit: '1mb' }));
+const jsonSmall = express.json({ limit: '1mb' });
+const jsonLarge = express.json({ limit: '8mb' });
+app.use((req, res, next) => (req.path.startsWith('/api/saves/runs') ? jsonLarge : jsonSmall)(req, res, next));
 
 // Security Headers & Basic CSRF Origin Protection for API mutations
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -168,70 +171,111 @@ let globalLeaderboards: LeaderboardRecord[] = [
   { rank: 5, username: 'AcidBurn', characterClass: 'technomancer', floor: 6, score: 11200, kills: 142, timeSec: 380, platform: 'desktop', difficultyMode: 'normal' }
 ];
 
+const pgStore: PostgresStore | null = process.env.DATABASE_URL ? new PostgresStore(process.env.DATABASE_URL) : null;
+const PERSISTENCE_MODE = pgStore ? 'neon-postgres' : 'disk-backed-json-store';
+
+function buildSnapshot(): PersistedSnapshot {
+  return {
+    users: Array.from(users.values()),
+    cloudSaves: Array.from(cloudSaves.values()),
+    onlineLoadouts: coopManager.exportPersistentState() as unknown as PersistedSnapshot['onlineLoadouts'],
+    kv: {
+      chatMessages: chatMessages.slice(-100),
+      friends: Array.from(friends.entries()).map(([k, set]) => [k, Array.from(set)]),
+      friendRequests: Array.from(friendRequests.entries()).map(([k, set]) => [k, Array.from(set)]),
+      globalLeaderboards,
+      auditLogs: auditLogs.slice(0, 200),
+      securityAlerts: securityAlerts.slice(0, 50)
+    }
+  };
+}
+
+function writeJsonFile() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  const snap = buildSnapshot();
+  const serialized = {
+    users: snap.users,
+    cloudSaves: snap.cloudSaves,
+    ...snap.kv,
+    onlineLoadouts: snap.onlineLoadouts
+  };
+  fs.writeFileSync(DB_FILE, JSON.stringify(serialized, null, 2), 'utf8');
+}
+
 let persistTimer: NodeJS.Timeout | null = null;
 function schedulePersist() {
   if (persistTimer) return;
   persistTimer = setTimeout(() => {
     persistTimer = null;
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
+      if (pgStore) {
+        void pgStore.save(buildSnapshot());
+      } else {
+        writeJsonFile();
       }
-      const serialized = {
-        users: Array.from(users.values()),
-        cloudSaves: Array.from(cloudSaves.values()),
-        chatMessages: chatMessages.slice(-100),
-        friends: Array.from(friends.entries()).map(([k, set]) => [k, Array.from(set)]),
-        friendRequests: Array.from(friendRequests.entries()).map(([k, set]) => [k, Array.from(set)]),
-        globalLeaderboards,
-        auditLogs: auditLogs.slice(0, 200),
-        securityAlerts: securityAlerts.slice(0, 50),
-        onlineLoadouts: coopManager.exportPersistentState()
-      };
-      fs.writeFileSync(DB_FILE, JSON.stringify(serialized, null, 2), 'utf8');
     } catch (err) {
       console.error('[CYBER-CRYPT] Persistence write failed:', err);
     }
   }, 250);
 }
 
-function loadDatabaseOrSeed() {
-  if (fs.existsSync(DB_FILE)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-      if (Array.isArray(raw.users)) {
-        for (const u of raw.users) users.set(u.id, ensureUserLoginField(u));
-      }
-      if (Array.isArray(raw.cloudSaves)) {
-        for (const s of raw.cloudSaves) cloudSaves.set(s.userId, s);
-      }
-      if (Array.isArray(raw.chatMessages) && raw.chatMessages.length > 0) {
-        chatMessages.splice(0, chatMessages.length, ...raw.chatMessages);
-      }
-      if (Array.isArray(raw.friends)) {
-        for (const [k, arr] of raw.friends) friends.set(k, new Set(arr));
-      }
-      if (Array.isArray(raw.friendRequests)) {
-        for (const [k, arr] of raw.friendRequests) friendRequests.set(k, new Set(arr));
-      }
-      if (Array.isArray(raw.globalLeaderboards)) {
-        globalLeaderboards = raw.globalLeaderboards;
-      }
-      if (Array.isArray(raw.auditLogs)) {
-        auditLogs.splice(0, auditLogs.length, ...raw.auditLogs);
-      }
-      if (Array.isArray(raw.securityAlerts)) {
-        securityAlerts.splice(0, securityAlerts.length, ...raw.securityAlerts);
-      }
-      if (Array.isArray(raw.onlineLoadouts)) {
-        coopManager.importPersistentState(raw.onlineLoadouts);
-      }
-      return;
-    } catch (err) {
-      console.error('[CYBER-CRYPT] Failed to load persisted db.json, seeding fresh defaults:', err);
-    }
+async function flushPersistence() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
   }
+  if (pgStore) {
+    await pgStore.save(buildSnapshot());
+    await pgStore.flush();
+  } else {
+    writeJsonFile();
+  }
+}
 
+/** Apply a legacy db.json-shaped object (or a Postgres snapshot flattened to that shape) to memory. */
+function applyRawState(raw: any) {
+  if (Array.isArray(raw.users)) {
+    for (const u of raw.users) users.set(u.id, ensureUserLoginField(u));
+  }
+  if (Array.isArray(raw.cloudSaves)) {
+    for (const s of raw.cloudSaves) cloudSaves.set(s.userId, s);
+  }
+  if (Array.isArray(raw.chatMessages) && raw.chatMessages.length > 0) {
+    chatMessages.splice(0, chatMessages.length, ...raw.chatMessages);
+  }
+  if (Array.isArray(raw.friends)) {
+    for (const [k, arr] of raw.friends) friends.set(k, new Set(arr));
+  }
+  if (Array.isArray(raw.friendRequests)) {
+    for (const [k, arr] of raw.friendRequests) friendRequests.set(k, new Set(arr));
+  }
+  if (Array.isArray(raw.globalLeaderboards)) {
+    globalLeaderboards = raw.globalLeaderboards;
+  }
+  if (Array.isArray(raw.auditLogs)) {
+    auditLogs.splice(0, auditLogs.length, ...raw.auditLogs);
+  }
+  if (Array.isArray(raw.securityAlerts)) {
+    securityAlerts.splice(0, securityAlerts.length, ...raw.securityAlerts);
+  }
+  if (Array.isArray(raw.onlineLoadouts)) {
+    coopManager.importPersistentState(raw.onlineLoadouts);
+  }
+}
+
+function readJsonFile(): any | null {
+  if (!fs.existsSync(DB_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  } catch (err) {
+    console.error('[CYBER-CRYPT] Failed to read data/db.json:', err);
+    return null;
+  }
+}
+
+function seedDefaults() {
   // Seed initial operatives with ephemeral cryptographically strong passwords/tokens (no hardcoded weak secrets)
   const adminPwd = process.env.ADMIN_SEED_PASSWORD || crypto.randomBytes(16).toString('hex');
   const demoPwd = process.env.DEMO_SEED_PASSWORD || crypto.randomBytes(16).toString('hex');
@@ -264,10 +308,37 @@ function loadDatabaseOrSeed() {
   users.set(demoUser.id, demoUser);
   friends.set(adminUser.id, new Set([demoUser.id]));
   friends.set(demoUser.id, new Set([adminUser.id]));
-  schedulePersist();
 }
 
-loadDatabaseOrSeed();
+async function loadDatabaseOrSeed() {
+  if (pgStore) {
+    await pgStore.migrate();
+    const snap = await pgStore.load();
+    if (snap) {
+      applyRawState({ ...snap.kv, users: snap.users, cloudSaves: snap.cloudSaves, onlineLoadouts: snap.onlineLoadouts });
+      console.log(`[CYBER-CRYPT][db] loaded ${users.size} accounts and ${cloudSaves.size} cloud saves from Neon Postgres`);
+      return;
+    }
+    // First boot against an empty database: migrate the legacy JSON store if present.
+    const legacy = readJsonFile();
+    if (legacy) {
+      applyRawState(legacy);
+      console.log(`[CYBER-CRYPT][db] migrating legacy data/db.json (${users.size} accounts) into Neon Postgres`);
+    } else {
+      seedDefaults();
+    }
+    await flushPersistence();
+    return;
+  }
+
+  const raw = readJsonFile();
+  if (raw) {
+    applyRawState(raw);
+    return;
+  }
+  seedDefaults();
+  schedulePersist();
+}
 
 // Helper: Logging Audit Events
 function logAudit(userId: string, username: string, action: string, ip: string, severity: AuditLog['severity'], details: string) {
@@ -343,7 +414,7 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     uptime: process.uptime(),
     timestamp: Date.now(),
-    persistence: 'disk-backed-json-store'
+    persistence: PERSISTENCE_MODE
   });
 });
 
@@ -756,6 +827,94 @@ app.get('/api/saves/load', authMiddleware, (req, res) => {
   });
 });
 
+// ----------------------------------------------------
+// FULL OFFLINE RUN SAVES (per difficulty + class slot) — synced for signed-in players
+// Stored in Neon Postgres (cc_run_saves) or data/runs/<userId>.json as local fallback.
+// ----------------------------------------------------
+const RUN_SLOT_RE = /^(normal|hard)_(striker|technomancer|vanguard)$/;
+const RUNS_DIR = path.join(DATA_DIR, 'runs');
+
+function runFile(userId: string) {
+  return path.join(RUNS_DIR, `${userId.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`);
+}
+function readRunFile(userId: string): Record<string, { savedAt: number; data: unknown }> {
+  try {
+    return JSON.parse(fs.readFileSync(runFile(userId), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+function writeRunFile(userId: string, rows: Record<string, { savedAt: number; data: unknown }>) {
+  fs.mkdirSync(RUNS_DIR, { recursive: true });
+  fs.writeFileSync(runFile(userId), JSON.stringify(rows), 'utf8');
+}
+
+app.get('/api/saves/runs', authMiddleware, async (req, res) => {
+  const user = (req as any).user as ServerUser;
+  try {
+    let rows: { slot: string; savedAt: number; data: unknown }[];
+    if (pgStore) {
+      rows = await pgStore.listRunSaves(user.id);
+    } else {
+      rows = Object.entries(readRunFile(user.id)).map(([slot, v]) => ({ slot, ...v }));
+    }
+    const runs: Record<string, unknown> = {};
+    for (const r of rows) runs[r.slot] = r.data;
+    res.json({ runs });
+  } catch (err) {
+    console.error('[CYBER-CRYPT] run save list failed:', err);
+    res.status(503).json({ error: 'Save storage unavailable' });
+  }
+});
+
+app.put('/api/saves/runs/:slot', authMiddleware, async (req, res) => {
+  const user = (req as any).user as ServerUser;
+  const slot = String(req.params.slot || '');
+  if (!RUN_SLOT_RE.test(slot)) return res.status(400).json({ error: 'Invalid save slot' });
+  const save = req.body?.save;
+  if (!save || typeof save !== 'object' || save.version !== 1 || !save.player || !save.dungeon) {
+    return res.status(400).json({ error: 'Invalid run save payload' });
+  }
+  const savedAt = Number(save.savedAt) || Date.now();
+  try {
+    let accepted = true;
+    if (pgStore) {
+      accepted = await pgStore.putRunSave(user.id, slot, savedAt, JSON.stringify(save));
+    } else {
+      const rows = readRunFile(user.id);
+      if (rows[slot] && rows[slot].savedAt > savedAt) accepted = false;
+      else {
+        rows[slot] = { savedAt, data: save };
+        writeRunFile(user.id, rows);
+      }
+    }
+    if (!accepted) return res.status(409).json({ error: 'Server has a newer save for this slot' });
+    res.json({ success: true, savedAt });
+  } catch (err) {
+    console.error('[CYBER-CRYPT] run save write failed:', err);
+    res.status(503).json({ error: 'Save storage unavailable' });
+  }
+});
+
+app.delete('/api/saves/runs/:slot', authMiddleware, async (req, res) => {
+  const user = (req as any).user as ServerUser;
+  const slot = String(req.params.slot || '');
+  if (!RUN_SLOT_RE.test(slot)) return res.status(400).json({ error: 'Invalid save slot' });
+  try {
+    if (pgStore) {
+      await pgStore.deleteRunSave(user.id, slot);
+    } else {
+      const rows = readRunFile(user.id);
+      delete rows[slot];
+      writeRunFile(user.id, rows);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[CYBER-CRYPT] run save delete failed:', err);
+    res.status(503).json({ error: 'Save storage unavailable' });
+  }
+});
+
 // Online 3P Co-Op Server-Only Loot Stash (Coins, Diamonds, Stones, Items/Armor in Inventory; always restarts Lv.1)
 app.get('/api/online/stashes', (req, res) => {
   let accountId = '';
@@ -1119,6 +1278,7 @@ function broadcastToRoom(roomId: string, payload: unknown) {
 }
 
 async function setupServer() {
+  await loadDatabaseOrSeed();
   const isProd = process.env.NODE_ENV === 'production';
 
   if (!isProd) {
@@ -1361,4 +1521,23 @@ async function setupServer() {
   });
 }
 
-setupServer();
+setupServer().catch(err => {
+  console.error('[CYBER-CRYPT] Fatal startup error:', err);
+  process.exit(1);
+});
+
+let shuttingDown = false;
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(sig, async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`[CYBER-CRYPT] ${sig} received, flushing persistence...`);
+    try {
+      await flushPersistence();
+      if (pgStore) await pgStore.close();
+    } catch (err) {
+      console.error('[CYBER-CRYPT] Flush on shutdown failed:', err);
+    }
+    process.exit(0);
+  });
+}

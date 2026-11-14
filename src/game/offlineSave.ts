@@ -95,6 +95,7 @@ export function saveOfflineRun(state: Omit<OfflineSaveState, 'version' | 'savedA
     };
     const key = getOfflineSaveStorageKey(state.difficultyMode, state.player.characterClass);
     window.localStorage.setItem(key, JSON.stringify(payload));
+    queueCloudRunPush(payload);
     return payload;
   } catch {
     return null;
@@ -110,5 +111,123 @@ export function clearOfflineSave(
     window.localStorage.removeItem(getOfflineSaveStorageKey(difficulty, characterClass));
   } catch {
     // Ignore storage quota / privacy mode errors
+  }
+  queueCloudRunDelete(getOfflineSaveSlotKey(difficulty, characterClass));
+}
+
+// ----------------------------------------------------
+// Cloud mirror (Neon Postgres via /api/saves/runs) for signed-in players.
+// localStorage stays the source of truth while playing; the server copy means
+// progress survives a new device, a cleared browser, or a redeploy.
+// ----------------------------------------------------
+const CLOUD_PUSH_DEBOUNCE_MS = 4000;
+let cloudToken = '';
+const pendingPush = new Map<OfflineSaveSlotKey, { save: OfflineSaveState; timer: ReturnType<typeof setTimeout> }>();
+
+export function setCloudRunSyncToken(token: string | null | undefined) {
+  const next = token || '';
+  if (cloudToken && next !== cloudToken) flushCloudRunPushes();
+  cloudToken = next;
+  if (!cloudToken) {
+    for (const p of pendingPush.values()) clearTimeout(p.timer);
+    pendingPush.clear();
+  }
+}
+
+function canSync() {
+  return !!cloudToken && typeof window !== 'undefined' && typeof fetch === 'function';
+}
+
+function sendRunPush(slot: OfflineSaveSlotKey, save: OfflineSaveState, keepalive = false) {
+  if (!canSync()) return Promise.resolve();
+  let body: string;
+  try {
+    body = JSON.stringify({ save });
+  } catch {
+    return Promise.resolve();
+  }
+  return fetch(`/api/saves/runs/${slot}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cloudToken}` },
+    body,
+    keepalive: keepalive && body.length < 60_000
+  })
+    .then(() => undefined)
+    .catch(() => undefined);
+}
+
+function queueCloudRunPush(save: OfflineSaveState) {
+  if (!canSync()) return;
+  const slot = getOfflineSaveSlotKey(save.difficultyMode, save.player.characterClass);
+  const existing = pendingPush.get(slot);
+  if (existing) {
+    existing.save = save;
+    return;
+  }
+  const entry = {
+    save,
+    timer: setTimeout(() => {
+      pendingPush.delete(slot);
+      void sendRunPush(slot, entry.save);
+    }, CLOUD_PUSH_DEBOUNCE_MS)
+  };
+  pendingPush.set(slot, entry);
+}
+
+/** Push any debounced saves right now (e.g. on tab hide / page unload). */
+export function flushCloudRunPushes() {
+  for (const [slot, p] of pendingPush) {
+    clearTimeout(p.timer);
+    void sendRunPush(slot, p.save, true);
+  }
+  pendingPush.clear();
+}
+
+function queueCloudRunDelete(slot: OfflineSaveSlotKey) {
+  const pending = pendingPush.get(slot);
+  if (pending) {
+    clearTimeout(pending.timer);
+    pendingPush.delete(slot);
+  }
+  if (!canSync()) return;
+  fetch(`/api/saves/runs/${slot}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${cloudToken}` }
+  }).catch(() => undefined);
+}
+
+/**
+ * Merge server-side run saves with local ones: newer wins per slot.
+ * Server-newer saves are written to localStorage; local-newer ones are pushed up.
+ */
+export async function pullAndMergeCloudRuns(): Promise<boolean> {
+  if (!canSync()) return false;
+  try {
+    const res = await fetch('/api/saves/runs', { headers: { Authorization: `Bearer ${cloudToken}` } });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { runs?: Record<string, OfflineSaveState> };
+    const remote = data.runs || {};
+    const local = loadAllOfflineSaves();
+    let changed = false;
+    for (const slot of Object.keys(local) as OfflineSaveSlotKey[]) {
+      const r = remote[slot];
+      const l = local[slot];
+      if (r && r.version === 1 && (!l || (r.savedAt || 0) > (l.savedAt || 0))) {
+        try {
+          window.localStorage.setItem(
+            getOfflineSaveStorageKey(r.difficultyMode, r.player.characterClass),
+            JSON.stringify(r)
+          );
+          changed = true;
+        } catch {
+          // quota
+        }
+      } else if (l && (!r || (l.savedAt || 0) > (r.savedAt || 0))) {
+        void sendRunPush(slot, l);
+      }
+    }
+    return changed;
+  } catch {
+    return false;
   }
 }

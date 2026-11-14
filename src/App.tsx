@@ -34,7 +34,10 @@ import {
 } from './game/combat';
 import {
   clearOfflineSave,
+  flushCloudRunPushes,
   getOfflineSaveSlotKey,
+  pullAndMergeCloudRuns,
+  setCloudRunSyncToken,
   loadAllOfflineSaves,
   loadOfflineSave,
   OfflineSaveSlotKey,
@@ -726,6 +729,26 @@ export default function App() {
       window.removeEventListener('appinstalled', onInstalled);
     };
   }, []);
+
+  // Mirror full offline run saves to Neon Postgres for any signed-in account (incl. guests)
+  useEffect(() => {
+    setCloudRunSyncToken(userToken);
+    if (!userToken) return;
+    let cancelled = false;
+    pullAndMergeCloudRuns().then(changed => {
+      if (!cancelled && changed) setSavedOfflineRuns(loadAllOfflineSaves());
+    });
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flushCloudRunPushes();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flushCloudRunPushes);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushCloudRunPushes);
+    };
+  }, [userToken]);
 
   // Restore "keep signed in" session, then optional autostart / Firestore probe
   useEffect(() => {

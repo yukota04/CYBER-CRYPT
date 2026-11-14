@@ -9,3 +9,6 @@ coverage/
 
 # Runtime persistence (seeded at boot; never commit session tokens)
 data/db.json
+
+# Local fallback run saves
+data/runs/
