@@ -6,13 +6,12 @@ import {
   canClassEquipItem,
   canUpgradeItem,
   getEffectiveItemStats,
-  getProbabilityStoneCost,
   getUpgradeCost,
   getUpgradeDestroyChance
 } from '../game/items';
 import { getTotalStats } from '../game/combat';
 import { getRarityStyle } from '../game/rarity';
-import { X, Backpack, Shield, Hammer, Lock, AlertTriangle, Sparkles, Tv } from 'lucide-react';
+import { X, Backpack, Shield, Hammer, Lock, AlertTriangle, Tv } from 'lucide-react';
 
 interface InventoryModalProps {
   player: Player;
@@ -23,7 +22,6 @@ interface InventoryModalProps {
   onUseItem: (item: GameItem) => void;
   onDropItem: (item: GameItem) => void;
   onUpgradeItem: (item: GameItem, useProbabilityStone?: boolean) => void;
-  onBuyProbabilityStone: () => void;
   destroyedItemPendingRecovery: GameItem | null;
   onRecoverDestroyedItem: () => void;
   onDeclineRecoverDestroyedItem: () => void;
@@ -40,7 +38,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   onUseItem,
   onDropItem,
   onUpgradeItem,
-  onBuyProbabilityStone,
   destroyedItemPendingRecovery,
   onRecoverDestroyedItem,
   onDeclineRecoverDestroyedItem,
@@ -60,7 +57,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
 
   const stoneCount = player.stats.probabilityStones || 0;
   const stoneActive = stoneInserted && stoneCount > 0;
-  const stoneCost = getProbabilityStoneCost(floor);
 
   useEffect(() => {
     if (!adPlaying) return;
@@ -378,128 +374,76 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
 
             {activeTab === 'upgrade' && (
               <div className="flex flex-col gap-2.5">
-                {/* Probability Stone Slot (+60% Forge Success) */}
-                <div className="p-2.5 rounded-xl bg-[#110a2a] border border-purple-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    data-testid="forge-stone-slot"
-                    onClick={() => {
-                      if (stoneCount > 0) setStoneInserted(prev => !prev);
-                    }}
-                    className={`flex items-center gap-2.5 text-left px-2.5 py-1.5 rounded-lg border transition cursor-pointer flex-1 ${
-                      stoneActive
-                        ? 'bg-purple-900/60 border-purple-300 shadow-[0_0_14px_rgba(189,0,255,0.45)]'
-                        : stoneCount > 0
-                        ? 'bg-slate-900/70 border-purple-500/40 hover:border-purple-400'
-                        : 'bg-slate-950/60 border-slate-800 opacity-75 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-black/60 border border-purple-400/50 flex items-center justify-center text-xl flex-shrink-0">
-                      🔮
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-purple-200 flex items-center gap-1.5">
-                        <Sparkles className="w-3 h-3 text-purple-300" />
-                        <span>{t('stoneSlotLabel', language)}</span>
-                        <span className="px-1.5 py-0.2 rounded bg-purple-950 border border-purple-400/40 text-purple-200 text-[10px]">
-                          x{stoneCount}
-                        </span>
-                      </div>
-                      <div className={`text-[10px] mt-0.5 ${stoneActive ? 'text-emerald-300 font-bold' : 'text-slate-400'}`}>
-                        {stoneActive ? `✓ ${t('stoneSlottedLabel', language)}` : t('stoneInsertHint', language)}
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    data-testid="buy-stone-btn"
-                    disabled={player.stats.coins < stoneCost}
-                    onClick={onBuyProbabilityStone}
-                    className={`px-3 py-2 rounded-lg border text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
-                      player.stats.coins >= stoneCost
-                        ? 'bg-amber-950/80 border-amber-400 text-amber-200 hover:bg-amber-900'
-                        : 'bg-slate-900/60 border-slate-700 text-slate-500 cursor-not-allowed'
-                    }`}
-                  >
-                    🔮 {t('buyStoneBtn', language)} ({stoneCost} 🪙)
-                  </button>
+                <div className="text-[10px] text-slate-400 px-1">
+                  Toca un ítem → usa piedra (si tienes) → forja. La piedra solo se compra en la tienda NPC.
                 </div>
+                {liveSelected && canUpgradeItem(liveSelected) && (
+                  <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl bg-[#110a2a] border border-purple-500/40">
+                    <button
+                      type="button"
+                      data-testid="forge-use-stone-btn"
+                      disabled={stoneCount <= 0}
+                      onClick={() => setStoneInserted(prev => !prev)}
+                      className={`px-3 py-2 rounded-lg border text-[11px] font-bold transition ${
+                        stoneCount <= 0
+                          ? 'bg-slate-900/60 border-slate-700 text-slate-500 cursor-not-allowed opacity-60'
+                          : stoneActive
+                          ? 'bg-purple-900/70 border-purple-300 text-purple-100'
+                          : 'bg-slate-900/70 border-purple-500/50 text-purple-200 hover:border-purple-300 cursor-pointer'
+                      }`}
+                    >
+                      🔮 {stoneActive ? 'Piedra equipada' : 'Usar piedra'} (x{stoneCount})
+                    </button>
+                    <CanvasButton
+                      label={`Forjar +1 (${getUpgradeCost(liveSelected)} 🪙)`}
+                      theme={player.stats.coins >= getUpgradeCost(liveSelected) ? 'amber' : 'cyan'}
+                      disabled={player.stats.coins < getUpgradeCost(liveSelected)}
+                      width={160}
+                      height={36}
+                      onClick={() => onUpgradeItem(liveSelected, stoneActive)}
+                    />
+                    <span className="text-[10px] text-slate-400">
+                      Éxito {100 - Math.round(getUpgradeDestroyChance(liveSelected, stoneActive) * 100)}%
+                      {stoneActive ? ' 🔮' : ''}
+                    </span>
+                  </div>
+                )}
 
-                <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto pr-1">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[340px] overflow-y-auto pr-1">
                   {allUpgradable.length === 0 ? (
-                    <div className="p-6 text-center text-xs text-slate-500 border border-slate-800 rounded-lg">
+                    <div className="col-span-full p-6 text-center text-xs text-slate-500 border border-slate-800 rounded-lg">
                       No upgradable weapons or armor found.
                     </div>
                   ) : (
                     allUpgradable.map(({ item, equippedIn }) => {
-                      const cost = getUpgradeCost(item);
-                      const destroyPct = Math.round(getUpgradeDestroyChance(item, stoneActive) * 100);
-                      const successPct = 100 - destroyPct;
-                      const canAfford = player.stats.coins >= cost;
-                      const upgradable = canUpgradeItem(item);
                       const isSelected = liveSelected?.id === item.id;
-                      const riskColor =
-                        destroyPct === 0
-                          ? 'text-emerald-400'
-                          : destroyPct < 35
-                          ? 'text-amber-300'
-                          : 'text-red-400';
                       const rStyle = getRarityStyle(item.rarity);
-
                       return (
-                        <div
+                        <button
                           key={item.id}
+                          type="button"
                           data-testid={`forge-item-${item.id}`}
-                          onClick={() => setSelectedItem(item)}
-                          className={`relative overflow-hidden flex items-center justify-between gap-2 p-2.5 pl-3.5 rounded-lg border cursor-pointer transition ${rStyle.cardClass} ${
-                            isSelected ? rStyle.selectedClass : ''
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setStoneInserted(false);
+                          }}
+                          className={`relative min-h-[88px] p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition cursor-pointer ${rStyle.cardClass} ${
+                            isSelected ? rStyle.selectedClass + ' ring-2 ring-cyan-400' : ''
                           }`}
                         >
-                          <div className={`absolute inset-y-0 left-0 w-1 ${rStyle.accentBarClass}`} />
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-10 h-10 rounded-lg border flex items-center justify-center text-xl flex-shrink-0 ${rStyle.iconFrameClass}`}>
-                              {item.icon}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-xs font-bold truncate flex items-center gap-1.5">
-                                <span className={rStyle.titleClass}>{item.name}</span>
-                                {equippedIn && (
-                                  <span className="text-[9px] px-1 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30 uppercase">
-                                    {equippedIn}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-slate-300 flex flex-wrap items-center gap-1.5 mt-0.5">
-                                <span className={`px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase ${rStyle.badgeClass}`}>
-                                  {rStyle.stars} +{item.upgradeLevel || 0}
-                                </span>
-                                {upgradable && (
-                                  <span className={`font-bold ${riskColor}`}>
-                                    ✓ {successPct}%{stoneActive ? ' 🔮' : ''} | ⚠️ {destroyPct}% {t('destroyRiskLabel', language)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex-shrink-0">
-                            {upgradable ? (
-                              <CanvasButton
-                                label={`+1 (${cost} 🪙)`}
-                                theme={canAfford ? 'amber' : 'cyan'}
-                                disabled={!canAfford}
-                                width={120}
-                                height={34}
-                                onClick={() => onUpgradeItem(item, stoneActive)}
-                              />
-                            ) : (
-                              <span className="text-[10px] text-emerald-400 font-bold">
-                                {t('maxLevelReached', language)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                          <span className="text-2xl">{item.icon}</span>
+                          <span className={`text-[9px] font-bold truncate w-full text-center ${rStyle.titleClass}`}>
+                            {item.name}
+                          </span>
+                          <span className="text-[9px] text-cyan-300">
+                            Lv.{item.itemLevel || 1} · +{item.upgradeLevel || 0}
+                          </span>
+                          {equippedIn && (
+                            <span className="absolute top-1 right-1 text-[8px] px-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                              EQ
+                            </span>
+                          )}
+                        </button>
                       );
                     })
                   )}
@@ -524,6 +468,8 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         </span>
                         <span className="text-[10px] text-slate-400 uppercase">
                           {liveSelected.type}
+                          {liveSelected.itemLevel ? ` · Lv.${liveSelected.itemLevel}` : ''}
+                          {typeof liveSelected.upgradeLevel === 'number' ? ` · +${liveSelected.upgradeLevel}` : ''}
                         </span>
                         {liveSelected.twoHanded && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/70 border border-amber-500/40 text-amber-300">
@@ -639,44 +585,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         />
                       )}
 
-                      {canUpgradeItem(liveSelected) && (() => {
-                        const cost = getUpgradeCost(liveSelected);
-                        const destroyPct = Math.round(getUpgradeDestroyChance(liveSelected, stoneActive) * 100);
-                        const successPct = 100 - destroyPct;
-                        return (
-                          <div className="w-full flex flex-col items-center gap-1.5 mt-1">
-                            <div
-                              data-testid="inspector-upgrade-risk"
-                              className="w-full max-w-[250px] px-2.5 py-1.5 rounded bg-slate-900/90 border border-amber-500/30 flex items-center justify-between text-[10px]"
-                            >
-                              <span className="text-emerald-400 font-bold">
-                                {t('successRateLabel', language)}: {successPct}%{stoneActive ? ' 🔮' : ''}
-                              </span>
-                              <span
-                                className={`font-bold flex items-center gap-1 ${
-                                  destroyPct === 0
-                                    ? 'text-emerald-400'
-                                    : destroyPct < 35
-                                    ? 'text-amber-300'
-                                    : 'text-red-400'
-                                }`}
-                              >
-                                {destroyPct > 0 && <AlertTriangle className="w-3 h-3" />}
-                                {t('destroyRiskLabel', language)}: {destroyPct}%
-                              </span>
-                            </div>
-                            <CanvasButton
-                              label={`${t('upgradeGearBtn', language)} (${cost} 🪙)`}
-                              icon="🔨"
-                              theme="amber"
-                              disabled={player.stats.coins < cost}
-                              width={250}
-                              height={38}
-                              onClick={() => onUpgradeItem(liveSelected, stoneActive)}
-                            />
-                          </div>
-                        );
-                      })()}
                     </>
                   )}
 

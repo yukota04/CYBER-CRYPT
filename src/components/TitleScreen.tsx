@@ -77,6 +77,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onLanguageChange
 }) => {
   const [roomInput, setRoomInput] = useState(coopRoom?.roomId || 'ALPHA-1');
+  const [titleTapCount, setTitleTapCount] = useState(0);
 
   const localSlot = coopRoom?.players.find(p => p.playerId === localPlayerId);
   const playerCount = coopRoom?.players.length || 0;
@@ -225,8 +226,23 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
       {/* Main Centerpiece */}
       <div className="flex flex-col items-center justify-center my-auto w-full max-w-4xl mx-auto text-center py-4">
-        <div className="mb-3">
-          <svg viewBox="0 0 680 104" className="w-full max-w-lg mx-auto h-auto drop-shadow-[0_0_22px_rgba(0,240,255,0.4)]">
+        <div
+          className="mb-3 cursor-pointer"
+          data-testid="game-title-secret"
+          onClick={() => {
+            setTitleTapCount(prev => {
+              const next = prev + 1;
+              if (next >= 5) {
+                onOpenAdmin();
+                return 0;
+              }
+              return next;
+            });
+          }}
+          role="button"
+          aria-label="CYBER-CRYPT"
+        >
+          <svg viewBox="0 0 680 104" className="w-full max-w-lg mx-auto h-auto drop-shadow-[0_0_22px_rgba(0,240,255,0.4)] pointer-events-none">
             <defs>
               <linearGradient id="neonCyanPink" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#00f0ff" />
@@ -576,7 +592,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           <CanvasButton label={t('leaderboardsBtn', language)} icon="🏆" theme="amber" width={205} height={42} onClick={onOpenLeaderboard} />
           <CanvasButton label={t('multiplayerBtn', language)} icon="⚡" theme="pink" width={205} height={42} onClick={onOpenMultiplayer} />
           <CanvasButton label={t('socialBtn', language)} icon="👥" theme="purple" width={205} height={42} onClick={onOpenSocial} />
-          <CanvasButton label={t('adminBtn', language)} icon="🛡️" theme="pink" width={220} height={42} onClick={onOpenAdmin} />
         </div>
       </div>
 

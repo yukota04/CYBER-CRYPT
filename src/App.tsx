@@ -52,6 +52,7 @@ import {
   canClassEquipItem,
   canUpgradeItem,
   getEquipSlotForItem,
+  getItemSellPrice,
   getProbabilityStoneCost,
   getUpgradeCost
 } from './game/items';
@@ -77,6 +78,7 @@ import { PauseModal } from './components/PauseModal';
 import { Minimap } from './components/Minimap';
 import { ShopModal } from './components/ShopModal';
 import { OptionsModal } from './components/OptionsModal';
+import { TradeModal, TradeRequestBanner } from './components/TradeModal';
 import { testFirestoreConnection } from './firebase';
 
 const DEFAULT_ACHIEVEMENTS: Achievement[] = [
@@ -135,6 +137,14 @@ export default function App() {
   const [showMinimap, setShowMinimap] = useState(true);
   const [showShop, setShowShop] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+  const [fps, setFps] = useState(0);
+  const [tradePartnerId, setTradePartnerId] = useState<string | null>(null);
+  const [tradePartnerName, setTradePartnerName] = useState('');
+  const [tradeIncoming, setTradeIncoming] = useState<{ fromId: string; fromName: string } | null>(null);
+  const [tradePartnerOffer, setTradePartnerOffer] = useState<(GameItem | null)[]>([]);
+  const [tradeLocked, setTradeLocked] = useState(false);
+  const [myTradeOffer, setMyTradeOffer] = useState<GameItem[]>([]);
+  const [partnerTradeReady, setPartnerTradeReady] = useState(false);
   const [upgradeFeedback, setUpgradeFeedback] = useState<{ status: 'success' | 'destroyed'; message: string } | null>(null);
   const [destroyedItemRecovery, setDestroyedItemRecovery] = useState<{
     item: GameItem;
@@ -311,14 +321,20 @@ export default function App() {
 
   useEffect(() => {
     uiBlockedRef.current =
-      showInventory || showSkillTree || showShop || showOptions || gameState !== 'playing';
+      showInventory ||
+      showSkillTree ||
+      showShop ||
+      showOptions ||
+      !!tradePartnerId ||
+      !!tradeIncoming ||
+      gameState !== 'playing';
     if (uiBlockedRef.current) {
       heldMoveKeysRef.current.clear();
       const prev = moveInputRef.current;
       moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
       joystickActiveRef.current = false;
     }
-  }, [showInventory, showSkillTree, showShop, showOptions, gameState]);
+  }, [showInventory, showSkillTree, showShop, showOptions, tradePartnerId, tradeIncoming, gameState]);
 
   const handleUpdateSettings = useCallback((next: AppSettings) => {
     setAppSettings(next);
@@ -706,6 +722,8 @@ export default function App() {
 
     let lastTime = performance.now();
     let animId: number;
+    let fpsFrames = 0;
+    let fpsLast = performance.now();
 
     const renderLoop = (time: number) => {
       animId = requestAnimationFrame(renderLoop);
@@ -719,6 +737,13 @@ export default function App() {
       const rawDt = elapsedMs / 1000;
       const dt = Math.min(Math.max(rawDt, 0.001), 0.08);
       lastTime = time;
+
+      fpsFrames += 1;
+      if (time - fpsLast >= 500) {
+        setFps(Math.round((fpsFrames * 1000) / (time - fpsLast)));
+        fpsFrames = 0;
+        fpsLast = time;
+      }
 
       // Freeze floating text decay during hitstop
       if (renderer.getHitstopRemaining() <= 0) {
@@ -904,6 +929,51 @@ export default function App() {
             });
             soundEngine.playSFX('forge_success');
           }
+        } else if (msg.type === 'coop:trade_request' && msg.fromPlayerId !== localPlayerId) {
+          const fromSlot = coopRoomRef.current?.players.find((p: any) => p.playerId === msg.fromPlayerId);
+          setTradeIncoming({
+            fromId: msg.fromPlayerId,
+            fromName: fromSlot?.username || msg.fromName || 'Operative'
+          });
+          soundEngine.playUI('open');
+        } else if (msg.type === 'coop:trade_response') {
+          if (msg.fromPlayerId === localPlayerId) return;
+          if (msg.accepted) {
+            setTradePartnerId(msg.fromPlayerId);
+            const fromSlot = coopRoomRef.current?.players.find((p: any) => p.playerId === msg.fromPlayerId);
+            setTradePartnerName(fromSlot?.username || 'Operative');
+            setTradePartnerOffer([]);
+            setTradeLocked(false);
+            setMyTradeOffer([]);
+            setPartnerTradeReady(false);
+            setTradeIncoming(null);
+          } else {
+            setTradePartnerId(null);
+            setTradeIncoming(null);
+            setTradeLocked(false);
+          }
+        } else if (msg.type === 'coop:trade_offer' && msg.fromPlayerId !== localPlayerId) {
+          setTradePartnerOffer(Array.isArray(msg.items) ? msg.items.slice(0, 6) : []);
+          setPartnerTradeReady(!!msg.ready);
+        } else if (msg.type === 'coop:trade_cancel') {
+          setTradePartnerId(null);
+          setTradeIncoming(null);
+          setTradeLocked(false);
+          setMyTradeOffer([]);
+          setPartnerTradeReady(false);
+          setTradePartnerOffer([]);
+        } else if (msg.type === 'coop:trade_done' && msg.room) {
+          setCoopRoom(msg.room);
+          const mySlot = msg.room.players.find((p: any) => p.playerId === localPlayerId);
+          if (mySlot?.player) setPlayer(mySlot.player);
+          if (msg.room.dungeon) setDungeon(msg.room.dungeon);
+          setTradePartnerId(null);
+          setTradeIncoming(null);
+          setTradeLocked(false);
+          setMyTradeOffer([]);
+          setPartnerTradeReady(false);
+          setTradePartnerOffer([]);
+          soundEngine.playSFX('pickup');
         }
       } catch {}
     };
@@ -923,6 +993,23 @@ export default function App() {
       wsRef.current.send(JSON.stringify(payload));
     }
   }, []);
+
+  const tradeExecutedRef = useRef(false);
+  useEffect(() => {
+    if (!tradePartnerId) {
+      tradeExecutedRef.current = false;
+      return;
+    }
+    if (!tradeLocked || !partnerTradeReady || tradeExecutedRef.current) return;
+    tradeExecutedRef.current = true;
+    const theirIds = tradePartnerOffer.filter((i): i is GameItem => !!i).map(i => i.id);
+    sendCoopWs({
+      type: 'coop:trade_execute',
+      toPlayerId: tradePartnerId,
+      fromItemIds: myTradeOffer.map(i => i.id),
+      toItemIds: theirIds
+    });
+  }, [tradePartnerId, tradeLocked, partnerTradeReady, tradePartnerOffer, myTradeOffer, sendCoopWs]);
 
   const handleReturnToTitle = useCallback(() => {
     if (playModeRef.current === 'online') {
@@ -1145,7 +1232,9 @@ export default function App() {
               score: snapshot.score,
               floor: snapshot.floor,
               characterClass: snapshot.characterClass,
-              timeSec: turnsPlayed * 2
+              timeSec: turnsPlayed * 2,
+              kills: snapshot.monstersSlain,
+              difficultyMode: difficultyModeRef.current
             })
           }).catch(() => {});
         }
@@ -2230,6 +2319,38 @@ export default function App() {
     soundEngine.playSFX('chest');
   }, [sendCoopWs, commitPlayer]);
 
+  const handleSellShopItem = useCallback(
+    (item: GameItem) => {
+      if (playModeRef.current === 'online' && coopRoomRef.current?.status === 'playing') {
+        sendCoopWs({ type: 'coop:sell_item', itemId: item.id });
+        soundEngine.playSFX('pickup');
+        return;
+      }
+      const price = getItemSellPrice(item);
+      commitPlayer(prev => {
+        if (!prev.inventory.some(i => i.id === item.id)) return prev;
+        return {
+          ...prev,
+          inventory: prev.inventory.filter(i => i.id !== item.id),
+          stats: { ...prev.stats, coins: prev.stats.coins + price }
+        };
+      });
+      setCombatLogs(prev =>
+        [
+          {
+            id: `shop_sell_${Date.now()}`,
+            text: `MERCHANT: Sold [${item.name}] for ${price} Coins.`,
+            type: 'item' as const,
+            turn: turnRef.current
+          },
+          ...prev
+        ].slice(0, 30)
+      );
+      soundEngine.playSFX('pickup');
+    },
+    [sendCoopWs, commitPlayer]
+  );
+
   const handleUnlockSkill = (skillId: string) => {
     const node = SKILL_DATABASE[skillId];
     if (!node) return;
@@ -2311,6 +2432,29 @@ export default function App() {
             setShowShop(true);
             soundEngine.playSFX('pickup');
             return;
+          }
+
+          // Online: tap exactly on another player to request trade
+          if (playModeRef.current === 'online' && coopRoomRef.current?.status === 'playing') {
+            const other = coopRoomRef.current.players.find(p => {
+              if (p.playerId === localPlayerId || !p.alive || !p.player) return false;
+              return Math.floor(p.player.x + 0.41) === tile.x && Math.floor(p.player.y + 0.41) === tile.y;
+            });
+            if (other?.player) {
+              sendCoopWs({
+                type: 'coop:trade_request',
+                toPlayerId: other.playerId,
+                fromName: userProfile?.username || 'Operative'
+              });
+              setTradePartnerId(other.playerId);
+              setTradePartnerName(other.username);
+              setTradePartnerOffer([]);
+              setTradeLocked(false);
+              setMyTradeOffer([]);
+              setPartnerTradeReady(false);
+              soundEngine.playUI('open');
+              return;
+            }
           }
 
           const targetMonster = curDungeon.monsters.find(m => {
@@ -2402,6 +2546,7 @@ export default function App() {
             difficultyMode={difficultyMode}
             coopRoom={playMode === 'online' ? coopRoom : null}
             localPlayerId={localPlayerId}
+            fps={fps}
             onToggleMinimap={() => setShowMinimap(prev => !prev)}
             onToggleMute={handleToggleMasterMute}
             onOpenInventory={() => {
@@ -2411,10 +2556,6 @@ export default function App() {
             onOpenSkillTree={() => {
               soundEngine.playUI('open');
               setShowSkillTree(true);
-            }}
-            onOpenOptions={() => {
-              soundEngine.playUI('open');
-              setShowOptions(true);
             }}
             onPause={() => {
               soundEngine.playUI('open');
@@ -2462,14 +2603,6 @@ export default function App() {
                 const prev = moveInputRef.current;
                 moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
               }
-            }}
-            onOpenInventory={() => {
-              soundEngine.playUI('open');
-              setShowInventory(true);
-            }}
-            onOpenSkillTree={() => {
-              soundEngine.playUI('open');
-              setShowSkillTree(true);
             }}
             onCastSkill={handleCastSkill}
             onRangedAttack={() => handleRangedAttack()}
@@ -2532,7 +2665,6 @@ export default function App() {
           onUseItem={handleUseItem}
           onDropItem={handleDropItem}
           onUpgradeItem={handleUpgradeItem}
-          onBuyProbabilityStone={handleBuyProbabilityStone}
           destroyedItemPendingRecovery={destroyedItemRecovery?.item || null}
           onRecoverDestroyedItem={handleRecoverDestroyedItem}
           onDeclineRecoverDestroyedItem={handleDeclineRecoverDestroyedItem}
@@ -2562,7 +2694,75 @@ export default function App() {
             setShowShop(false);
           }}
           onBuyItem={handleBuyShopItem}
+          onSellItem={handleSellShopItem}
           language={language}
+        />
+      )}
+
+      {tradeIncoming && (
+        <TradeRequestBanner
+          fromName={tradeIncoming.fromName}
+          onAccept={() => {
+            sendCoopWs({
+              type: 'coop:trade_response',
+              toPlayerId: tradeIncoming.fromId,
+              accepted: true
+            });
+            setTradePartnerId(tradeIncoming.fromId);
+            setTradePartnerName(tradeIncoming.fromName);
+            setTradeIncoming(null);
+            setTradeLocked(false);
+            setMyTradeOffer([]);
+            setPartnerTradeReady(false);
+            setTradePartnerOffer([]);
+          }}
+          onReject={() => {
+            sendCoopWs({
+              type: 'coop:trade_response',
+              toPlayerId: tradeIncoming.fromId,
+              accepted: false
+            });
+            setTradeIncoming(null);
+          }}
+        />
+      )}
+
+      {tradePartnerId && !tradeIncoming && (
+        <TradeModal
+          player={player}
+          partnerName={tradePartnerName}
+          partnerOffer={tradePartnerOffer}
+          language={language}
+          locked={tradeLocked}
+          onCancel={() => {
+            sendCoopWs({ type: 'coop:trade_cancel', toPlayerId: tradePartnerId });
+            setTradePartnerId(null);
+            setTradeLocked(false);
+            setMyTradeOffer([]);
+            setPartnerTradeReady(false);
+            setTradePartnerOffer([]);
+          }}
+          onSubmit={items => {
+            setMyTradeOffer(items);
+            setTradeLocked(true);
+            sendCoopWs({
+              type: 'coop:trade_offer',
+              toPlayerId: tradePartnerId,
+              items,
+              ready: true
+            });
+            if (partnerTradeReady) {
+              const theirIds = tradePartnerOffer
+                .filter((i): i is GameItem => !!i)
+                .map(i => i.id);
+              sendCoopWs({
+                type: 'coop:trade_execute',
+                toPlayerId: tradePartnerId,
+                fromItemIds: items.map(i => i.id),
+                toItemIds: theirIds
+              });
+            }
+          }}
         />
       )}
 

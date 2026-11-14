@@ -1,5 +1,4 @@
-import React from 'react';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Disc } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
 import { CanvasButton } from './CanvasButton';
 import { DungeonState, Player } from '../game/types';
 import { SKILL_DATABASE } from '../game/skills';
@@ -8,197 +7,144 @@ import { getEffectiveSkillEnergyCost, getPlayerAttackRange } from '../game/comba
 interface TouchControlsProps {
   player: Player;
   dungeon: DungeonState;
-  /** Discrete step (online turn mode) */
   onMove: (dx: number, dy: number) => void;
-  /** Hold-to-move for offline free movement */
   onMoveHold?: (dx: number, dy: number, pressed: boolean) => void;
   onWaitTurn: () => void;
-  onOpenInventory: () => void;
-  onOpenSkillTree: () => void;
   onCastSkill: (skillId: string) => void;
   onRangedAttack: () => void;
-  /** When true, hide the D-pad (replaced by VirtualJoystick). */
   hideDpad?: boolean;
 }
 
+const ORBIT_R = 78;
+const BUBBLE = 56;
+const VISIBLE = 3;
+
+/**
+ * Mobile combat cluster: big FIRE button with a rotatable skill orbit (3 visible).
+ * BAG / TECH removed — inventory & skill tree stay on the top HUD.
+ */
 export const TouchControls: React.FC<TouchControlsProps> = ({
   player,
   dungeon,
-  onMove,
-  onMoveHold,
-  onWaitTurn,
-  onOpenInventory,
-  onOpenSkillTree,
   onCastSkill,
-  onRangedAttack,
-  hideDpad = false
+  onRangedAttack
 }) => {
   const attackRange = getPlayerAttackRange(player);
-  const classActiveSkills = Object.values(SKILL_DATABASE)
-    .filter(s => s.branch === player.characterClass && s.type === 'active')
-    .sort((a, b) => {
-      const aUn = player.unlockedSkills.includes(a.id) ? 1 : 0;
-      const bUn = player.unlockedSkills.includes(b.id) ? 1 : 0;
-      return bUn - aUn;
-    })
-    .slice(0, 4);
+  const [orbitOffset, setOrbitOffset] = useState(0);
+  const dragRef = useRef<{ x: number; active: boolean } | null>(null);
 
-  const bindDir = (dx: number, dy: number) => {
-    if (!onMoveHold) {
-      return {
-        onClick: () => onMove(dx, dy)
-      };
+  const unlockedSkills = useMemo(() => {
+    return Object.values(SKILL_DATABASE)
+      .filter(s => s.branch === player.characterClass && s.type === 'active')
+      .filter(s => player.unlockedSkills.includes(s.id))
+      .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+  }, [player.characterClass, player.unlockedSkills]);
+
+  const n = Math.max(1, unlockedSkills.length);
+  const start = ((orbitOffset % n) + n) % n;
+
+  const visible = useMemo(() => {
+    if (unlockedSkills.length === 0) return [];
+    const out = [];
+    for (let i = 0; i < Math.min(VISIBLE, unlockedSkills.length); i++) {
+      out.push(unlockedSkills[(start + i) % unlockedSkills.length]);
     }
-    return {
-      onPointerDown: (e: React.PointerEvent) => {
-        e.preventDefault();
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-        onMoveHold(dx, dy, true);
-      },
-      onPointerUp: (e: React.PointerEvent) => {
-        e.preventDefault();
-        onMoveHold(dx, dy, false);
-      },
-      onPointerCancel: () => onMoveHold(dx, dy, false),
-      onPointerLeave: (e: React.PointerEvent) => {
-        // Only release if we lost capture / left while pressed
-        if (e.buttons === 0) onMoveHold(dx, dy, false);
-      }
-    };
+    return out;
+  }, [unlockedSkills, start]);
+
+  const onOrbitPointerDown = (e: React.PointerEvent) => {
+    dragRef.current = { x: e.clientX, active: true };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
+  const onOrbitPointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current?.active || unlockedSkills.length <= VISIBLE) return;
+    const dx = e.clientX - dragRef.current.x;
+    if (Math.abs(dx) > 36) {
+      setOrbitOffset(prev => prev + (dx > 0 ? -1 : 1));
+      dragRef.current.x = e.clientX;
+    }
+  };
+  const onOrbitPointerUp = () => {
+    dragRef.current = null;
+  };
+
+  // Angles for 3 bubbles around the attack button (upper arc)
+  const angles = [-110, -70, -30].map(d => (d * Math.PI) / 180);
 
   return (
     <div
-      className={`sm:hidden fixed bottom-12 left-2.5 right-2.5 z-20 flex items-end pointer-events-none select-none ${
-        hideDpad ? 'justify-end' : 'justify-between'
-      }`}
+      className="sm:hidden fixed bottom-10 right-2 z-20 pointer-events-none select-none"
       data-no-joystick
+      data-testid="mobile-combat-cluster"
     >
-      {/* Virtual D-Pad — hidden when Roblox-style joystick is active */}
-      {!hideDpad && (
-        <div className="grid grid-cols-3 gap-1 w-32 h-32 p-1.5 rounded-2xl bg-[#0d0920]/85 border border-cyan-500/45 backdrop-blur-sm pointer-events-auto shadow-[0_0_16px_rgba(0,240,255,0.2)]">
-          <div />
-          <button
-            type="button"
-            {...bindDir(0, -1)}
-            data-no-ui-sfx="true"
-            className="flex items-center justify-center rounded-t-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-            aria-label="Move Up"
-          >
-            <ChevronUp className="w-5 h-5" />
-          </button>
-          <div />
+      <div
+        className="relative pointer-events-auto touch-none"
+        style={{ width: 168, height: 168 }}
+        onPointerDown={onOrbitPointerDown}
+        onPointerMove={onOrbitPointerMove}
+        onPointerUp={onOrbitPointerUp}
+        onPointerCancel={onOrbitPointerUp}
+      >
+        {visible.map((skill, idx) => {
+          const ang = angles[idx] ?? angles[angles.length - 1];
+          const cx = 84 + Math.cos(ang) * ORBIT_R;
+          const cy = 84 + Math.sin(ang) * ORBIT_R;
+          const cd = player.activeCooldowns[skill.id] || 0;
+          const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
+          const canAfford = player.stats.energy >= energyNeeded;
+          const isReady = cd <= 0 && canAfford;
+          const cdSec = Math.max(0, cd);
 
-          <button
-            type="button"
-            {...bindDir(-1, 0)}
-            data-no-ui-sfx="true"
-            className="flex items-center justify-center rounded-l-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-            aria-label="Move Left"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
+          return (
+            <button
+              key={`${skill.id}_${idx}`}
+              type="button"
+              data-testid={`orbit-skill-${skill.id}`}
+              onClick={e => {
+                e.stopPropagation();
+                if (isReady) onCastSkill(skill.id);
+              }}
+              disabled={!isReady}
+              aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
+              className={`absolute flex items-center justify-center rounded-full border-2 text-xl transition active:scale-95 ${
+                isReady
+                  ? 'bg-cyan-950/90 border-cyan-300 text-white shadow-[0_0_16px_rgba(0,240,255,0.45)]'
+                  : 'bg-slate-950/90 border-slate-600 text-slate-400 opacity-80'
+              }`}
+              style={{
+                width: BUBBLE,
+                height: BUBBLE,
+                left: cx - BUBBLE / 2,
+                top: cy - BUBBLE / 2
+              }}
+            >
+              <span>{skill.icon}</span>
+              {cdSec > 0 && (
+                <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300">
+                  {cdSec}
+                </span>
+              )}
+            </button>
+          );
+        })}
 
-          <button
-            type="button"
-            onClick={onWaitTurn}
-            data-testid="mobile-wait-btn"
-            className="flex flex-col items-center justify-center rounded-md bg-purple-950/85 active:bg-purple-600 text-purple-200 border border-purple-400/60 text-[8px] font-mono font-bold active:scale-95 transition leading-none gap-0.5"
-            title="Stop moving / Wait"
-            aria-label="Wait"
-          >
-            <Disc className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
-            <span>STOP</span>
-          </button>
-
-          <button
-            type="button"
-            {...bindDir(1, 0)}
-            data-no-ui-sfx="true"
-            className="flex items-center justify-center rounded-r-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-            aria-label="Move Right"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-
-          <div />
-          <button
-            type="button"
-            {...bindDir(0, 1)}
-            data-no-ui-sfx="true"
-            className="flex items-center justify-center rounded-b-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-            aria-label="Move Down"
-          >
-            <ChevronDown className="w-5 h-5" />
-          </button>
-          <div />
-        </div>
-      )}
-
-      <div className="flex flex-col items-end gap-1.5 pointer-events-auto">
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-[#0d0920]/85 border border-cyan-500/35">
-          {classActiveSkills.map((skill, idx) => {
-            const isUnlocked = player.unlockedSkills.includes(skill.id);
-            const cd = player.activeCooldowns[skill.id] || 0;
-            const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
-            const canAfford = player.stats.energy >= energyNeeded;
-            const isReady = isUnlocked && cd === 0 && canAfford;
-
-            return (
-              <button
-                key={skill.id}
-                type="button"
-                onClick={() => isReady && onCastSkill(skill.id)}
-                disabled={!isReady}
-                aria-label={`Mobile Skill ${idx + 1}: ${skill.name} (${energyNeeded} NRG)`}
-                className={`relative w-9 h-9 rounded border flex items-center justify-center text-sm transition active:scale-95 ${
-                  !isUnlocked
-                    ? 'opacity-35 border-slate-700 bg-slate-900/60'
-                    : isReady
-                    ? 'border-cyan-400 bg-cyan-950/70 text-white shadow-[0_0_8px_rgba(0,240,255,0.3)]'
-                    : 'opacity-55 border-slate-700 bg-slate-900/70'
-                }`}
-              >
-                <span>{skill.icon}</span>
-                {cd > 0 && (
-                  <span className="absolute inset-0 bg-black/75 rounded flex items-center justify-center text-[10px] font-bold text-pink-400">
-                    {cd}t
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-1">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <CanvasButton
-            label={`FIRE ${attackRange}`}
+            label={`ATK ${attackRange}`}
             icon="🎯"
             theme="amber"
-            width={68}
-            height={42}
-            aria-label={`Mobile Ranged Fire (${attackRange} tiles)`}
+            width={88}
+            height={88}
+            aria-label={`Mobile Attack (${attackRange} tiles)`}
             onClick={onRangedAttack}
           />
-          <CanvasButton
-            label="BAG"
-            icon="🎒"
-            theme="cyan"
-            width={60}
-            height={42}
-            aria-label="Mobile Inventory BAG"
-            onClick={onOpenInventory}
-          />
-          <CanvasButton
-            label="TECH"
-            icon="⚡"
-            theme="purple"
-            width={60}
-            height={42}
-            aria-label="Mobile Tech Tree TECH"
-            onClick={onOpenSkillTree}
-          />
         </div>
+
+        {unlockedSkills.length > VISIBLE && (
+          <div className="absolute bottom-1 left-0 right-0 text-center text-[9px] text-cyan-400/80 font-mono pointer-events-none">
+            ← slide skills →
+          </div>
+        )}
       </div>
     </div>
   );

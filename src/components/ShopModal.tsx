@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { GameItem, Player } from '../game/types';
 import { Language, t } from '../game/i18n';
 import { getRarityStyle } from '../game/rarity';
+import { getItemSellPrice } from '../game/items';
 import { CanvasButton } from './CanvasButton';
 import {
   X,
@@ -67,6 +68,7 @@ interface ShopModalProps {
   shopItems: GameItem[];
   onClose: () => void;
   onBuyItem: (item: GameItem) => void;
+  onSellItem: (item: GameItem) => void;
   language: Language;
 }
 
@@ -75,10 +77,13 @@ export const ShopModal: React.FC<ShopModalProps> = ({
   shopItems,
   onClose,
   onBuyItem,
+  onSellItem,
   language
 }) => {
+  const [shopMode, setShopMode] = useState<'buy' | 'sell'>('buy');
   const [selectedCategory, setSelectedCategory] = useState<'all' | ShopCategory>('all');
   const [previewItem, setPreviewItem] = useState<GameItem | null>(null);
+  const [selectedSellIds, setSelectedSellIds] = useState<string[]>([]);
 
   const counts = useMemo(() => {
     const c = { all: shopItems.length, potions: 0, gear: 0, utility: 0 };
@@ -261,7 +266,35 @@ export const ShopModal: React.FC<ShopModalProps> = ({
           </div>
         </div>
 
+        <div className="flex items-center gap-2 py-2 border-b border-slate-800/80">
+          <button
+            type="button"
+            data-testid="shop-mode-buy"
+            onClick={() => setShopMode('buy')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+              shopMode === 'buy'
+                ? 'bg-amber-950 border-amber-400 text-amber-200'
+                : 'bg-slate-900 border-slate-700 text-slate-400'
+            }`}
+          >
+            Comprar
+          </button>
+          <button
+            type="button"
+            data-testid="shop-mode-sell"
+            onClick={() => setShopMode('sell')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+              shopMode === 'sell'
+                ? 'bg-pink-950 border-pink-400 text-pink-200'
+                : 'bg-slate-900 border-slate-700 text-slate-400'
+            }`}
+          >
+            Vender
+          </button>
+        </div>
+
         {/* Category Tabs (Mobile-First Touch Targets) */}
+        {shopMode === 'buy' && (
         <div className="flex items-center gap-1.5 sm:gap-2 py-2.5 border-b border-slate-800/80 overflow-x-auto no-scrollbar">
           <button
             type="button"
@@ -318,10 +351,74 @@ export const ShopModal: React.FC<ShopModalProps> = ({
             <span>{t('shopCatUtility', language)} ({counts.utility})</span>
           </button>
         </div>
+        )}
 
         {/* Categorized & Rarity-Enhanced Item Catalog */}
         <div className="py-3 space-y-4 overflow-y-auto flex-1 pr-1">
-          {filteredSections.map(section => {
+          {shopMode === 'sell' ? (
+            <div className="space-y-2" data-testid="shop-sell-panel">
+              <p className="text-[11px] text-slate-400 px-1">
+                Selecciona ítems del inventario. El precio depende del nivel y la rareza.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {player.inventory.map(item => {
+                  const price = getItemSellPrice(item);
+                  const selected = selectedSellIds.includes(item.id);
+                  const r = getRarityStyle(item.rarity);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      data-testid={`shop-sell-item-${item.id}`}
+                      onClick={() =>
+                        setSelectedSellIds(prev =>
+                          prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                        )
+                      }
+                      className={`relative min-h-[84px] p-2 rounded-lg border text-left transition ${r.cardClass} ${
+                        selected ? 'ring-2 ring-pink-400' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{item.icon}</span>
+                        <div className="min-w-0">
+                          <div className={`text-[10px] font-bold truncate ${r.titleClass}`}>{item.name}</div>
+                          <div className="text-[9px] text-amber-300 mt-0.5">
+                            Lv.{item.itemLevel || 1} · +{item.upgradeLevel || 0} · {price} 🪙
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+                {player.inventory.length === 0 && (
+                  <div className="col-span-full text-center text-xs text-slate-500 py-8">Inventario vacío</div>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-2">
+                <span className="text-[11px] text-amber-200 font-bold">
+                  Total:{' '}
+                  {player.inventory
+                    .filter(i => selectedSellIds.includes(i.id))
+                    .reduce((sum, i) => sum + getItemSellPrice(i), 0)}{' '}
+                  🪙
+                </span>
+                <CanvasButton
+                  label={`Vender (${selectedSellIds.length})`}
+                  theme="amber"
+                  disabled={selectedSellIds.length === 0}
+                  width={150}
+                  height={38}
+                  onClick={() => {
+                    const toSell = player.inventory.filter(i => selectedSellIds.includes(i.id));
+                    toSell.forEach(onSellItem);
+                    setSelectedSellIds([]);
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+          filteredSections.map(section => {
             const catMeta = CATEGORY_META[section.category];
             return (
               <div key={section.category} data-testid={`shop-section-${section.category}`} className="space-y-2">
@@ -415,7 +512,8 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
         {/* Footer */}

@@ -103,10 +103,11 @@ export function generateShopItems(floor: number, includeBlackMarketBonus = false
     icon: '🔮'
   };
 
+  const gearLevel = Math.max(1, floor);
   const shardGear: GameItem[] = [
     {
       id: uid('wep'),
-      name: floor >= 5 ? 'Void-Edge Plasma Katana' : 'Plasma Arc Katana',
+      name: `${floor >= 5 ? 'Void-Edge Plasma Katana' : 'Plasma Arc Katana'} [Lv.${gearLevel}]`,
       type: 'weapon',
       weaponCategory: 'katana',
       allowedClasses: ['striker'],
@@ -116,11 +117,13 @@ export function generateShopItems(floor: number, includeBlackMarketBonus = false
       critBonus: 0.16,
       currency: 'shards',
       value: 65 + floor * 6,
-      icon: '⚔️'
+      icon: '⚔️',
+      upgradeLevel: 0,
+      itemLevel: gearLevel
     },
     {
       id: uid('arm'),
-      name: 'Aegis Carbon Nano-Weave',
+      name: `Aegis Carbon Nano-Weave [Lv.${gearLevel}]`,
       type: 'chest',
       rarity: floor >= 5 ? 'legendary' : 'epic',
       description: 'Hardened graphene composite armor with built-in kinetic dissipators.',
@@ -128,12 +131,18 @@ export function generateShopItems(floor: number, includeBlackMarketBonus = false
       hpBonus: 35 + floor * 5,
       currency: 'shards',
       value: 70 + floor * 6,
-      icon: '🛡️'
+      icon: '🛡️',
+      upgradeLevel: 0,
+      itemLevel: gearLevel
     }
   ];
 
   if (includeBlackMarketBonus) {
-    const bonusRelic = createItem(floor >= 4 ? 'mythic_chronos_ring' : 'crimson_signet', uid('bm_relic'));
+    const bonusRelic = createItem(
+      floor >= 4 ? 'mythic_chronos_ring' : 'crimson_signet',
+      uid('bm_relic'),
+      gearLevel
+    );
     shardGear.push({
       ...bonusRelic,
       currency: 'shards',

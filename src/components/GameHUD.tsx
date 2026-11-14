@@ -12,7 +12,6 @@ import {
   Compass,
   Lock,
   Crosshair,
-  Settings
 } from 'lucide-react';
 
 interface GameHUDProps {
@@ -25,11 +24,11 @@ interface GameHUDProps {
   difficultyMode: DifficultyMode;
   coopRoom?: CoopRoomState | null;
   localPlayerId?: string;
+  fps?: number;
   onToggleMinimap: () => void;
   onToggleMute: () => void;
   onOpenInventory: () => void;
   onOpenSkillTree: () => void;
-  onOpenOptions: () => void;
   onPause: () => void;
   onCastSkill: (skillId: string) => void;
   onRangedAttack: () => void;
@@ -45,11 +44,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   difficultyMode,
   coopRoom,
   localPlayerId,
+  fps = 0,
   onToggleMinimap,
   onToggleMute,
   onOpenInventory,
   onOpenSkillTree,
-  onOpenOptions,
   onPause,
   onCastSkill,
   onRangedAttack,
@@ -219,12 +218,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           )}
         </div>
 
-        {/* Top-Right Quick Controls (Compact grid on mobile, inline on desktop) */}
-        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
+        {/* Top-Right Quick Controls — larger icons; options live in Pause only */}
+        <div className="grid grid-cols-3 sm:flex items-center gap-2 sm:gap-2.5 pointer-events-auto">
+          <div
+            data-testid="fps-counter"
+            className="col-span-3 sm:col-span-1 sm:order-first px-2 py-1 rounded bg-black/50 border border-slate-700 text-[10px] font-mono text-emerald-300 tabular-nums text-center"
+            title="Frames per second"
+          >
+            {Math.round(fps)} FPS
+          </div>
           <button
             onClick={onToggleMinimap}
             data-testid="minimap-toggle-btn"
-            className={`p-2 sm:p-2.5 rounded-lg border transition cursor-pointer ${
+            className={`p-3 sm:p-3.5 rounded-xl border transition cursor-pointer ${
               showMinimap
                 ? 'bg-cyan-950/90 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.3)]'
                 : 'bg-[#0a0718]/85 border-slate-700 text-slate-300 hover:bg-slate-800'
@@ -233,18 +239,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             aria-label="Toggle Minimap"
             aria-pressed={showMinimap}
           >
-            <Compass className="w-4 h-4" />
+            <Compass className="w-6 h-6 sm:w-6 sm:h-6" />
           </button>
 
           <button
             onClick={onOpenInventory}
-            className="p-2 sm:p-2.5 rounded-lg bg-[#0a0718]/85 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/80 hover:border-cyan-300 transition cursor-pointer relative"
+            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-950/80 hover:border-cyan-300 transition cursor-pointer relative"
             title={`${t('inventoryTitle', language)} [I]`}
             aria-label="Open Inventory"
           >
-            <Backpack className="w-4 h-4" />
+            <Backpack className="w-6 h-6" />
             {player.inventory.length > 0 && (
-              <span className="absolute -top-1 -right-1 px-1 text-[9px] font-bold bg-pink-600 text-white rounded-full">
+              <span className="absolute -top-1 -right-1 px-1.5 text-[10px] font-bold bg-pink-600 text-white rounded-full">
                 {player.inventory.length}
               </span>
             )}
@@ -252,13 +258,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           <button
             onClick={onOpenSkillTree}
-            className="p-2 sm:p-2.5 rounded-lg bg-[#0a0718]/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/80 hover:border-purple-300 transition cursor-pointer relative"
+            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/80 hover:border-purple-300 transition cursor-pointer relative"
             title={`${t('techTreeTitle', language)} [K]`}
             aria-label="Open Skill Tree"
           >
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-6 h-6" />
             {player.stats.skillPoints > 0 && (
-              <span className="absolute -top-1 -right-1 px-1 text-[9px] font-bold bg-amber-500 text-black rounded-full animate-bounce">
+              <span className="absolute -top-1 -right-1 px-1.5 text-[10px] font-bold bg-amber-500 text-black rounded-full animate-bounce">
                 +{player.stats.skillPoints}
               </span>
             )}
@@ -266,30 +272,20 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           <button
             onClick={onToggleMute}
-            className="p-2 sm:p-2.5 rounded-lg bg-[#0a0718]/85 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer"
+            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer"
             title={`${t('toggleAudio', language)} [N]`}
             aria-label="Toggle Sound"
           >
-            {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
-          </button>
-
-          <button
-            onClick={onOpenOptions}
-            data-testid="hud-options-btn"
-            className="p-2 sm:p-2.5 rounded-lg bg-[#0a0718]/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/80 transition cursor-pointer"
-            title={t('optionsBtn', language)}
-            aria-label={t('optionsBtn', language)}
-          >
-            <Settings className="w-4 h-4" />
+            {isMuted ? <VolumeX className="w-6 h-6 text-red-400" /> : <Volume2 className="w-6 h-6 text-cyan-400" />}
           </button>
 
           <button
             onClick={onPause}
-            className="p-2 sm:p-2.5 rounded-lg bg-[#0a0718]/85 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer"
+            className="p-3 sm:p-3.5 rounded-xl bg-[#0a0718]/85 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer"
             title={`${t('pauseTitle', language)} [Esc / P]`}
             aria-label="Pause Game"
           >
-            <Pause className="w-4 h-4 text-slate-200" />
+            <Pause className="w-6 h-6 text-slate-200" />
           </button>
         </div>
       </div>

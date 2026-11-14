@@ -778,11 +778,21 @@ export const BASE_ITEMS: Record<string, Omit<GameItem, 'id'>> = {
 
 let itemCounter = 1;
 
-export function createItem(key: string, customId?: string): GameItem {
+export function createItem(key: string, customId?: string, itemLevel = 1): GameItem {
   const base = BASE_ITEMS[key] || BASE_ITEMS['stim_pack'];
+  const lvl = Math.max(1, itemLevel);
+  const isGear = base.type !== 'consumable';
+  // Scale base power with item level (floor-scaled drops)
+  const levelMult = isGear ? 1 + (lvl - 1) * 0.12 : 1;
   return {
     ...base,
-    upgradeLevel: base.type === 'consumable' ? undefined : 0,
+    attackBonus: base.attackBonus ? Math.round(base.attackBonus * levelMult) : base.attackBonus,
+    defenseBonus: base.defenseBonus ? Math.round(base.defenseBonus * levelMult) : base.defenseBonus,
+    hpBonus: base.hpBonus ? Math.round(base.hpBonus * levelMult) : base.hpBonus,
+    energyBonus: base.energyBonus ? Math.round(base.energyBonus * levelMult) : base.energyBonus,
+    upgradeLevel: isGear ? 0 : undefined,
+    itemLevel: isGear ? lvl : undefined,
+    name: isGear && lvl > 1 ? `${base.name} [Lv.${lvl}]` : base.name,
     id: customId || `item_${key}_${Date.now()}_${itemCounter++}`
   };
 }
@@ -872,15 +882,43 @@ export function getEffectiveItemStats(item: GameItem): {
   hpBonus: number;
   energyBonus: number;
 } {
-  const lvl = item.upgradeLevel || 0;
-  const mult = 1 + lvl * 0.22;
+  const up = item.upgradeLevel || 0;
+  const ilvl = Math.max(1, item.itemLevel || 1);
+  const mult = 1 + up * 0.22;
+  const ilvlBonusAtk = item.attackBonus ? Math.floor((ilvl - 1) * 0.8) : 0;
+  const ilvlBonusDef = item.defenseBonus ? Math.floor((ilvl - 1) * 0.6) : 0;
   return {
-    attackBonus: item.attackBonus ? Math.round(item.attackBonus * mult) + lvl : 0,
-    defenseBonus: item.defenseBonus ? Math.round(item.defenseBonus * mult) + (lvl > 0 && item.defenseBonus > 0 ? lvl : 0) : 0,
-    critBonus: item.critBonus ? Number((item.critBonus + lvl * 0.01).toFixed(3)) : 0,
-    hpBonus: item.hpBonus ? Math.round(item.hpBonus * mult) + (lvl > 0 ? lvl * 4 : 0) : 0,
-    energyBonus: item.energyBonus ? Math.round(item.energyBonus * mult) + (lvl > 0 ? lvl * 2 : 0) : 0
+    attackBonus: item.attackBonus ? Math.round(item.attackBonus * mult) + up + ilvlBonusAtk : 0,
+    defenseBonus: item.defenseBonus
+      ? Math.round(item.defenseBonus * mult) + (up > 0 ? up : 0) + ilvlBonusDef
+      : 0,
+    critBonus: item.critBonus ? Number((item.critBonus + up * 0.01).toFixed(3)) : 0,
+    hpBonus: item.hpBonus ? Math.round(item.hpBonus * mult) + (up > 0 ? up * 4 : 0) + (ilvl - 1) * 3 : 0,
+    energyBonus: item.energyBonus
+      ? Math.round(item.energyBonus * mult) + (up > 0 ? up * 2 : 0) + (ilvl - 1)
+      : 0
   };
+}
+
+/** Sell price in coins — scales with rarity, upgrade level, and item level. */
+export function getItemSellPrice(item: GameItem): number {
+  if (item.effectType === 'stone') return Math.max(50, Math.floor(item.value * 0.35));
+  const rarityMult =
+    item.rarity === 'cyber-relic'
+      ? 4.5
+      : item.rarity === 'mythic'
+      ? 3.6
+      : item.rarity === 'legendary'
+      ? 2.8
+      : item.rarity === 'epic'
+      ? 2.0
+      : item.rarity === 'rare'
+      ? 1.45
+      : 1.0;
+  const up = item.upgradeLevel || 0;
+  const ilvl = Math.max(1, item.itemLevel || 1);
+  const base = item.value || 20;
+  return Math.max(5, Math.round(base * rarityMult * (1 + up * 0.35) * (0.7 + ilvl * 0.15)));
 }
 
 export function upgradeItem(item: GameItem): GameItem {
@@ -941,5 +979,7 @@ export function generateRandomLoot(floor: number): GameItem {
 
   if (candidateKeys.length === 0) candidateKeys = keys;
   const picked = candidateKeys[Math.floor(Math.random() * candidateKeys.length)];
-  return createItem(picked);
+  // Item level tracks dungeon depth so deeper floors drop stronger gear
+  const itemLevel = Math.max(1, floor + Math.floor(Math.random() * 2));
+  return createItem(picked, undefined, itemLevel);
 }
