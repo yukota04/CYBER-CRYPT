@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { GameItem, Player } from '../game/types';
 import { Language, t } from '../game/i18n';
 import { getRarityStyle } from '../game/rarity';
-import { getItemSellPrice } from '../game/items';
+import { getItemRequiredLevel, getItemSellPrice } from '../game/items';
 import { getLocalizedItemDescription, getLocalizedItemName } from '../game/itemI18n';
 import { CanvasButton } from './CanvasButton';
 import { GameIcon } from './GameIcon';
@@ -599,6 +599,13 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                 <p className="text-xs text-slate-200 leading-relaxed mt-3 p-2.5 rounded-lg bg-black/45 border border-slate-700/60">
                   {getLocalizedItemDescription(previewItem, language)}
                 </p>
+
+                {previewItem.type !== 'consumable' && (
+                  <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-300 px-1">
+                    <span>{t('levelRequirement', language)}</span>
+                    <span className="font-bold text-amber-300">{getItemRequiredLevel(previewItem)}</span>
+                  </div>
+                )}
 
                 <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-300 px-1">
                   <span>{t('classCompatLabel', language)}:</span>

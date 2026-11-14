@@ -300,7 +300,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             disabled={!!localCoopSlot?.movedThisTurn}
             title={`${t('rangedStrikeBtn', language)} (${attackRange} tiles) — Click enemy or press F`}
             aria-label={`Ranged Attack (${attackRange} tiles)`}
-            className={`relative flex flex-col items-center justify-center w-16 h-14 rounded border transition cursor-pointer ${
+            className={`relative flex flex-col items-center justify-center w-16 h-14 rounded border transition cursor-pointer active:scale-90 active:brightness-125 ${
               localCoopSlot?.movedThisTurn
                 ? 'opacity-50 border-slate-700 bg-slate-900/60 cursor-not-allowed'
                 : 'border-amber-400 bg-amber-950/60 hover:bg-amber-900/80 text-amber-200 shadow-[0_0_12px_rgba(255,230,0,0.3)]'
@@ -325,9 +325,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 disabled={!isReady}
                 aria-label={`${skill.name} (${energyNeeded} NRG)`}
                 data-ready={isReady ? 'true' : 'false'}
-                className={`cc-hotbar-slot relative w-13 h-14 rounded cursor-pointer ${
-                  !isUnlocked ? 'opacity-40 cursor-not-allowed' : isReady ? '' : 'cursor-not-allowed'
+                className={`cc-hotbar-slot relative w-13 h-14 rounded cursor-pointer active:scale-90 active:brightness-125 ${
+                  !isUnlocked ? 'opacity-40 cursor-not-allowed' : isReady ? 'skill-ready-glow' : 'cursor-not-allowed'
                 }`}
+                style={
+                  isReady
+                    ? { animation: 'skillReadyPulse 1.6s ease-in-out infinite' }
+                    : undefined
+                }
                 title={`${skill.name} (${energyNeeded} NRG) - ${skill.description}`}
               >
                 <span className="absolute top-0.5 left-1 text-[9px] font-bold text-cyan-300">

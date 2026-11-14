@@ -107,6 +107,8 @@ export interface GameItem {
   upgradeLevel?: number;
   /** Gear power level that scales with dungeon floor when dropped/bought */
   itemLevel?: number;
+  /** Minimum player level required to equip this gear */
+  requiredLevel?: number;
   attackRange?: number;
   /** Catalog key used for localized name/description lookup */
   baseKey?: string;

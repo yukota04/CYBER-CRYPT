@@ -114,3 +114,12 @@
 
   .cc-icon { image-rendering: auto; }
 }
+
+@keyframes skillReadyPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.35), 0 0 0 0 rgba(0, 240, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.7), 0 0 0 7px rgba(0, 240, 255, 0);
+  }
+}

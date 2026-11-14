@@ -49,7 +49,7 @@ import {
 import { canUnlockSkill, SKILL_DATABASE } from './game/skills';
 import {
   attemptUpgradeItem,
-  canClassEquipItem,
+  canEquipItem,
   canUpgradeItem,
   getEquipSlotForItem,
   getItemSellPrice,
@@ -2011,7 +2011,7 @@ export default function App() {
     }
 
     commitPlayer(prev => {
-      if (!canClassEquipItem(prev.characterClass, item)) return prev;
+      if (!canEquipItem(prev.characterClass, prev.stats.level, item)) return prev;
       const slot = getEquipSlotForItem(item, prev.equipment);
       if (!slot) return prev;
       if (slot === 'offhand' && prev.equipment.weapon?.twoHanded) return prev;

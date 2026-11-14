@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateDungeon, updateFOV } from './dungeon';
+import { generateDungeon, getPartyThreatMultipliers, updateFOV } from './dungeon';
 import {
   createInitialPlayer,
   calculatePlayerDamage,
@@ -21,12 +21,16 @@ import {
   BASE_ITEMS,
   createItem,
   canClassEquipItem,
+  canEquipItem,
+  canMeetItemLevelRequirement,
+  getItemRequiredLevel,
   getUpgradeCost,
   getUpgradeDestroyChance,
   getProbabilityStoneCost,
   attemptUpgradeItem,
   upgradeItem
 } from './items';
+import { generateShopItems } from './events';
 import { CoopRoomManager } from '../server/coopRooms';
 
 test('dungeon generator creates valid walkable rooms, stairs, and checkpoints', () => {
@@ -173,6 +177,62 @@ test('class weapon compatibility enforces striker/vanguard/technomancer restrict
   // Armor/Clothing is usable across classes
   assert.equal(canClassEquipItem('striker', helmet), true);
   assert.equal(canClassEquipItem('technomancer', helmet), true);
+});
+
+test('gear level requirements block low-level players from equipping high-tier gifts', () => {
+  const lowLegendary = createItem('hyperion_greatsword', 'leg_low', 1);
+  assert.equal(getItemRequiredLevel(lowLegendary), 3, 'legendary itemLevel 1 requires Lv.3');
+  assert.equal(canMeetItemLevelRequirement(1, lowLegendary), false);
+  assert.equal(canEquipItem('vanguard', 1, lowLegendary), false);
+  assert.equal(canEquipItem('vanguard', 3, lowLegendary), true);
+
+  const deepMythic = createItem('mythic_chronos_ring', 'myth_deep', 10);
+  assert.equal(getItemRequiredLevel(deepMythic), 13);
+  assert.equal(canMeetItemLevelRequirement(5, deepMythic), false);
+  assert.equal(canMeetItemLevelRequirement(13, deepMythic), true);
+
+  const commonHelm = createItem('recon_visor', 'helm_ok', 1);
+  assert.equal(canEquipItem('striker', 1, commonHelm), true);
+});
+
+test('party size scales creature HP and attack', () => {
+  const solo = getPartyThreatMultipliers(1);
+  const duo = getPartyThreatMultipliers(2);
+  const trio = getPartyThreatMultipliers(3);
+  assert.equal(solo.hp, 1);
+  assert.ok(duo.hp > solo.hp && trio.hp > duo.hp);
+  assert.ok(duo.attack > solo.attack && trio.attack > duo.attack);
+
+  const d1 = generateDungeon(3, 88, { partySize: 1 });
+  const d3 = generateDungeon(3, 88, { partySize: 3 });
+  const all1 = [...d1.monsters, ...(d1.pendingSpawns || [])];
+  const all3 = [...d3.monsters, ...(d3.pendingSpawns || [])];
+  assert.ok(all1.length > 0 && all3.length > 0);
+  const avgHp = (list: typeof all1) => list.reduce((s, m) => s + m.maxHp, 0) / list.length;
+  const avgAtk = (list: typeof all1) => list.reduce((s, m) => s + m.attack, 0) / list.length;
+  assert.ok(avgHp(all3) > avgHp(all1) * 1.4, '3P dungeon monsters should have much higher HP');
+  assert.ok(avgAtk(all3) > avgAtk(all1) * 1.2, '3P dungeon monsters should hit harder');
+});
+
+test('shop stock improves with floor depth', () => {
+  const f1 = generateShopItems(1);
+  const f5 = generateShopItems(5);
+  const f10 = generateShopItems(10);
+  assert.ok(f5.length > f1.length, 'deeper floors offer more shop slots');
+  assert.ok(f10.length >= f5.length);
+
+  const maxIlvl = (items: ReturnType<typeof generateShopItems>) =>
+    Math.max(0, ...items.filter(i => i.type !== 'consumable').map(i => i.itemLevel || 1));
+  assert.ok(maxIlvl(f5) >= 5);
+  assert.ok(maxIlvl(f10) >= 10);
+
+  const f1Gear = f1.filter(i => i.currency === 'shards');
+  const f10Gear = f10.filter(i => i.currency === 'shards');
+  assert.ok(f10Gear.length > f1Gear.length, 'deep floors stock more shard gear');
+  const topRarityRank = (r: string) =>
+    r === 'cyber-relic' ? 5 : r === 'mythic' ? 4 : r === 'legendary' ? 3 : r === 'epic' ? 2 : 1;
+  const best = (items: typeof f1Gear) => Math.max(0, ...items.map(i => topRarityRank(i.rarity)));
+  assert.ok(best(f10Gear) >= best(f1Gear), 'deep floors unlock higher rarity shop gear');
 });
 
 test('awardXP levels up player and replenishes stats', () => {

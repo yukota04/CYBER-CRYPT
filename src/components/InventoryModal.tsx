@@ -4,6 +4,8 @@ import { Language, t } from '../game/i18n';
 import { CanvasButton } from './CanvasButton';
 import {
   canClassEquipItem,
+  canMeetItemLevelRequirement,
+  getItemRequiredLevel,
   canUpgradeItem,
   getEffectiveItemStats,
   getUpgradeCost,
@@ -143,8 +145,23 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     ? liveSelected.type === 'consumable' || canClassEquipItem(player.characterClass, liveSelected)
     : true;
 
+  const meetsLevelReq = liveSelected
+    ? liveSelected.type === 'consumable' || canMeetItemLevelRequirement(player.stats.level, liveSelected)
+    : true;
+
+  const requiredLevel = liveSelected && liveSelected.type !== 'consumable'
+    ? getItemRequiredLevel(liveSelected)
+    : 0;
+
   const isBlockedByTwoHanded =
     liveSelected?.type === 'offhand' && !!player.equipment.weapon?.twoHanded;
+
+  const canEquipSelected =
+    !!liveSelected &&
+    liveSelected.type !== 'consumable' &&
+    isCompatible &&
+    meetsLevelReq &&
+    !isBlockedByTwoHanded;
 
   const selectedEff = liveSelected ? getEffectiveItemStats(liveSelected) : null;
 
@@ -266,7 +283,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                     const item = player.inventory[idx];
                     const isSelected = liveSelected && item && liveSelected.id === item.id;
                     const compatible = item
-                      ? item.type === 'consumable' || canClassEquipItem(player.characterClass, item)
+                      ? item.type === 'consumable' ||
+                        (canClassEquipItem(player.characterClass, item) &&
+                          canMeetItemLevelRequirement(player.stats.level, item))
                       : true;
                     const rStyle = item ? getRarityStyle(item.rarity) : null;
 
@@ -485,6 +504,16 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                           </span>
                         )}
                       </div>
+                      {requiredLevel > 0 && (
+                        <div
+                          className={`text-[10px] mt-1 font-bold ${meetsLevelReq ? 'text-cyan-300' : 'text-amber-400'}`}
+                          data-testid="item-level-requirement"
+                        >
+                          {meetsLevelReq ? '✓ ' : '🔒 '}
+                          {t('levelRequirement', language)} {requiredLevel}
+                          {!meetsLevelReq ? ` (${t('yourLevel', language)} ${player.stats.level})` : ''}
+                        </div>
+                      )}
                       {liveSelected.allowedClasses && liveSelected.allowedClasses.length > 0 && (
                         <div className={`text-[10px] mt-1 font-bold ${isCompatible ? 'text-emerald-400' : 'text-red-400'}`}>
                           {isCompatible ? '✓ ' : '🔒 '}
@@ -580,13 +609,15 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                           label={
                             !isCompatible
                               ? t('classIncompatible', language)
+                              : !meetsLevelReq
+                              ? `${t('levelRequirement', language)} ${requiredLevel}`
                               : isBlockedByTwoHanded
                               ? t('twoHandedBlocked', language)
                               : t('equipBtn', language)
                           }
-                          icon={isCompatible && !isBlockedByTwoHanded ? '⚔' : '🔒'}
+                          icon={canEquipSelected ? '⚔' : '🔒'}
                           theme="cyan"
-                          disabled={!isCompatible || isBlockedByTwoHanded}
+                          disabled={!canEquipSelected}
                           width={250}
                           height={42}
                           onClick={() => onEquipItem(liveSelected)}

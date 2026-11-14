@@ -11,7 +11,7 @@ interface MinimapProps {
   language: Language;
 }
 
-/** Clean minimap: canvas only — no chrome, title, coords, or legend. */
+/** Clean minimap: canvas only — sized/positioned clear of the HP/NRG cluster. */
 export const Minimap: React.FC<MinimapProps> = ({
   dungeon,
   player,
@@ -44,8 +44,11 @@ export const Minimap: React.FC<MinimapProps> = ({
       const w = canvas.width;
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = 'rgba(5,3,15,0.55)';
+      ctx.fillStyle = 'rgba(5,3,15,0.72)';
       ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(34,211,238,0.35)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 
       const cellW = w / dungeon.width;
       const cellH = h / dungeon.height;
@@ -88,21 +91,22 @@ export const Minimap: React.FC<MinimapProps> = ({
 
   if (!isOpen) return null;
 
-  const canvasDim = isMobile ? 96 : 140;
+  // Larger map, parked under the HP/NRG panel (not behind it)
+  const canvasDim = isMobile ? 148 : 200;
 
   return (
     <div
       role="region"
       aria-label="Minimap Overlay"
       data-testid="minimap-clean"
-      className="fixed z-10 pointer-events-none select-none top-[7.5rem] left-2 sm:top-28 sm:left-[13.5rem]"
+      className="fixed z-[15] pointer-events-none select-none top-[13.5rem] left-2 sm:top-[11.5rem] sm:left-5"
     >
       <canvas
         ref={canvasRef}
         width={canvasDim}
-        height={Math.round(canvasDim * 0.72)}
+        height={Math.round(canvasDim * 0.78)}
         data-testid="minimap-canvas"
-        className="block opacity-90"
+        className="block opacity-95 shadow-[0_4px_18px_rgba(0,0,0,0.55)]"
         style={{ imageRendering: 'pixelated' }}
       />
     </div>
