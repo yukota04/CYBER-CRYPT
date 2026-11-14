@@ -84,22 +84,75 @@ export async function testFirestoreConnection(): Promise<void> {
   }
 }
 
+function isLikelyMobileClient(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 768 || 'ontouchstart' in window || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+/** Stable server id for a Firebase Google user (must match server.ts goog_ prefix). */
+export function googleServerUserId(uid: string): string {
+  return `goog_${uid.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48)}`;
+}
+
+/**
+ * Sign in with Google. Prefers redirect on mobile (popup often hangs after account picker).
+ * Returns null when a redirect navigation was started (page will reload).
+ */
 export async function signInWithGoogleNativeMobile(): Promise<User | null> {
+  // Already authenticated — caller can finalize without opening another picker hang.
+  if (auth.currentUser) {
+    return auth.currentUser;
+  }
+
+  if (isLikelyMobileClient()) {
+    await signInWithRedirect(auth, googleProvider);
+    return null;
+  }
+
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (err: any) {
     const code = err?.code || '';
-    // On strict mobile in-app WebViews where popups are blocked, fall back to native redirect flow
     if (
       code === 'auth/popup-blocked' ||
-      code === 'auth/operation-not-supported-in-this-environment'
+      code === 'auth/operation-not-supported-in-this-environment' ||
+      code === 'auth/cancelled-popup-request'
     ) {
       await signInWithRedirect(auth, googleProvider);
       return null;
     }
     throw err;
   }
+}
+
+/**
+ * Wait until Firebase reports a signed-in user (covers hung popups where
+ * onAuthStateChanged updates but signInWithPopup never resolves).
+ */
+export function waitForFirebaseUser(timeoutMs = 90000): Promise<User | null> {
+  return new Promise(resolve => {
+    if (auth.currentUser) {
+      resolve(auth.currentUser);
+      return;
+    }
+    let settled = false;
+    const finish = (user: User | null) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poll);
+      clearTimeout(timer);
+      unsub();
+      resolve(user);
+    };
+    const unsub = onAuthStateChanged(auth, user => {
+      if (user) finish(user);
+    });
+    const poll = window.setInterval(() => {
+      if (auth.currentUser) finish(auth.currentUser);
+    }, 400);
+    const timer = window.setTimeout(() => finish(auth.currentUser), timeoutMs);
+  });
 }
 
 export async function checkGoogleRedirectSignIn(): Promise<User | null> {

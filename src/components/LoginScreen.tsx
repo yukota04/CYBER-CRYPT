@@ -27,6 +27,8 @@ interface LoginScreenProps {
   canInstallPwa?: boolean;
   onInstallPwa?: () => void;
   isInstallBusy?: boolean;
+  /** When Firebase already has a Google session, exclude that account from "taken" checks */
+  excludeUserId?: string | null;
 }
 
 type NameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
@@ -46,7 +48,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onToggleFullscreen,
   canInstallPwa = false,
   onInstallPwa,
-  isInstallBusy = false
+  isInstallBusy = false,
+  excludeUserId = null
 }) => {
   const [operativeName, setOperativeName] = useState('');
   const [nameStatus, setNameStatus] = useState<NameStatus>('idle');
@@ -79,7 +82,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     const seq = ++checkSeq.current;
     const timer = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(cleaned)}`);
+        const qs = new URLSearchParams({ username: cleaned });
+        if (excludeUserId) qs.set('excludeUserId', excludeUserId);
+        const res = await fetch(`/api/auth/check-username?${qs.toString()}`);
         const data = await res.json();
         if (seq !== checkSeq.current) return;
         if (data.available) {
@@ -101,7 +106,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [operativeName, language]);
+  }, [operativeName, language, excludeUserId]);
 
   const statusBadge = useMemo(() => {
     switch (nameStatus) {
