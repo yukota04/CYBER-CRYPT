@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateDungeon, getPartyThreatMultipliers, updateFOV } from './dungeon';
+import { generateDungeon, generateDungeonAsync, getPartyThreatMultipliers, updateFOV } from './dungeon';
 import {
   createInitialPlayer,
   calculatePlayerDamage,
@@ -41,6 +41,17 @@ import {
   refreshInventoryCapacity
 } from './inventorySlots';
 import { CoopRoomManager } from '../server/coopRooms';
+
+test('async dungeon generator matches sync layout for same seed', async () => {
+  const sync = generateDungeon(2, 4242);
+  const asyncDungeon = await generateDungeonAsync(2, 4242);
+  assert.equal(asyncDungeon.width, sync.width);
+  assert.equal(asyncDungeon.height, sync.height);
+  assert.equal(asyncDungeon.rooms.length, sync.rooms.length);
+  assert.equal(asyncDungeon.stairsPos.x, sync.stairsPos.x);
+  assert.equal(asyncDungeon.stairsPos.y, sync.stairsPos.y);
+  assert.equal((asyncDungeon.pendingSpawns || []).length, (sync.pendingSpawns || []).length);
+});
 
 test('dungeon generator creates valid walkable rooms, stairs, and checkpoints', () => {
   const dungeon = generateDungeon(1, 42);
