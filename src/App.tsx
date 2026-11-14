@@ -518,9 +518,10 @@ export default function App() {
           rendererRef.current.spawnAttackEffect(attackEffects[i]);
         }
         if (
-          attackEffects.some(fx =>
-            fx.type === 'slash' || fx.type === 'crit_slash' || fx.type === 'smash' || fx.type === 'beam'
-          )
+          attackEffects.length > 0 ||
+          events.includes('hit') ||
+          events.includes('crit') ||
+          events.includes('skill')
         ) {
           rendererRef.current.notifyMeleeSwing();
         }

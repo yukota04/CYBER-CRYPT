@@ -111,7 +111,7 @@ export class CanvasRenderer {
     this.addTrauma(0.28 * i);
   }
 
-  /** Kick a short melee swing pose on the local humanoid. */
+  /** Kick a marked melee swing pose on the local humanoid (~0.45s). */
   public notifyMeleeSwing() {
     this.attackAnim = 1;
   }
@@ -374,17 +374,23 @@ export class CanvasRenderer {
     const nowSec = anim?.nowSec ?? 0;
     const moveBlend = Math.max(0, Math.min(1, anim?.moveBlend ?? 0));
     const attackT = Math.max(0, Math.min(1, anim?.attackAnim ?? 0));
-    const idleBob = Math.sin(nowSec * 2.4) * 0.7 * (1 - moveBlend);
-    const walkPhase = nowSec * 11;
-    const stride = Math.sin(walkPhase) * 3.2 * moveBlend;
-    const strideOpp = Math.sin(walkPhase + Math.PI) * 3.2 * moveBlend;
-    const bodyBob = Math.abs(Math.sin(walkPhase)) * 1.4 * moveBlend + idleBob;
-    const attackSwing = Math.sin((1 - attackT) * Math.PI) * attackT * 10;
-    const attackLunge = attackT * 2.2;
+    // Peak mid-swing so the whole body reads the strike
+    const attackP = 1 - attackT;
+    const attackPulse = Math.sin(attackP * Math.PI);
+    const idleBob = Math.sin(nowSec * 2.6) * 1.25 * (1 - moveBlend) * (1 - attackPulse * 0.4);
+    const walkPhase = nowSec * 13;
+    const stride = Math.sin(walkPhase) * 5.8 * moveBlend;
+    const strideOpp = Math.sin(walkPhase + Math.PI) * 5.8 * moveBlend;
+    const bodyBob = Math.abs(Math.sin(walkPhase)) * 2.6 * moveBlend + idleBob;
+    const attackSwing = attackPulse * 14;
+    const attackLunge = attackPulse * 8;
+    const torsoLean = attackPulse * 0.24 + Math.sin(walkPhase) * 0.05 * moveBlend;
+    const shoulderTwist = attackPulse * 3.8;
 
     // Mirror helper: x relative to tile when facing left
     const mx = (x: number, w = 0) => (facingLeft ? px + 32 - x - w : px + x);
     const faceSign = facingLeft ? -1 : 1;
+    const horizSign = facingLeft ? -1 : 1;
 
     const weaponRarity = eq?.weapon ? getRarityStyle(eq.weapon.rarity) : null;
     const chestHex = this.gearColor(eq?.chest, c.suit);
@@ -396,13 +402,22 @@ export class CanvasRenderer {
     const offHex = this.gearColor(eq?.offhand, '#38bdf8');
 
     const by = py - bodyBob;
-    const lungeX = facingLeft || facingRight ? faceSign * attackLunge : 0;
-    const lungeY = facingUp ? -attackLunge : facing === 'down' ? attackLunge * 0.4 : 0;
+    const lungeX =
+      facingLeft || facingRight ? faceSign * attackLunge : Math.sin(walkPhase) * 1.1 * moveBlend;
+    const lungeY = facingUp ? -attackLunge : facing === 'down' ? attackLunge * 0.55 : attackPulse * 1.4;
 
-    // Ground aura (stretches slightly while walking)
+    // Ground aura (stretches while walking / attacking)
     ctx.fillStyle = weaponRarity && weaponRarity.tierNumber >= 2 ? weaponRarity.glowHex : 'rgba(0, 240, 255, 0.16)';
     ctx.beginPath();
-    ctx.ellipse(px + 16 + lungeX * 0.3, py + 30, 13 + moveBlend * 2, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(
+      px + 16 + lungeX * 0.35,
+      py + 30,
+      13 + moveBlend * 3 + attackPulse * 4,
+      5 + attackPulse,
+      0,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
     if (weaponRarity && weaponRarity.tierNumber >= 3) {
       ctx.strokeStyle = weaponRarity.hex;
@@ -417,109 +432,119 @@ export class CanvasRenderer {
       ctx.shadowBlur = 0;
     }
 
+    // Whole-body lean around the feet during attack
+    ctx.save();
+    ctx.translate(px + 16 + lungeX * 0.35, py + 28);
+    ctx.rotate(horizSign * torsoLean * (facingLeft || facingRight ? 1 : 0.4));
+    ctx.translate(-(px + 16 + lungeX * 0.35), -(py + 28));
+
     // --- BOOTS ---
     ctx.fillStyle = eq?.boots ? bootHex : '#475569';
-    ctx.fillRect(mx(9, 6) + lungeX * 0.2, by + 26 + stride * 0.35 + lungeY * 0.2, 6, 5);
-    ctx.fillRect(mx(17, 6) + lungeX * 0.2, by + 26 + strideOpp * 0.35 + lungeY * 0.2, 6, 5);
+    ctx.fillRect(mx(8, 7) + lungeX * 0.15, by + 26 + stride * 0.55 + lungeY * 0.15, 7, 5);
+    ctx.fillRect(mx(17, 7) + lungeX * 0.15, by + 26 + strideOpp * 0.55 + lungeY * 0.15, 7, 5);
     if (eq?.boots) {
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(mx(9, 6) + lungeX * 0.2, by + 29 + stride * 0.35 + lungeY * 0.2, 6, 2);
-      ctx.fillRect(mx(17, 6) + lungeX * 0.2, by + 29 + strideOpp * 0.35 + lungeY * 0.2, 6, 2);
+      ctx.fillRect(mx(8, 7) + lungeX * 0.15, by + 29 + stride * 0.55 + lungeY * 0.15, 7, 2);
+      ctx.fillRect(mx(17, 7) + lungeX * 0.15, by + 29 + strideOpp * 0.55 + lungeY * 0.15, 7, 2);
     }
 
     // --- LEGS ---
     ctx.fillStyle = eq?.legs ? legHex : c.suit;
-    ctx.fillRect(mx(10, 5) + lungeX * 0.25, by + 18 + stride * 0.25 + lungeY * 0.25, 5, 9);
-    ctx.fillRect(mx(17, 5) + lungeX * 0.25, by + 18 + strideOpp * 0.25 + lungeY * 0.25, 5, 9);
+    ctx.fillRect(mx(9, 6) + lungeX * 0.2 + stride * 0.15, by + 17 + stride * 0.35 + lungeY * 0.2, 6, 10);
+    ctx.fillRect(mx(17, 6) + lungeX * 0.2 + strideOpp * 0.15, by + 17 + strideOpp * 0.35 + lungeY * 0.2, 6, 10);
     if (eq?.legs) {
       ctx.strokeStyle = '#020617';
       ctx.lineWidth = 1;
-      ctx.strokeRect(mx(10, 5) + 0.5 + lungeX * 0.25, by + 18.5 + stride * 0.25, 4, 8);
-      ctx.strokeRect(mx(17, 5) + 0.5 + lungeX * 0.25, by + 18.5 + strideOpp * 0.25, 4, 8);
+      ctx.strokeRect(mx(9, 6) + 0.5 + lungeX * 0.2, by + 17.5 + stride * 0.35, 5, 9);
+      ctx.strokeRect(mx(17, 6) + 0.5 + lungeX * 0.2, by + 17.5 + strideOpp * 0.35, 5, 9);
     }
 
     // --- TORSO (undersuit) ---
     ctx.fillStyle = c.suit;
-    ctx.fillRect(mx(10, 12) + lungeX, by + 10 + lungeY, 12, 9);
+    ctx.fillRect(mx(10, 12) + lungeX + shoulderTwist * 0.15 * horizSign, by + 9 + lungeY, 12, 10);
 
     // Chest armor plate — large & readable
+    const torsoShiftX = lungeX + shoulderTwist * 0.2 * horizSign;
     if (eq?.chest) {
       ctx.fillStyle = chestHex;
-      ctx.fillRect(mx(9, 14) + lungeX, by + 10 + lungeY, 14, 10);
+      ctx.fillRect(mx(9, 14) + torsoShiftX, by + 9 + lungeY, 14, 11);
       ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
-      ctx.fillRect(mx(11, 10) + lungeX, by + 12 + lungeY, 10, 3);
+      ctx.fillRect(mx(11, 10) + torsoShiftX, by + 11 + lungeY, 10, 3);
       ctx.strokeStyle = '#f8fafc';
       ctx.lineWidth = eq.chest && getRarityStyle(eq.chest.rarity).tierNumber >= 4 ? 1.6 : 1.1;
-      ctx.strokeRect(mx(9, 14) + 0.5 + lungeX, by + 10.5 + lungeY, 13, 9);
+      ctx.strokeRect(mx(9, 14) + 0.5 + torsoShiftX, by + 9.5 + lungeY, 13, 10);
       ctx.fillStyle = chestHex;
-      ctx.fillRect(mx(7, 4) + lungeX, by + 10 + lungeY, 4, 4);
-      ctx.fillRect(mx(21, 4) + lungeX, by + 10 + lungeY, 4, 4);
+      ctx.fillRect(mx(7, 4) + torsoShiftX, by + 9 + lungeY, 4, 4);
+      ctx.fillRect(mx(21, 4) + torsoShiftX, by + 9 + lungeY, 4, 4);
     }
 
-    // --- ARMS (weapon arm swings on attack / opposite arm counters walk) ---
-    const armWalk = Math.sin(walkPhase) * 2.2 * moveBlend;
-    const weaponArmY = by + 11 + lungeY - attackSwing * 0.55 - armWalk * 0.3;
-    const offArmY = by + 11 + lungeY + armWalk * 0.35;
+    // --- ARMS (full swing on attack / opposite arm counters walk) ---
+    const armWalk = Math.sin(walkPhase) * 4.2 * moveBlend;
+    const weaponArmY = by + 10 + lungeY - attackSwing * 0.95 - armWalk * 0.45;
+    const offArmY = by + 10 + lungeY + armWalk * 0.55 + attackSwing * 0.2;
+    const weaponArmX = lungeX - faceSign * (attackSwing * 0.55 + shoulderTwist);
+    const offArmX = lungeX + faceSign * attackSwing * 0.12;
     ctx.fillStyle = c.suit;
-    ctx.fillRect(mx(6, 4) + lungeX - faceSign * attackSwing * 0.15, weaponArmY, 4, 8);
-    ctx.fillRect(mx(22, 4) + lungeX, offArmY, 4, 8);
+    ctx.fillRect(mx(5, 5) + weaponArmX, weaponArmY, 5, 9);
+    ctx.fillRect(mx(22, 5) + offArmX, offArmY, 5, 9);
 
     // Gloves / hands
     ctx.fillStyle = eq?.gloves ? gloveHex : c.skin;
-    ctx.fillRect(mx(5, 5) + lungeX - faceSign * attackSwing * 0.25, weaponArmY + 6, 5, 4);
-    ctx.fillRect(mx(22, 5) + lungeX, offArmY + 6, 5, 4);
+    ctx.fillRect(mx(4, 6) + weaponArmX - faceSign * attackSwing * 0.2, weaponArmY + 7, 6, 5);
+    ctx.fillRect(mx(22, 6) + offArmX, offArmY + 7, 6, 5);
     if (eq?.gloves) {
       ctx.strokeStyle = '#0f172a';
       ctx.lineWidth = 1;
-      ctx.strokeRect(mx(5, 5) + 0.5 + lungeX, weaponArmY + 6.5, 4, 3);
-      ctx.strokeRect(mx(22, 5) + 0.5 + lungeX, offArmY + 6.5, 4, 3);
+      ctx.strokeRect(mx(4, 6) + 0.5 + weaponArmX, weaponArmY + 7.5, 5, 4);
+      ctx.strokeRect(mx(22, 6) + 0.5 + offArmX, offArmY + 7.5, 5, 4);
     }
 
     // --- HEAD ---
-    const headY = by + 6 + lungeY * 0.6;
+    const headY = by + 5 + lungeY * 0.75 - attackPulse * 1.2;
+    const headX = px + 16 + lungeX + shoulderTwist * 0.35 * horizSign;
     ctx.fillStyle = c.skin;
     ctx.beginPath();
-    ctx.arc(px + 16 + lungeX, headY, 5.2, 0, Math.PI * 2);
+    ctx.arc(headX, headY, 5.4, 0, Math.PI * 2);
     ctx.fill();
 
     if (eq?.helmet) {
       ctx.fillStyle = helmHex;
       ctx.beginPath();
-      ctx.ellipse(px + 16 + lungeX, headY - 0.5, 6.2, 5.4, 0, Math.PI, 0);
+      ctx.ellipse(headX, headY - 0.5, 6.4, 5.6, 0, Math.PI, 0);
       ctx.fill();
-      ctx.fillRect(px + 10 + lungeX, headY - 1, 12, 4);
+      ctx.fillRect(headX - 6, headY - 1, 12, 4);
       const ht = getRarityStyle(eq.helmet.rarity).tierNumber;
       ctx.fillStyle = ht >= 3 ? helmHex : '#e2e8f0';
-      ctx.fillRect(px + 15 + lungeX, headY - 6, 2, 4);
+      ctx.fillRect(headX - 1, headY - 6.5, 2, 4);
       if (ht >= 4) {
-        ctx.fillRect(px + 12 + lungeX, headY - 5, 2, 3);
-        ctx.fillRect(px + 18 + lungeX, headY - 5, 2, 3);
+        ctx.fillRect(headX - 4, headY - 5.5, 2, 3);
+        ctx.fillRect(headX + 2, headY - 5.5, 2, 3);
       }
     }
 
     ctx.fillStyle = c.visor;
     if (facingUp) {
-      ctx.fillRect(px + 12 + lungeX, headY - 2, 8, 2);
+      ctx.fillRect(headX - 4, headY - 2, 8, 2);
     } else if (facingLeft) {
-      ctx.fillRect(px + 10 + lungeX, headY - 1, 5, 2.5);
+      ctx.fillRect(headX - 6, headY - 1, 5, 2.5);
     } else if (facingRight) {
-      ctx.fillRect(px + 17 + lungeX, headY - 1, 5, 2.5);
+      ctx.fillRect(headX + 1, headY - 1, 5, 2.5);
     } else {
-      ctx.fillRect(px + 11 + lungeX, headY - 1, 4, 2.5);
-      ctx.fillRect(px + 17 + lungeX, headY - 1, 4, 2.5);
+      ctx.fillRect(headX - 5, headY - 1, 4, 2.5);
+      ctx.fillRect(headX + 1, headY - 1, 4, 2.5);
     }
 
     // --- WEAPON (dominant hand side) ---
     if (eq?.weapon) {
       const cat = eq.weapon.weaponCategory || 'sword';
-      const handX = (facingLeft ? px + 3 : px + 24) + lungeX - faceSign * attackSwing * 0.35;
-      const wepY = weaponArmY - 4 - attackSwing * 0.8;
+      const handX = (facingLeft ? px + 2 : px + 24) + weaponArmX - faceSign * attackSwing * 0.45;
+      const wepY = weaponArmY - 6 - attackSwing * 1.15;
       ctx.save();
-      if (attackT > 0.05) {
+      if (attackT > 0.02) {
         const pivotX = handX + 1.5;
         const pivotY = weaponArmY + 8;
         ctx.translate(pivotX, pivotY);
-        ctx.rotate(faceSign * attackSwing * 0.09);
+        ctx.rotate(faceSign * attackSwing * 0.16);
         ctx.translate(-pivotX, -pivotY);
       }
       ctx.fillStyle = wepHex;
@@ -589,6 +614,7 @@ export class CanvasRenderer {
       ctx.stroke();
     }
 
+    ctx.restore(); // end whole-body lean
     ctx.shadowBlur = 0;
 
     if (label) {
@@ -775,55 +801,55 @@ export class CanvasRenderer {
     }
 
     // 1c. RENDER FLOATING SKULL & LOOT BAGS (Death Drops)
+    // Always draw on integer tile — continuous free-move coords must be floored or tiles[y] is undefined
     if (dungeon.deathDrops && dungeon.deathDrops.length > 0) {
       for (const drop of dungeon.deathDrops) {
-        const tile = dungeon.tiles[drop.y]?.[drop.x];
-        if (!tile || !tile.explored) continue;
+        const tx = Math.floor(drop.x);
+        const ty = Math.floor(drop.y);
+        const tile = dungeon.tiles[ty]?.[tx];
+        if (!tile) continue;
 
-        const baseX = drop.x * this.tileSize + 16;
-        const baseY = drop.y * this.tileSize + 16;
-        const bobY = baseY - 3 + Math.sin(nowSec * 3.6 + drop.x) * 3.2;
+        const baseX = tx * this.tileSize + 16;
+        const baseY = ty * this.tileSize + 16;
+        const bobY = baseY - 4 + Math.sin(nowSec * 3.6 + tx) * 3.5;
         const pulse = 0.65 + Math.sin(nowSec * 5) * 0.25;
-        const isLit = tile.visible;
+        const isLit = !!(tile.visible || tile.explored);
 
         ctx.save();
-        // Ground spectral aura ring
-        ctx.fillStyle = isLit ? `rgba(255, 0, 102, ${0.22 * pulse})` : 'rgba(255, 0, 102, 0.1)';
+        // Ground spectral aura ring — large so it reads on fogged tiles too
+        ctx.fillStyle = isLit ? `rgba(255, 0, 102, ${0.28 * pulse})` : 'rgba(255, 0, 102, 0.16)';
         ctx.beginPath();
-        ctx.ellipse(baseX, baseY + 8, 12, 5.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(baseX, baseY + 9, 14, 6, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = isLit ? '#ffe600' : '#854d0e';
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = '#ffe600';
+        ctx.lineWidth = 2;
         ctx.stroke();
 
         // Loot pouch below floating skull
-        ctx.fillStyle = isLit ? '#d97706' : '#78350f';
+        ctx.fillStyle = isLit ? '#f59e0b' : '#b45309';
         ctx.beginPath();
-        ctx.arc(baseX, baseY + 5, 5.5, 0, Math.PI * 2);
+        ctx.arc(baseX, baseY + 6, 6.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#fef08a';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(baseX - 3, baseY + 3, 6, 3);
 
         // Floating Skull emblem
         if (this.enableGlow) {
-          ctx.shadowColor = isLit ? '#ff007f' : '#881337';
-          ctx.shadowBlur = isLit ? 12 : 4;
+          ctx.shadowColor = '#ff007f';
+          ctx.shadowBlur = isLit ? 14 : 8;
         }
-        ctx.font = '15px sans-serif';
+        ctx.font = '18px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('💀', baseX, bobY);
 
-        if (isLit) {
-          ctx.shadowBlur = 0;
-          ctx.font = 'bold 7px ui-monospace, monospace';
-          const tag = drop.ownerName ? `${drop.ownerName.slice(0, 8)} ☠` : 'LOOT ☠';
-          ctx.fillStyle = '#060410';
-          ctx.fillText(tag, baseX + 1, bobY - 12);
-          ctx.fillStyle = '#fef08a';
-          ctx.fillText(tag, baseX, bobY - 13);
-        }
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 8px ui-monospace, monospace';
+        const tag = drop.ownerName ? `${drop.ownerName.slice(0, 8)} ☠` : 'LOOT ☠';
+        ctx.fillStyle = '#060410';
+        ctx.fillText(tag, baseX + 1, bobY - 14);
+        ctx.fillStyle = '#fef08a';
+        ctx.fillText(tag, baseX, bobY - 15);
         ctx.restore();
       }
     }
@@ -918,7 +944,7 @@ export class CanvasRenderer {
       }
       this.prevPlayerX = player.x;
       this.prevPlayerY = player.y;
-      if (this.attackAnim > 0) this.attackAnim = Math.max(0, this.attackAnim - simDt / 0.28);
+      if (this.attackAnim > 0) this.attackAnim = Math.max(0, this.attackAnim - simDt / 0.45);
       if (this.damageVignette > 0) this.damageVignette = Math.max(0, this.damageVignette - simDt * 1.65);
     }
 

@@ -218,12 +218,13 @@ export function dropPlayerLoadoutOnDeath(
     return null;
   }
 
+  // Always snap to integer tile — free-move uses continuous coords; render/collect index tiles by int
   const bag: DeathDropBag = {
     id: `skull_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     ownerId,
     ownerName,
-    x: player.x,
-    y: player.y,
+    x: Math.floor(player.x + 0.36),
+    y: Math.floor(player.y + 0.36),
     items: droppedItems,
     equipment: equippedSnap,
     coins: droppedCoins,
@@ -251,13 +252,14 @@ export function collectDeathDropBagsAt(
   let totalStones = 0;
 
   for (const bag of dungeon.deathDrops) {
-    // Support continuous positions: bag sits on integer tile; player may straddle cells.
+    // Bag tile is integer (or floored for legacy float bags); player may straddle cells.
+    const bx = Math.floor(bag.x);
+    const by = Math.floor(bag.y);
     const px0 = Math.floor(player.x);
     const py0 = Math.floor(player.y);
     const px1 = Math.floor(player.x + 0.72 - 1e-4);
     const py1 = Math.floor(player.y + 0.72 - 1e-4);
-    const matchesPos =
-      bag.x >= px0 && bag.x <= px1 && bag.y >= py0 && bag.y <= py1;
+    const matchesPos = bx >= px0 && bx <= px1 && by >= py0 && by <= py1;
     const matchesOwner = !ownerId || bag.ownerId === ownerId;
     if (!matchesPos || !matchesOwner) {
       remaining.push(bag);
