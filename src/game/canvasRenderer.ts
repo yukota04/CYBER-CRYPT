@@ -101,6 +101,16 @@ export class CanvasRenderer {
     };
   }
 
+  /** Continuous tile-space position under a screen pixel (for mouse aim). */
+  public screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    const worldX = screenX + Math.floor(this.cameraX);
+    const worldY = screenY + Math.floor(this.cameraY);
+    return {
+      x: worldX / this.tileSize,
+      y: worldY / this.tileSize
+    };
+  }
+
   public spawnAttackEffect(effect: AttackEffect) {
     this.attackEffects.push({
       ...effect,

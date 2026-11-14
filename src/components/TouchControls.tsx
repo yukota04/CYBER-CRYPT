@@ -17,6 +17,8 @@ interface TouchControlsProps {
   onOpenSkillTree: () => void;
   onCastSkill: (skillId: string) => void;
   onRangedAttack: () => void;
+  /** When true, hide the D-pad (replaced by VirtualJoystick). */
+  hideDpad?: boolean;
 }
 
 export const TouchControls: React.FC<TouchControlsProps> = ({
@@ -28,7 +30,8 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   onOpenInventory,
   onOpenSkillTree,
   onCastSkill,
-  onRangedAttack
+  onRangedAttack,
+  hideDpad = false
 }) => {
   const attackRange = getPlayerAttackRange(player);
   const classActiveSkills = Object.values(SKILL_DATABASE)
@@ -65,65 +68,72 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
   };
 
   return (
-    <div className="sm:hidden fixed bottom-12 left-2.5 right-2.5 z-20 flex items-end justify-between pointer-events-none select-none">
-      {/* Virtual D-Pad — hold for continuous free movement */}
-      <div className="grid grid-cols-3 gap-1 w-32 h-32 p-1.5 rounded-2xl bg-[#0d0920]/85 border border-cyan-500/45 backdrop-blur-sm pointer-events-auto shadow-[0_0_16px_rgba(0,240,255,0.2)]">
-        <div />
-        <button
-          type="button"
-          {...bindDir(0, -1)}
-          data-no-ui-sfx="true"
-          className="flex items-center justify-center rounded-t-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-          aria-label="Move Up"
-        >
-          <ChevronUp className="w-5 h-5" />
-        </button>
-        <div />
+    <div
+      className={`sm:hidden fixed bottom-12 left-2.5 right-2.5 z-20 flex items-end pointer-events-none select-none ${
+        hideDpad ? 'justify-end' : 'justify-between'
+      }`}
+      data-no-joystick
+    >
+      {/* Virtual D-Pad — hidden when Roblox-style joystick is active */}
+      {!hideDpad && (
+        <div className="grid grid-cols-3 gap-1 w-32 h-32 p-1.5 rounded-2xl bg-[#0d0920]/85 border border-cyan-500/45 backdrop-blur-sm pointer-events-auto shadow-[0_0_16px_rgba(0,240,255,0.2)]">
+          <div />
+          <button
+            type="button"
+            {...bindDir(0, -1)}
+            data-no-ui-sfx="true"
+            className="flex items-center justify-center rounded-t-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
+            aria-label="Move Up"
+          >
+            <ChevronUp className="w-5 h-5" />
+          </button>
+          <div />
 
-        <button
-          type="button"
-          {...bindDir(-1, 0)}
-          data-no-ui-sfx="true"
-          className="flex items-center justify-center rounded-l-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-          aria-label="Move Left"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
+          <button
+            type="button"
+            {...bindDir(-1, 0)}
+            data-no-ui-sfx="true"
+            className="flex items-center justify-center rounded-l-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
+            aria-label="Move Left"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
 
-        <button
-          type="button"
-          onClick={onWaitTurn}
-          data-testid="mobile-wait-btn"
-          className="flex flex-col items-center justify-center rounded-md bg-purple-950/85 active:bg-purple-600 text-purple-200 border border-purple-400/60 text-[8px] font-mono font-bold active:scale-95 transition leading-none gap-0.5"
-          title="Stop moving / Wait"
-          aria-label="Wait"
-        >
-          <Disc className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
-          <span>STOP</span>
-        </button>
+          <button
+            type="button"
+            onClick={onWaitTurn}
+            data-testid="mobile-wait-btn"
+            className="flex flex-col items-center justify-center rounded-md bg-purple-950/85 active:bg-purple-600 text-purple-200 border border-purple-400/60 text-[8px] font-mono font-bold active:scale-95 transition leading-none gap-0.5"
+            title="Stop moving / Wait"
+            aria-label="Wait"
+          >
+            <Disc className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
+            <span>STOP</span>
+          </button>
 
-        <button
-          type="button"
-          {...bindDir(1, 0)}
-          data-no-ui-sfx="true"
-          className="flex items-center justify-center rounded-r-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-          aria-label="Move Right"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
+          <button
+            type="button"
+            {...bindDir(1, 0)}
+            data-no-ui-sfx="true"
+            className="flex items-center justify-center rounded-r-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
+            aria-label="Move Right"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
 
-        <div />
-        <button
-          type="button"
-          {...bindDir(0, 1)}
-          data-no-ui-sfx="true"
-          className="flex items-center justify-center rounded-b-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
-          aria-label="Move Down"
-        >
-          <ChevronDown className="w-5 h-5" />
-        </button>
-        <div />
-      </div>
+          <div />
+          <button
+            type="button"
+            {...bindDir(0, 1)}
+            data-no-ui-sfx="true"
+            className="flex items-center justify-center rounded-b-lg bg-cyan-950/70 active:bg-cyan-600 text-cyan-300 border border-cyan-500/35 active:scale-95 transition touch-none"
+            aria-label="Move Down"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+          <div />
+        </div>
+      )}
 
       <div className="flex flex-col items-end gap-1.5 pointer-events-auto">
         <div className="flex items-center gap-1 p-1 rounded-lg bg-[#0d0920]/85 border border-cyan-500/35">

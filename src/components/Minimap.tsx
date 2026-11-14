@@ -21,7 +21,16 @@ export const Minimap: React.FC<MinimapProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState(false);
   const pulseRef = useRef<number>(0);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   const stats = calculateMinimapStats(dungeon);
 
@@ -195,11 +204,13 @@ export const Minimap: React.FC<MinimapProps> = ({
     render();
 
     return () => cancelAnimationFrame(animId);
-  }, [dungeon, player, isOpen, isExpanded]);
+  }, [dungeon, player, isOpen, isExpanded, isMobile]);
 
   if (!isOpen) return null;
 
-  const canvasDim = isExpanded ? 320 : 148;
+  // Compact minimap ~30% smaller on mobile so it does not cover the playfield
+  const compactCanvas = isMobile ? Math.round(148 * 0.7) : 148;
+  const canvasDim = isExpanded ? 320 : compactCanvas;
 
   return (
     <div
@@ -208,7 +219,7 @@ export const Minimap: React.FC<MinimapProps> = ({
       className={`fixed z-30 transition-all duration-200 select-none font-mono ${
         isExpanded
           ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px]'
-          : 'top-20 right-2 w-[164px] sm:top-16 sm:right-4 sm:w-[232px]'
+          : 'top-20 right-2 w-[115px] sm:top-16 sm:right-4 sm:w-[232px]'
       } bg-[#080516]/95 backdrop-blur-md border border-cyan-500/50 rounded-xl shadow-[0_0_25px_rgba(0,240,255,0.3)] overflow-hidden`}
     >
       {/* Header Bar */}
