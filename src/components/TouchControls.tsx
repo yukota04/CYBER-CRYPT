@@ -3,6 +3,7 @@ import { CanvasButton } from './CanvasButton';
 import { DungeonState, Player } from '../game/types';
 import { SKILL_DATABASE } from '../game/skills';
 import { getEffectiveSkillEnergyCost, getPlayerAttackRange } from '../game/combat';
+import { GameIcon } from './GameIcon';
 
 interface TouchControlsProps {
   player: Player;
@@ -149,7 +150,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
                 animation: isReady ? 'skillReadyPulse 1.6s ease-in-out infinite' : undefined
               }}
             >
-              <span className="relative z-[1]">{skill.icon}</span>
+              <GameIcon id={skill.id} fallback={skill.icon} size={28} className="relative z-[1]" />
               {cdSec > 0 && (
                 <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300 z-[2]">
                   {cdSec}

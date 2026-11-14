@@ -15,6 +15,7 @@ import { getTotalStats } from '../game/combat';
 import { getRarityStyle } from '../game/rarity';
 import { getLocalizedItemDescription, getLocalizedItemName } from '../game/itemI18n';
 import { X, Backpack, Shield, Hammer, Lock, AlertTriangle, Tv } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 
 interface InventoryModalProps {
   player: Player;
@@ -165,7 +166,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const selectedEff = liveSelected ? getEffectiveItemStats(liveSelected) : null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm select-none font-mono">
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm select-none cc-font">
       <div className="w-full max-w-4xl bg-[#0a0718] border border-cyan-500/50 rounded-xl shadow-[0_0_35px_rgba(0,240,255,0.3)] p-3 sm:p-5 flex flex-col max-h-[92dvh] overflow-y-auto relative">
         {/* Header + Coin / Shard Balances */}
         <div className="flex flex-wrap items-center justify-between pb-3 border-b border-cyan-500/30 gap-3">
@@ -184,11 +185,11 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               data-testid="inventory-coins-balance"
               className="px-2.5 py-1 rounded bg-amber-950/70 border border-amber-400/50 text-amber-300 font-bold text-xs flex items-center gap-1.5"
             >
-              <span>🪙</span>
+              <GameIcon id="currency.coins" fallback="🪙" size={14} />
               <span>{player.stats.coins} {t('coins', language)}</span>
             </div>
             <div className="px-2.5 py-1 rounded bg-cyan-950/70 border border-cyan-400/40 text-cyan-300 font-bold text-xs flex items-center gap-1.5">
-              <span>💎</span>
+              <GameIcon id="currency.soul_shards" fallback="💎" size={14} />
               <span>{player.stats.soulShards} {t('shards', language)}</span>
             </div>
             <button
@@ -308,7 +309,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         {item && rStyle ? (
                           <>
                             <div className={`absolute top-0 inset-x-0 h-0.5 ${rStyle.accentBarClass}`} />
-                            <span className="text-xl">{item.icon}</span>
+                            <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={32} />
                             <span className={`text-[9px] truncate w-full text-center leading-tight font-semibold ${rStyle.titleClass}`}>
                               {getLocalizedItemName(item, language, { includeUpgrade: false, includeLevel: false })}
                             </span>
@@ -376,7 +377,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
                           {t(labelKey, language)}
                         </span>
-                        <span className="text-lg my-0.5">{eq ? eq.icon : blockedOffhand ? '🚫' : defaultIcon}</span>
+                        <span className="my-0.5"><GameIcon id={eq ? (eq.baseKey || eq.id) : blockedOffhand ? 'ui.inv.blocked_offhand' : `ui.slot.${slot === 'ring1' || slot === 'ring2' ? slot : slot}`} fallback={eq ? eq.icon : blockedOffhand ? '🚫' : defaultIcon} size={28} /></span>
                         <span className={`text-[10px] truncate max-w-full leading-tight font-semibold ${eqRarity ? eqRarity.titleClass : ''}`}>
                           {eq
                             ? getLocalizedItemName(eq, language)
@@ -455,7 +456,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                             isSelected ? rStyle.selectedClass + ' ring-2 ring-cyan-400' : ''
                           }`}
                         >
-                          <span className="text-2xl">{item.icon}</span>
+                          <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={36} />
                           <span className={`text-[9px] font-bold truncate w-full text-center ${rStyle.titleClass}`}>
                             {getLocalizedItemName(item, language, { includeUpgrade: false, includeLevel: false })}
                           </span>
@@ -521,7 +522,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                       )}
                     </div>
                     <div className={`w-12 h-12 rounded-xl border flex items-center justify-center text-2xl flex-shrink-0 ${selRarity.iconFrameClass}`}>
-                      {liveSelected.icon}
+                      <GameIcon id={liveSelected.baseKey || liveSelected.id} fallback={liveSelected.icon} size={40} />
                     </div>
                   </div>
 
@@ -660,7 +661,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
           >
             <div className={`w-full max-w-sm p-5 rounded-2xl border-2 flex flex-col items-center text-center ${dRarity.cardClass}`}>
               <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-4xl mb-3 ${dRarity.iconFrameClass}`}>
-                {destroyedItemPendingRecovery.icon}
+                <GameIcon id={destroyedItemPendingRecovery.baseKey || destroyedItemPendingRecovery.id} fallback={destroyedItemPendingRecovery.icon} size={48} />
               </div>
 
               <div className={`text-sm font-bold ${dRarity.titleClass}`}>

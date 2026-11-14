@@ -4,6 +4,7 @@ import { getSkillTreesForClass, canUnlockSkill, SKILL_DATABASE } from '../game/s
 import { Language, t } from '../game/i18n';
 import { CanvasButton } from './CanvasButton';
 import { X, Check, Lock } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 
 interface SkillTreeModalProps {
   player: Player;
@@ -34,7 +35,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none font-mono">
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none cc-font">
       <div className="w-full max-w-4xl bg-[#0a0718] border border-purple-500/50 rounded-lg shadow-[0_0_35px_rgba(189,0,255,0.3)] p-5 flex flex-col max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between pb-3 border-b border-purple-500/30 gap-2">
@@ -111,7 +112,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
                         : 'bg-slate-900/60 border-slate-700 text-slate-400 hover:border-purple-500/60'
                     } ${isSelected ? 'ring-2 ring-cyan-400' : ''}`}
                   >
-                    <span className="text-2xl">{node.icon}</span>
+                    <GameIcon id={node.id} fallback={node.icon} size={36} />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold truncate">{node.name}</div>
                       <div className="text-[10px] text-purple-300/80 uppercase">
@@ -153,7 +154,7 @@ export const SkillTreeModal: React.FC<SkillTreeModalProps> = ({
                     )}
                   </div>
                 </div>
-                <span className="text-3xl">{displaySkill.icon}</span>
+                <GameIcon id={displaySkill.id} fallback={displaySkill.icon} size={48} />
               </div>
 
               <p className="text-xs text-slate-300 mt-4 leading-relaxed border-t border-slate-800 pt-3">

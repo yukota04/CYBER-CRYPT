@@ -5,6 +5,7 @@ import { getRarityStyle } from '../game/rarity';
 import { getItemRequiredLevel, getItemSellPrice } from '../game/items';
 import { getLocalizedItemDescription, getLocalizedItemName } from '../game/itemI18n';
 import { CanvasButton } from './CanvasButton';
+import { GameIcon } from './GameIcon';
 import {
   X,
   ShoppingBag,
@@ -223,7 +224,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
   return (
     <div
       data-testid="shop-modal"
-      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/82 backdrop-blur-sm select-none font-mono"
+      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/82 backdrop-blur-sm select-none cc-font"
     >
       <div className="w-full max-w-3xl bg-[#090616] border-t sm:border border-amber-500/60 rounded-t-2xl sm:rounded-xl shadow-[0_0_40px_rgba(255,230,0,0.28)] p-3 sm:p-5 flex flex-col max-h-[92dvh] relative">
         {/* Header */}
@@ -244,7 +245,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
 
           <div className="flex items-center gap-1.5 sm:gap-2">
             <div className="flex items-center gap-1 px-2 py-1 bg-amber-950/80 border border-amber-400/50 rounded-lg text-amber-300 font-bold text-[11px]">
-              <span>🪙</span>
+              <GameIcon id="currency.coins" fallback="🪙" size={14} />
               <span>{player.stats.coins}</span>
             </div>
             <div className="flex items-center gap-1 px-2 py-1 bg-cyan-950/80 border border-cyan-400/50 rounded-lg text-cyan-300 font-bold text-[11px]">
@@ -381,7 +382,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{item.icon}</span>
+                        <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={32} />
                         <div className="min-w-0">
                           <div className={`text-[10px] font-bold truncate ${r.titleClass}`}>
                             {getLocalizedItemName(item, language, { includeUpgrade: false })}
@@ -404,7 +405,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                   {player.inventory
                     .filter(i => selectedSellIds.includes(i.id))
                     .reduce((sum, i) => sum + getItemSellPrice(i), 0)}{' '}
-                  🪙
+                  <GameIcon id="currency.coins" fallback="🪙" size={12} />
                 </span>
                 <CanvasButton
                   label={`Vender (${selectedSellIds.length})`}
@@ -459,7 +460,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                           <div
                             className={`w-11 h-11 rounded-xl border flex flex-col items-center justify-center text-xl flex-shrink-0 ${rarityStyle.iconFrameClass}`}
                           >
-                            <span>{item.icon}</span>
+                            <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={28} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1.5">
@@ -578,7 +579,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                   <div
                     className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center text-3xl flex-shrink-0 ${pRarity.iconFrameClass}`}
                   >
-                    {previewItem.icon}
+                    <GameIcon id={previewItem.baseKey || previewItem.id} fallback={previewItem.icon} size={48} />
                   </div>
                   <div className="min-w-0">
                     <h3 className={`text-base font-bold leading-tight ${pRarity.titleClass}`}>

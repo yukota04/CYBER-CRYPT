@@ -4,6 +4,7 @@ import { getOfflineSaveSlotKey, OfflineSaveSlotKey, OfflineSaveState } from '../
 import { Language, t } from '../game/i18n';
 import { Shield, Zap, Sword, Cloud, Volume2, VolumeX, Wifi, WifiOff, CheckCircle2, Clock, Maximize2, Minimize2, Settings } from 'lucide-react';
 import { CanvasButton } from './CanvasButton';
+import { GameIcon } from './GameIcon';
 import { LanguageSelector } from './LanguageSelector';
 
 interface TitleScreenProps {
@@ -352,7 +353,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                       </span>
                     )}
                     <div className="p-2.5 rounded-full bg-slate-900/80 border border-white/15 mb-2 text-cyan-300">
-                      {card.icon}
+                      <GameIcon id={`ui.title.class_${card.cls}`} fallback={card.icon} size={22} />
                     </div>
                     <div className="font-bold text-white text-sm font-mono tracking-wide">
                       {t(card.titleKey, language)}
@@ -383,7 +384,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                     {savedOfflineRun.player.characterClass} · LV.{savedOfflineRun.player.stats.level} · F{savedOfflineRun.dungeon.floor}
                   </span>
                   <span className="text-amber-300">
-                    🪙 {savedOfflineRun.player.stats.coins} · 💎 {savedOfflineRun.player.stats.soulShards}
+                    <GameIcon id="currency.coins" fallback="🪙" size={14} /> {savedOfflineRun.player.stats.coins} · <GameIcon id="currency.soul_shards" fallback="💎" size={14} /> {savedOfflineRun.player.stats.soulShards}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-snug">{t('continueRunDesc', language)}</p>
@@ -494,7 +495,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-cyan-300">{card.icon}</span>
+                      <span className="text-cyan-300"><GameIcon id={`ui.title.class_${card.cls}`} fallback={card.icon} size={22} /></span>
                       {holder ? (
                         <span
                           className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
@@ -513,8 +514,8 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                     <div className="text-[10px] text-slate-400 mt-0.5">{card.weaponNote}</div>
                     {stash && (
                       <div className="mt-1.5 px-1.5 py-0.5 rounded bg-black/45 border border-cyan-500/30 text-[10px] text-cyan-200 flex flex-wrap gap-1.5">
-                        <span className="text-amber-300">🪙{stash.coins}</span>
-                        <span className="text-cyan-300">💎{stash.soulShards}</span>
+                        <span className="text-amber-300 inline-flex items-center gap-0.5"><GameIcon id="currency.coins" fallback="🪙" size={12} />{stash.coins}</span>
+                        <span className="text-cyan-300 inline-flex items-center gap-0.5"><GameIcon id="currency.soul_shards" fallback="💎" size={12} />{stash.soulShards}</span>
                         <span className="text-emerald-300">🎒{stashItemsCount}</span>
                         <span className="text-slate-400">· Lv.1</span>
                       </div>

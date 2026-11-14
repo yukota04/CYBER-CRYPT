@@ -4,6 +4,7 @@ import { Language, t } from '../game/i18n';
 import { getRarityStyle } from '../game/rarity';
 import { getLocalizedItemName } from '../game/itemI18n';
 import { X } from 'lucide-react';
+import { GameIcon } from './GameIcon';
 
 const TRADE_SLOTS = 6;
 
@@ -98,7 +99,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                       locked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'
                     }`}
                   >
-                    <span className="text-xl">{item.icon}</span>
+                    <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={32} />
                     <span className={`text-[8px] truncate w-full text-center ${r.titleClass}`}>
                       {getLocalizedItemName(item, language, { includeUpgrade: false, includeLevel: false })}
                     </span>
@@ -131,7 +132,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                   >
                     {item ? (
                       <>
-                        <span className="text-lg">{item.icon}</span>
+                        <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={28} />
                         <span className="text-[8px] truncate w-full text-center px-0.5">
                           {getLocalizedItemName(item, language)}
                         </span>
@@ -157,7 +158,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                   >
                     {item ? (
                       <>
-                        <span className="text-lg">{item.icon}</span>
+                        <GameIcon id={item.baseKey || item.id} fallback={item.icon} size={28} />
                         <span className="text-[8px] truncate w-full text-center px-0.5">
                           {getLocalizedItemName(item, language)}
                         </span>
