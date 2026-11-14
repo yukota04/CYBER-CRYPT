@@ -483,9 +483,9 @@ export default function App() {
         sfxCount++;
       }
       if (rendererRef.current) {
-        if (screenShake > 0) rendererRef.current.addTrauma(Math.min(0.35, screenShake));
-        // Visual-only micro freeze (does NOT pause movement/sim anymore)
-        if (hitstopSeconds > 0) rendererRef.current.triggerHitstop(Math.min(0.06, hitstopSeconds));
+        if (screenShake > 0) rendererRef.current.addTrauma(Math.min(0.45, screenShake));
+        // Visual hitstop freeze-frame + micro-shake (player movement keeps running in sim)
+        if (hitstopSeconds > 0) rendererRef.current.triggerHitstop(Math.min(0.16, hitstopSeconds));
         const maxFx = 3;
         for (let i = 0; i < attackEffects.length && i < maxFx; i++) {
           rendererRef.current.spawnAttackEffect(attackEffects[i]);
@@ -754,8 +754,8 @@ export default function App() {
         }
       }
 
-      // Offline free-movement simulation (player + mobs)
-      // Never freeze the sim for hitstop — that made combat feel "stuck".
+      // Offline free-movement simulation (player + mobs).
+      // Hitstop pauses monsters + freezes the camera/VFX; player movement stays free.
       // Pause only while inventory / skills / shop / options are open.
       if (
         gameStateRef.current === 'playing' &&
