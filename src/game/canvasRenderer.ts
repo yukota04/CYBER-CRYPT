@@ -98,6 +98,20 @@ export class CanvasRenderer {
     this.trauma = Math.min(1.0, this.trauma + amount);
   }
 
+  /** Drop VFX pools so title/hub can reclaim memory after a run. */
+  public releaseSession() {
+    this.trauma = 0;
+    this.hitstopTimer = 0;
+    this.damageVignette = 0;
+    this.attackAnim = 0;
+    this.moveBlend = 0;
+    this.attackEffects.length = 0;
+    this.remoteMove.clear();
+    for (const p of this.particles) p.active = false;
+    this.prevPlayerX = Number.NaN;
+    this.prevPlayerY = Number.NaN;
+  }
+
   public triggerHitstop(seconds: number) {
     if (seconds <= 0) return;
     const clamped = Math.max(0.03, Math.min(0.25, seconds));
@@ -639,26 +653,27 @@ export class CanvasRenderer {
     const ctx = this.ctx;
     const nowSec = performance.now() / 1000;
 
-    // Hitstop Freeze-Frame Handling (0.03s - 0.25s)
+    // Hitstop: brief FX freeze only — camera MUST keep following free-move player
+    // (freezing cam while the body keeps moving felt like broken controls).
     const isFrozen = this.hitstopTimer > 0;
     if (isFrozen) {
       this.hitstopTimer = Math.max(0, this.hitstopTimer - rawDt);
     }
     const simDt = isFrozen ? 0 : rawDt;
 
-    if (!isFrozen) {
-      const targetCamX = player.x * this.tileSize + this.tileSize / 2 - width / 2;
-      const targetCamY = player.y * this.tileSize + this.tileSize / 2 - height / 2;
-      this.cameraX += (targetCamX - this.cameraX) * 0.18;
-      this.cameraY += (targetCamY - this.cameraY) * 0.18;
-    }
+    const targetCamX = player.x * this.tileSize + this.tileSize / 2 - width / 2;
+    const targetCamY = player.y * this.tileSize + this.tileSize / 2 - height / 2;
+    // Snappier follow so movement doesn't feel laggy behind the camera
+    const camLerp = isFrozen ? 0.42 : 0.28;
+    this.cameraX += (targetCamX - this.cameraX) * camLerp;
+    this.cameraY += (targetCamY - this.cameraY) * camLerp;
 
     let shakeOffsetX = 0;
     let shakeOffsetY = 0;
     if (isFrozen) {
-      // Crisp micro-vibration during freeze frames for tactile impact punch
-      shakeOffsetX = (Math.random() * 2 - 1) * 3.5;
-      shakeOffsetY = (Math.random() * 2 - 1) * 3.5;
+      // Light micro-vibration (not a full freeze-frame of the world)
+      shakeOffsetX = (Math.random() * 2 - 1) * 2.2;
+      shakeOffsetY = (Math.random() * 2 - 1) * 2.2;
     } else if (this.trauma > 0) {
       const shakeMag = this.trauma * this.trauma * 14;
       shakeOffsetX = (Math.random() * 2 - 1) * shakeMag;

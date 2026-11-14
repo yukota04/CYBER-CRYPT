@@ -13,7 +13,6 @@ interface TouchControlsProps {
   onWaitTurn: () => void;
   onCastSkill: (skillId: string) => void;
   onRangedAttack: () => void;
-  /** Hold/release attack for free-move melee when Auto is off */
   onAttackHold?: (pressed: boolean) => void;
   autoAttack: boolean;
   onAutoAttackChange: (enabled: boolean) => void;
@@ -61,7 +60,6 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
 
   const castSkillNow = (skillId: string, isReady: boolean) => {
     if (!isReady) return;
-    // Debounce double-fire from pointerdown + click on some devices
     if (castLockRef.current.has(skillId)) return;
     castLockRef.current.add(skillId);
     window.setTimeout(() => castLockRef.current.delete(skillId), 220);
@@ -82,8 +80,8 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
     >
       <style>{`
         @keyframes skillReadyPulse {
-          0%, 100% { box-shadow: 0 0 10px rgba(0,240,255,0.35), 0 0 0 0 rgba(0,240,255,0.45); }
-          50% { box-shadow: 0 0 18px rgba(0,240,255,0.75), 0 0 0 8px rgba(0,240,255,0); }
+          0%, 100% { box-shadow: 0 0 10px rgba(0,240,255,0.35); }
+          50% { box-shadow: 0 0 18px rgba(0,240,255,0.75); }
         }
         @keyframes touchImpactRing {
           0% { transform: scale(0.55); opacity: 0.85; }
@@ -96,9 +94,8 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
       `}</style>
 
       <div className="pointer-events-auto flex flex-col items-end gap-1.5">
-        {/* Horizontal skill slide — tap casts immediately */}
         <div
-          className="max-w-[min(72vw,280px)] rounded-2xl border border-cyan-500/40 bg-[#0a0818]/88 backdrop-blur-sm px-1.5 pt-1.5 pb-1 shadow-[0_0_18px_rgba(0,240,255,0.18)]"
+          className="max-w-[min(72vw,280px)] rounded-2xl bg-[#0a0818]/75 backdrop-blur-sm px-1.5 pt-1.5 pb-1"
           data-testid="skill-slide-rail"
         >
           <div
@@ -106,9 +103,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
           >
             {unlockedSkills.length === 0 && (
-              <div className="text-[10px] text-slate-500 font-mono px-2 py-3 whitespace-nowrap">
-                —
-              </div>
+              <div className="text-[10px] text-slate-500 font-mono px-2 py-3 whitespace-nowrap">—</div>
             )}
             {unlockedSkills.map(skill => {
               const cd = player.activeCooldowns[skill.id] || 0;
@@ -124,6 +119,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
                   type="button"
                   data-testid={`orbit-skill-${skill.id}`}
                   data-no-ui-sfx="true"
+                  // Keep enabled so pointer events always fire; gate cast in handler
                   onPointerDown={e => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -131,16 +127,15 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
                     castSkillNow(skill.id, isReady);
                   }}
                   onClick={e => {
-                    // Fallback for devices that only emit click
                     e.stopPropagation();
                     castSkillNow(skill.id, isReady);
                   }}
-                  disabled={!isReady}
+                  aria-disabled={!isReady}
                   aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
-                  className={`relative shrink-0 flex items-center justify-center rounded-full border-2 transition-transform duration-75 ${
+                  className={`relative shrink-0 flex items-center justify-center rounded-full transition-transform duration-75 ${
                     isReady
-                      ? 'bg-cyan-950/95 border-cyan-300 text-white active:scale-[0.85]'
-                      : 'bg-slate-950/90 border-slate-600 text-slate-400 opacity-75'
+                      ? 'bg-cyan-950/90 text-white active:scale-[0.85]'
+                      : 'bg-slate-950/80 text-slate-400 opacity-70'
                   }`}
                   style={{
                     width: SKILL_BUBBLE,
@@ -179,7 +174,6 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
           </div>
         </div>
 
-        {/* AUTO + spherical ATK */}
         <div className="flex items-end gap-2.5 pr-0.5">
           <button
             type="button"
@@ -205,7 +199,7 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
             type="button"
             data-testid="mobile-attack-sphere"
             data-no-ui-sfx="true"
-            aria-label={`${t('rangedStrikeBtn', language)} (${attackRange})`}
+            aria-label={`${t('attackBtnLabel', language)} (${attackRange})`}
             onPointerDown={e => {
               e.preventDefault();
               e.stopPropagation();
@@ -213,7 +207,6 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
               setAtkPressed(true);
               triggerPressFx('atk');
               onAttackHold?.(true);
-              // Online / ranged fallback still fires on press
               onRangedAttack();
             }}
             onPointerUp={releaseAttack}
@@ -232,11 +225,8 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
               transform: atkPressed ? 'scale(0.86)' : 'scale(1)'
             }}
           >
-            <span className="text-2xl leading-none" aria-hidden>
-              🎯
-            </span>
-            <span className="text-[11px] leading-none mt-1 tracking-wide">ATK</span>
-            <span className="text-[9px] text-amber-300/90 leading-none mt-0.5">RNG {attackRange}</span>
+            <span className="text-sm leading-tight tracking-wide">{t('attackBtnLabel', language)}</span>
+            <span className="text-[9px] text-amber-300/90 leading-none mt-1">RNG {attackRange}</span>
             {pressFx?.id === 'atk' && (
               <>
                 <span
