@@ -3,6 +3,7 @@ import { GameItem, Player } from '../game/types';
 import { Language, t } from '../game/i18n';
 import { getRarityStyle } from '../game/rarity';
 import { getItemSellPrice } from '../game/items';
+import { getLocalizedItemDescription, getLocalizedItemName } from '../game/itemI18n';
 import { CanvasButton } from './CanvasButton';
 import {
   X,
@@ -382,7 +383,9 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="text-xl">{item.icon}</span>
                         <div className="min-w-0">
-                          <div className={`text-[10px] font-bold truncate ${r.titleClass}`}>{item.name}</div>
+                          <div className={`text-[10px] font-bold truncate ${r.titleClass}`}>
+                            {getLocalizedItemName(item, language, { includeUpgrade: false })}
+                          </div>
                           <div className="text-[9px] text-amber-300 mt-0.5">
                             Lv.{item.itemLevel || 1} · +{item.upgradeLevel || 0} · {price} 🪙
                           </div>
@@ -461,7 +464,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className={`font-bold text-xs sm:text-sm ${rarityStyle.titleClass}`}>
-                                {item.name}
+                                {getLocalizedItemName(item, language)}
                               </span>
                               <span
                                 data-testid={`rarity-badge-${item.rarity}`}
@@ -477,7 +480,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                             </div>
 
                             <p className="text-[11px] text-slate-300/90 max-w-md mt-0.5 leading-snug">
-                              {item.description}
+                              {getLocalizedItemDescription(item, language)}
                             </p>
 
                             {renderStatChips(item, false)}
@@ -490,7 +493,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                             data-testid={`shop-preview-btn-${item.id || idx}`}
                             onClick={() => setPreviewItem(item)}
                             className="min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 active:scale-95 border border-slate-500/50 hover:border-cyan-400 text-cyan-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                            aria-label={`${t('previewBtn', language)} ${item.name}`}
+                            aria-label={`${t('previewBtn', language)} ${getLocalizedItemName(item, language)}`}
                           >
                             <Eye className="w-3.5 h-3.5 text-cyan-400" />
                             <span>{t('previewBtn', language)}</span>
@@ -503,7 +506,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                             width={148}
                             height={38}
                             onClick={() => onBuyItem(item)}
-                            aria-label={`Buy ${item.name} for ${item.value} ${currency}`}
+                            aria-label={`Buy ${getLocalizedItemName(item, language)} for ${item.value} ${currency}`}
                           />
                         </div>
                       </div>
@@ -579,7 +582,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                   </div>
                   <div className="min-w-0">
                     <h3 className={`text-base font-bold leading-tight ${pRarity.titleClass}`}>
-                      {previewItem.name}
+                      {getLocalizedItemName(previewItem, language)}
                     </h3>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       <span className={`text-[10px] px-2 py-0.5 rounded border font-bold uppercase ${pRarity.badgeClass}`}>
@@ -593,7 +596,7 @@ export const ShopModal: React.FC<ShopModalProps> = ({
                 </div>
 
                 <p className="text-xs text-slate-200 leading-relaxed mt-3 p-2.5 rounded-lg bg-black/45 border border-slate-700/60">
-                  {previewItem.description}
+                  {getLocalizedItemDescription(previewItem, language)}
                 </p>
 
                 <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-300 px-1">

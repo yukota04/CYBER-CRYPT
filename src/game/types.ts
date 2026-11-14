@@ -108,6 +108,8 @@ export interface GameItem {
   /** Gear power level that scales with dungeon floor when dropped/bought */
   itemLevel?: number;
   attackRange?: number;
+  /** Catalog key used for localized name/description lookup */
+  baseKey?: string;
 }
 
 export type SkillActionType =

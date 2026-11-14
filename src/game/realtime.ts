@@ -14,6 +14,7 @@ import {
 import {
   applyMonsterDamageToPlayer,
   awardXP,
+  calculateHitstopSeconds,
   calculatePlayerDamage,
   collectDeathDropBagsAt,
   dropCoinsAround,
@@ -61,6 +62,8 @@ export interface RealtimeClock {
   lastFovTx: number;
   lastFovTy: number;
   fovAcc: number;
+  /** Brief world freeze on hit — player can still move; monsters pause for impact feel */
+  impactFreeze: number;
 }
 
 export function createRealtimeClock(): RealtimeClock {
@@ -72,7 +75,8 @@ export function createRealtimeClock(): RealtimeClock {
     lastVisible: [],
     lastFovTx: -9999,
     lastFovTy: -9999,
-    fovAcc: 0
+    fovAcc: 0,
+    impactFreeze: 0
   };
 }
 
@@ -493,8 +497,9 @@ function tryPlayerMelee(
   const killed = best.hp <= 0;
   clock.playerAttackCd = PLAYER_ATTACK_COOLDOWN;
 
-  // Realtime auto-melee: no gameplay hitstop (was freezing movement every swing)
-  hitstopSeconds = 0;
+  // Impact freeze for feel — short, stacks via max (player movement stays free in tickRealtime)
+  hitstopSeconds = calculateHitstopSeconds(damage, best.maxHp, isCrit, false, killed);
+  clock.impactFreeze = Math.max(clock.impactFreeze, Math.min(0.14, hitstopSeconds));
   attackEffects.push({
     type: isCrit ? 'crit_slash' : 'slash',
     x: player.x,
@@ -846,6 +851,10 @@ export function tickRealtime(
   let statusTicks = 0;
 
   clock.playerAttackCd = Math.max(0, clock.playerAttackCd - dt);
+  const inImpact = clock.impactFreeze > 0;
+  if (inImpact) {
+    clock.impactFreeze = Math.max(0, clock.impactFreeze - dt);
+  }
 
   // Wake nearby pending monsters (far rooms stay dormant → huge FPS win)
   activateNearbySpawns(dungeon, player.x, player.y, 11);
@@ -932,16 +941,19 @@ export function tickRealtime(
     deathDropCreated = interact.deathDropCreated;
   }
 
-  if (!floorCompleted && !gameOver) {
+  // During impact freeze: pause monster AI (player movement above stays full-speed)
+  if (!floorCompleted && !gameOver && !inImpact) {
     const mon = tickMonsters(player, dungeon, clock, dt, turn, logs, soundEvents, floatingTexts);
     screenShake += mon.screenShake;
   }
 
-  clock.statusAcc += dt;
-  while (clock.statusAcc >= STATUS_TICK_INTERVAL) {
-    clock.statusAcc -= STATUS_TICK_INTERVAL;
-    statusTicks++;
-    applyStatusTick(player, dungeon, turn + statusTicks, logs, soundEvents, floatingTexts);
+  if (!inImpact) {
+    clock.statusAcc += dt;
+    while (clock.statusAcc >= STATUS_TICK_INTERVAL) {
+      clock.statusAcc -= STATUS_TICK_INTERVAL;
+      statusTicks++;
+      applyStatusTick(player, dungeon, turn + statusTicks, logs, soundEvents, floatingTexts);
+    }
   }
 
   // FOV: incremental clear + throttle (~12 Hz) unless the player entered a new tile

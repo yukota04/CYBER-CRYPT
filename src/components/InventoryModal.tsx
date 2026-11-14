@@ -11,6 +11,7 @@ import {
 } from '../game/items';
 import { getTotalStats } from '../game/combat';
 import { getRarityStyle } from '../game/rarity';
+import { getLocalizedItemDescription, getLocalizedItemName } from '../game/itemI18n';
 import { X, Backpack, Shield, Hammer, Lock, AlertTriangle, Tv } from 'lucide-react';
 
 interface InventoryModalProps {
@@ -290,7 +291,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                             <div className={`absolute top-0 inset-x-0 h-0.5 ${rStyle.accentBarClass}`} />
                             <span className="text-xl">{item.icon}</span>
                             <span className={`text-[9px] truncate w-full text-center leading-tight font-semibold ${rStyle.titleClass}`}>
-                              {item.name}
+                              {getLocalizedItemName(item, language, { includeUpgrade: false, includeLevel: false })}
                             </span>
                             {(item.upgradeLevel || 0) > 0 && (
                               <span className="absolute top-0.5 right-1 text-[9px] font-bold text-amber-300">
@@ -358,7 +359,11 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         </span>
                         <span className="text-lg my-0.5">{eq ? eq.icon : blockedOffhand ? '🚫' : defaultIcon}</span>
                         <span className={`text-[10px] truncate max-w-full leading-tight font-semibold ${eqRarity ? eqRarity.titleClass : ''}`}>
-                          {eq ? eq.name : blockedOffhand ? '2H LOCK' : t('emptySlot', language)}
+                          {eq
+                            ? getLocalizedItemName(eq, language)
+                            : blockedOffhand
+                            ? '2H LOCK'
+                            : t('emptySlot', language)}
                         </span>
                         {eqRarity && eqRarity.tierNumber >= 2 && (
                           <span className="text-[8px] leading-none mt-0.5" style={{ color: eqRarity.hex }}>
@@ -433,7 +438,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                         >
                           <span className="text-2xl">{item.icon}</span>
                           <span className={`text-[9px] font-bold truncate w-full text-center ${rStyle.titleClass}`}>
-                            {item.name}
+                            {getLocalizedItemName(item, language, { includeUpgrade: false, includeLevel: false })}
                           </span>
                           <span className="text-[9px] text-cyan-300">
                             Lv.{item.itemLevel || 1} · +{item.upgradeLevel || 0}
@@ -461,7 +466,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className={`text-sm font-bold ${selRarity.titleClass}`}>{liveSelected.name}</h3>
+                      <h3 className={`text-sm font-bold ${selRarity.titleClass}`}>
+                        {getLocalizedItemName(liveSelected, language)}
+                      </h3>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
                         <span className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border ${selRarity.badgeClass}`}>
                           {selRarity.stars} {selRarity.label}
@@ -490,7 +497,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   </div>
 
                   <p className="text-xs text-slate-300 mt-3 leading-relaxed border-t border-slate-800 pt-2">
-                    {liveSelected.description}
+                    {getLocalizedItemDescription(liveSelected, language)}
                   </p>
 
                   {/* Effective Stat Modifiers (including upgrades) */}
@@ -626,7 +633,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               </div>
 
               <div className={`text-sm font-bold ${dRarity.titleClass}`}>
-                {destroyedItemPendingRecovery.name}
+                {getLocalizedItemName(destroyedItemPendingRecovery, language)}
               </div>
               <span className={`text-[10px] mt-1 px-2 py-0.5 rounded uppercase font-bold border ${dRarity.badgeClass}`}>
                 {dRarity.stars} {dRarity.label} · LVL +{destroyedItemPendingRecovery.upgradeLevel || 0}
