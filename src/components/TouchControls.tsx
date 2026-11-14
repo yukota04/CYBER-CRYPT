@@ -20,12 +20,17 @@ interface TouchControlsProps {
   hideDpad?: boolean;
 }
 
-const SKILL_BUBBLE = 54;
-const ATK_SIZE = 86;
-const AUTO_SIZE = 52;
+const SKILL_BUBBLE = 56;
+const SKILL_GAP = 10;
+const SKILLS_VISIBLE = 3;
+const ATK_SIZE = 92;
+const AUTO_SIZE = 58;
+/** Viewport width for exactly 3 skill bubbles + gaps (no 4th peeking). */
+const SKILL_VIEWPORT =
+  SKILLS_VISIBLE * SKILL_BUBBLE + (SKILLS_VISIBLE - 1) * SKILL_GAP;
 
 /**
- * Mobile combat: horizontal skill slide (tap-to-cast) + spherical ATK + AUTO toggle.
+ * Mobile combat: horizontal skill slide (3 visible) + spherical ATK + AUTO toggle.
  */
 export const TouchControls: React.FC<TouchControlsProps> = ({
   player,
@@ -74,7 +79,11 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
 
   return (
     <div
-      className="sm:hidden fixed bottom-8 right-2 z-20 pointer-events-none select-none"
+      className="sm:hidden fixed z-20 pointer-events-none select-none"
+      style={{
+        right: 8,
+        bottom: 'max(1.25rem, env(safe-area-inset-bottom, 0px))'
+      }}
       data-no-joystick
       data-testid="mobile-combat-cluster"
     >
@@ -93,88 +102,97 @@ export const TouchControls: React.FC<TouchControlsProps> = ({
         }
       `}</style>
 
-      <div className="pointer-events-auto flex flex-col items-end gap-1.5">
+      <div className="pointer-events-auto flex flex-col items-end gap-3">
         <div
-          className="max-w-[min(72vw,280px)] rounded-2xl bg-[#0a0818]/75 backdrop-blur-sm px-1.5 pt-1.5 pb-1"
+          className="rounded-2xl bg-[#0a0818]/80 backdrop-blur-sm px-2.5 pt-2.5 pb-2"
           data-testid="skill-slide-rail"
+          style={{ width: SKILL_VIEWPORT + 20 }}
         >
           <div
-            className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain touch-pan-x pb-0.5 px-0.5"
-            style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
+            className="overflow-x-auto overscroll-x-contain touch-pan-x"
+            style={{
+              width: SKILL_VIEWPORT,
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none'
+            }}
           >
-            {unlockedSkills.length === 0 && (
-              <div className="text-[10px] text-slate-500 font-mono px-2 py-3 whitespace-nowrap">—</div>
-            )}
-            {unlockedSkills.map(skill => {
-              const cd = player.activeCooldowns[skill.id] || 0;
-              const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
-              const canAfford = player.stats.energy >= energyNeeded;
-              const isReady = cd <= 0 && canAfford;
-              const cdSec = Math.max(0, cd);
-              const showImpact = pressFx?.id === skill.id;
+            <div className="flex items-center" style={{ gap: SKILL_GAP, minHeight: SKILL_BUBBLE + 4 }}>
+              {unlockedSkills.length === 0 && (
+                <div className="text-[10px] text-slate-500 font-mono px-2 py-3 whitespace-nowrap">—</div>
+              )}
+              {unlockedSkills.map(skill => {
+                const cd = player.activeCooldowns[skill.id] || 0;
+                const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
+                const canAfford = player.stats.energy >= energyNeeded;
+                const isReady = cd <= 0 && canAfford;
+                const cdSec = Math.max(0, cd);
+                const showImpact = pressFx?.id === skill.id;
 
-              return (
-                <button
-                  key={skill.id}
-                  type="button"
-                  data-testid={`orbit-skill-${skill.id}`}
-                  data-no-ui-sfx="true"
-                  // Keep enabled so pointer events always fire; gate cast in handler
-                  onPointerDown={e => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-                    castSkillNow(skill.id, isReady);
-                  }}
-                  onClick={e => {
-                    e.stopPropagation();
-                    castSkillNow(skill.id, isReady);
-                  }}
-                  aria-disabled={!isReady}
-                  aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
-                  className={`relative shrink-0 flex items-center justify-center rounded-full transition-transform duration-75 ${
-                    isReady
-                      ? 'bg-cyan-950/90 text-white active:scale-[0.85]'
-                      : 'bg-slate-950/80 text-slate-400 opacity-70'
-                  }`}
-                  style={{
-                    width: SKILL_BUBBLE,
-                    height: SKILL_BUBBLE,
-                    animation: isReady ? 'skillReadyPulse 1.6s ease-in-out infinite' : undefined,
-                    transform: showImpact ? 'scale(0.86)' : undefined
-                  }}
-                >
-                  <GameIcon id={skill.id} fallback={skill.icon} size={26} className="relative z-[1]" />
-                  {cdSec > 0 && (
-                    <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300 z-[2]">
-                      {cdSec}
-                    </span>
-                  )}
-                  {showImpact && (
-                    <>
-                      <span
-                        className="absolute inset-0 rounded-full border-2 border-cyan-200 pointer-events-none z-[3]"
-                        style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
-                      />
-                      <span
-                        className="absolute inset-0 rounded-full bg-cyan-300/40 pointer-events-none z-[3]"
-                        style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
-                      />
-                    </>
-                  )}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    data-testid={`orbit-skill-${skill.id}`}
+                    data-no-ui-sfx="true"
+                    onPointerDown={e => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                      castSkillNow(skill.id, isReady);
+                    }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      castSkillNow(skill.id, isReady);
+                    }}
+                    aria-disabled={!isReady}
+                    aria-label={`Skill ${skill.name}${cd > 0 ? ` cooldown ${cd}` : ''}`}
+                    className={`relative shrink-0 flex items-center justify-center rounded-full transition-transform duration-75 ${
+                      isReady
+                        ? 'bg-cyan-950/90 text-white active:scale-[0.85]'
+                        : 'bg-slate-950/80 text-slate-400 opacity-70'
+                    }`}
+                    style={{
+                      width: SKILL_BUBBLE,
+                      height: SKILL_BUBBLE,
+                      animation: isReady ? 'skillReadyPulse 1.6s ease-in-out infinite' : undefined,
+                      transform: showImpact ? 'scale(0.86)' : undefined
+                    }}
+                  >
+                    <GameIcon id={skill.id} fallback={skill.icon} size={26} className="relative z-[1]" />
+                    {cdSec > 0 && (
+                      <span className="absolute inset-0 rounded-full bg-black/70 flex items-center justify-center text-[12px] font-bold text-pink-300 z-[2]">
+                        {cdSec}
+                      </span>
+                    )}
+                    {showImpact && (
+                      <>
+                        <span
+                          className="absolute inset-0 rounded-full border-2 border-cyan-200 pointer-events-none z-[3]"
+                          style={{ animation: 'touchImpactRing 0.28s ease-out forwards' }}
+                        />
+                        <span
+                          className="absolute inset-0 rounded-full bg-cyan-300/40 pointer-events-none z-[3]"
+                          style={{ animation: 'touchImpactFlash 0.22s ease-out forwards' }}
+                        />
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div
-            className="text-center text-[9px] text-cyan-300/90 font-mono tracking-wide pt-0.5 pb-0.5 pointer-events-none"
+            className="text-center text-[9px] text-cyan-300/90 font-mono tracking-wide pt-1.5 pb-0.5 pointer-events-none"
             data-testid="skill-slide-hint"
           >
             {t('skillSlideHint', language)}
           </div>
         </div>
 
-        <div className="flex items-end gap-2.5 pr-0.5">
+        <div
+          className="flex items-center gap-3 pr-0.5 min-h-[96px]"
+          data-testid="mobile-attack-row"
+        >
           <button
             type="button"
             data-testid="auto-attack-toggle"

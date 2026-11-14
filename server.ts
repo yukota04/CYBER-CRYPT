@@ -276,50 +276,73 @@ function readJsonFile(): any | null {
 }
 
 function seedDefaults() {
-  // Seed initial operatives with ephemeral cryptographically strong passwords/tokens (no hardcoded weak secrets)
+  // Only INSERT missing seed accounts — never overwrite existing Neon-hydrated users/tokens.
   const adminPwd = process.env.ADMIN_SEED_PASSWORD || crypto.randomBytes(16).toString('hex');
   const demoPwd = process.env.DEMO_SEED_PASSWORD || crypto.randomBytes(16).toString('hex');
 
-  const adminUser: ServerUser = {
-    id: 'usr_admin',
-    login: 'admin',
-    username: 'AdminOverlord',
-    role: 'admin',
-    passwordHash: hashPassword(adminPwd),
-    token: generateSessionToken('tok_adm'),
-    email: 'admin@cybercrypt.io',
-    devices: [{ deviceId: 'dev_adm_1', platform: 'Desktop Chrome / Linux', lastSeen: Date.now() }],
-    createdAt: Date.now() - 86400000 * 7
-  };
+  if (!users.has('usr_admin')) {
+    users.set('usr_admin', {
+      id: 'usr_admin',
+      login: 'admin',
+      username: 'AdminOverlord',
+      role: 'admin',
+      passwordHash: hashPassword(adminPwd),
+      token: generateSessionToken('tok_adm'),
+      email: 'admin@cybercrypt.io',
+      devices: [{ deviceId: 'dev_adm_1', platform: 'Desktop Chrome / Linux', lastSeen: Date.now() }],
+      createdAt: Date.now() - 86400000 * 7
+    });
+  }
 
-  const demoUser: ServerUser = {
-    id: 'usr_demo',
-    login: 'neonvalkyrie',
-    username: 'NeonValkyrie',
-    role: 'player',
-    passwordHash: hashPassword(demoPwd),
-    token: generateSessionToken('tok_ply'),
-    email: 'valkyrie@cybercrypt.io',
-    devices: [{ deviceId: 'dev_mbl_1', platform: 'Mobile Safari / iOS', lastSeen: Date.now() }],
-    createdAt: Date.now() - 86400000 * 3
-  };
+  if (!users.has('usr_demo')) {
+    users.set('usr_demo', {
+      id: 'usr_demo',
+      login: 'neonvalkyrie',
+      username: 'NeonValkyrie',
+      role: 'player',
+      passwordHash: hashPassword(demoPwd),
+      token: generateSessionToken('tok_ply'),
+      email: 'valkyrie@cybercrypt.io',
+      devices: [{ deviceId: 'dev_mbl_1', platform: 'Mobile Safari / iOS', lastSeen: Date.now() }],
+      createdAt: Date.now() - 86400000 * 3
+    });
+  }
 
-  users.set(adminUser.id, adminUser);
-  users.set(demoUser.id, demoUser);
-  friends.set(adminUser.id, new Set([demoUser.id]));
-  friends.set(demoUser.id, new Set([adminUser.id]));
+  if (!friends.has('usr_admin')) friends.set('usr_admin', new Set(['usr_demo']));
+  if (!friends.has('usr_demo')) friends.set('usr_demo', new Set(['usr_admin']));
 }
 
 async function loadDatabaseOrSeed() {
+  if (process.env.NODE_ENV === 'production' && !pgStore) {
+    throw new Error(
+      '[CYBER-CRYPT] DATABASE_URL is required in production. Without Neon, every Render redeploy wipes accounts (ephemeral disk).'
+    );
+  }
+
   if (pgStore) {
     await pgStore.migrate();
-    const snap = await pgStore.load();
+    let snap: PersistedSnapshot | null = null;
+    try {
+      snap = await pgStore.load();
+    } catch (err) {
+      // Fail closed — never seedDefaults+flush over a Neon that we failed to read
+      // (that used to DELETE surviving rows via the in-memory diff).
+      console.error('[CYBER-CRYPT][db] Neon load failed — refusing to start with empty memory:', err);
+      throw err;
+    }
     if (snap) {
       applyRawState({ ...snap.kv, users: snap.users, cloudSaves: snap.cloudSaves, onlineLoadouts: snap.onlineLoadouts });
       console.log(`[CYBER-CRYPT][db] loaded ${users.size} accounts and ${cloudSaves.size} cloud saves from Neon Postgres`);
       return;
     }
-    // First boot against an empty database: migrate the legacy JSON store if present.
+    // Double-check: load() returned null, but rows might still exist if schema drifted.
+    const existing = await pgStore.countUsers();
+    if (existing > 0) {
+      throw new Error(
+        `[CYBER-CRYPT][db] Neon reports ${existing} users but load() returned empty — aborting to protect accounts`
+      );
+    }
+    // First boot against a truly empty database: migrate the legacy JSON store if present.
     const legacy = readJsonFile();
     if (legacy) {
       applyRawState(legacy);
@@ -328,6 +351,7 @@ async function loadDatabaseOrSeed() {
       seedDefaults();
     }
     await flushPersistence();
+    pgStore.enableRowDeletes();
     return;
   }
 
@@ -414,7 +438,9 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     uptime: process.uptime(),
     timestamp: Date.now(),
-    persistence: PERSISTENCE_MODE
+    persistence: PERSISTENCE_MODE,
+    accounts: users.size,
+    neonHydrated: pgStore ? pgStore.isHydrated : false
   });
 });
 

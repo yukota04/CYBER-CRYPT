@@ -10,9 +10,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Must stay stable across deploys — rotating this invalidates encrypted cloud saves.
       - key: CLOUD_SAVE_SECRET
-        generateValue: true
+        sync: false
       - key: APP_URL
         value: https://cyber-crypt.onrender.com
+      # Neon Postgres — required so accounts survive Render redeploys (ephemeral disk).
       - key: DATABASE_URL
         sync: false

@@ -119,7 +119,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
     >
       {/* Active capture zone — left half, above bottom skill bar */}
       <div
-        className="absolute left-0 top-0 bottom-24 w-[48%] pointer-events-auto"
+        className="absolute left-0 top-0 bottom-36 w-[48%] pointer-events-auto"
         style={{ touchAction: 'none' }}
         onPointerDown={handleZoneDown}
         aria-hidden
@@ -129,7 +129,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
       {!active && !disabled && (
         <div
           data-testid="virtual-joystick-hint"
-          className="absolute left-4 bottom-28 w-[148px] h-[148px] rounded-full border-2 border-cyan-400/35 bg-cyan-950/25 pointer-events-none flex items-center justify-center"
+          className="absolute left-4 bottom-36 w-[148px] h-[148px] rounded-full border-2 border-cyan-400/35 bg-cyan-950/25 pointer-events-none flex items-center justify-center"
         >
           <div className="w-[72px] h-[72px] rounded-full bg-cyan-400/20 border border-cyan-300/40 shadow-[0_0_18px_rgba(0,240,255,0.25)]" />
         </div>

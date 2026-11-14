@@ -79,6 +79,12 @@ export class PostgresStore {
   private persisted = new Map<Table, Map<string, string>>();
   private flushing: Promise<void> | null = null;
   private pending: PersistedSnapshot | null = null;
+  /**
+   * Diff-driven DELETEs are dangerous: a boot that failed to hydrate memory then
+   * flushed would wipe Neon accounts. Only enable after a successful load (or an
+   * intentional first-time seed of an empty database).
+   */
+  private rowDeletesEnabled = false;
 
   constructor(connectionString: string) {
     const opts = { connectionString, max: 5, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 15_000 };
@@ -125,6 +131,21 @@ export class PostgresStore {
     }
   }
 
+  /** Enable cascading row deletes in writeDiff (call only after hydrate or first seed). */
+  enableRowDeletes() {
+    this.rowDeletesEnabled = true;
+  }
+
+  /** True once Neon was successfully read into the in-memory diff baseline. */
+  get isHydrated(): boolean {
+    return this.rowDeletesEnabled;
+  }
+
+  async countUsers(): Promise<number> {
+    const { rows } = await this.pool.query('SELECT COUNT(*)::int AS n FROM cc_users');
+    return Number(rows[0]?.n || 0);
+  }
+
   /** Returns null when the database has never been populated. */
   async load(): Promise<PersistedSnapshot | null> {
     const [users, saves, loadouts, kv] = await Promise.all([
@@ -152,6 +173,8 @@ export class PostgresStore {
       snap.kv[r.key] = r.value;
       this.persisted.get('cc_kv')!.set(r.key, JSON.stringify(r.value));
     }
+    // Hydrated from Neon — safe to mirror removals later
+    this.rowDeletesEnabled = true;
     return snap;
   }
 
@@ -216,9 +239,16 @@ export class PostgresStore {
           await this.upsert(client, table, id, json, obj);
           committed.push([table, id, json]);
         }
+        // NEVER delete accounts via incomplete in-memory snapshots (deploy / failed hydrate).
+        // Other tables may sync deletes only after a successful Neon load.
+        if (table === 'cc_users') {
+          // Accounts are append/upsert only — never cascade-delete from memory diffs.
+          continue;
+        }
+        if (!this.rowDeletesEnabled) continue;
         const removed = [...prev.keys()].filter(id => !cur.has(id));
         if (removed.length) {
-          const col = table === 'cc_users' ? 'id' : table === 'cc_cloud_saves' ? 'user_id' : table === 'cc_kv' ? 'key' : 'stash_key';
+          const col = table === 'cc_cloud_saves' ? 'user_id' : table === 'cc_kv' ? 'key' : 'stash_key';
           await client.query(`DELETE FROM ${table} WHERE ${col} = ANY($1::text[])`, [removed]);
           for (const id of removed) committed.push([table, id, null]);
         }
