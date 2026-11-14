@@ -14,7 +14,6 @@ import {
 import {
   applyMonsterDamageToPlayer,
   awardXP,
-  calculateHitstopSeconds,
   calculatePlayerDamage,
   collectDeathDropBagsAt,
   dropCoinsAround,
@@ -124,11 +123,18 @@ function isWalkableAt(dungeon: DungeonState, tx: number, ty: number): boolean {
   return !!dungeon.tiles[ty]?.[tx]?.walkable;
 }
 
-/** True if the entity body at (x,y) only overlaps walkable tiles. */
+/** True if the entity body at (x,y) only overlaps walkable tiles (no array alloc). */
 export function canOccupy(dungeon: DungeonState, x: number, y: number, body = ENTITY_BODY): boolean {
-  const tiles = occupiedTiles(x, y, body);
-  if (tiles.length === 0) return false;
-  return tiles.every(t => isWalkableAt(dungeon, t.tx, t.ty));
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const x1 = Math.floor(x + body - 1e-4);
+  const y1 = Math.floor(y + body - 1e-4);
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      if (!isWalkableAt(dungeon, tx, ty)) return false;
+    }
+  }
+  return true;
 }
 
 function centersOverlap(
@@ -138,17 +144,64 @@ function centersOverlap(
   by: number,
   minDist = ENTITY_BODY * 0.55
 ): boolean {
-  const a = entityCenter(ax, ay);
-  const b = entityCenter(bx, by);
-  const dx = a.cx - b.cx;
-  const dy = a.cy - b.cy;
+  const acx = ax + ENTITY_BODY * 0.5;
+  const acy = ay + ENTITY_BODY * 0.5;
+  const bcx = bx + ENTITY_BODY * 0.5;
+  const bcy = by + ENTITY_BODY * 0.5;
+  const dx = acx - bcx;
+  const dy = acy - bcy;
   return dx * dx + dy * dy < minDist * minDist;
 }
 
 function distanceCenters(ax: number, ay: number, bx: number, by: number): number {
-  const a = entityCenter(ax, ay);
-  const b = entityCenter(bx, by);
-  return Math.hypot(a.cx - b.cx, a.cy - b.cy);
+  const acx = ax + ENTITY_BODY * 0.5;
+  const acy = ay + ENTITY_BODY * 0.5;
+  const bcx = bx + ENTITY_BODY * 0.5;
+  const bcy = by + ENTITY_BODY * 0.5;
+  return Math.hypot(acx - bcx, acy - bcy);
+}
+
+type Blocker = { x: number; y: number; id?: string };
+
+/** Sparse spatial hash so entity checks are O(neighbors), not O(all monsters). */
+function buildSpatialHash(blockers: Blocker[]): Map<number, Blocker[]> {
+  const map = new Map<number, Blocker[]>();
+  for (let i = 0; i < blockers.length; i++) {
+    const b = blockers[i];
+    const cx = Math.floor(b.x + ENTITY_BODY * 0.5);
+    const cy = Math.floor(b.y + ENTITY_BODY * 0.5);
+    const key = cx * 4096 + cy;
+    let bucket = map.get(key);
+    if (!bucket) {
+      bucket = [];
+      map.set(key, bucket);
+    }
+    bucket.push(b);
+  }
+  return map;
+}
+
+function entityBlockedAt(
+  hash: Map<number, Blocker[]>,
+  px: number,
+  py: number,
+  selfId: string | undefined,
+  minDist: number
+): boolean {
+  const cx = Math.floor(px + ENTITY_BODY * 0.5);
+  const cy = Math.floor(py + ENTITY_BODY * 0.5);
+  for (let oy = -1; oy <= 1; oy++) {
+    for (let ox = -1; ox <= 1; ox++) {
+      const bucket = hash.get((cx + ox) * 4096 + (cy + oy));
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        const b = bucket[i];
+        if (selfId && b.id === selfId) continue;
+        if (centersOverlap(px, py, b.x, b.y, minDist)) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function facingVector(facing: Player['facing']): { fx: number; fy: number } {
@@ -243,7 +296,11 @@ function monsterAttackRange(m: Monster): number {
   }
 }
 
-/** Axis-separated slide + corner assist into narrow corridors. */
+/**
+ * Axis-separated slide + optional corner assist.
+ * Pass a prebuilt spatial hash (or null to skip entity blocking).
+ * `allowCornerSlide` is for the player only — monsters use the cheap path.
+ */
 export function moveWithCollision(
   dungeon: DungeonState,
   x: number,
@@ -251,30 +308,27 @@ export function moveWithCollision(
   vx: number,
   vy: number,
   dt: number,
-  blockers: Array<{ x: number; y: number; id?: string }>,
-  selfId?: string
+  blockers: Array<{ x: number; y: number; id?: string }> | Map<number, Blocker[]>,
+  selfId?: string,
+  allowCornerSlide = true
 ): { x: number; y: number; hitWall: boolean } {
-  const blockedByEntity = (px: number, py: number) =>
-    blockers.some(b => b.id !== selfId && centersOverlap(px, py, b.x, b.y, ENTITY_BODY * 0.5));
+  const hash =
+    blockers instanceof Map ? blockers : buildSpatialHash(blockers as Blocker[]);
+  const minDist = ENTITY_BODY * 0.5;
 
   const tryPos = (px: number, py: number) =>
-    canOccupy(dungeon, px, py) && !blockedByEntity(px, py);
+    canOccupy(dungeon, px, py) && !entityBlockedAt(hash, px, py, selfId, minDist);
 
-  const clamp = (px: number, py: number) => ({
-    x: Math.max(0, Math.min(dungeon.width - ENTITY_BODY, px)),
-    y: Math.max(0, Math.min(dungeon.height - ENTITY_BODY, py))
-  });
+  const clampX = (px: number) => Math.max(0, Math.min(dungeon.width - ENTITY_BODY, px));
+  const clampY = (py: number) => Math.max(0, Math.min(dungeon.height - ENTITY_BODY, py));
 
   const wantX = x + vx * dt;
   const wantY = y + vy * dt;
 
-  // Free move
   if (tryPos(wantX, wantY)) {
-    const c = clamp(wantX, wantY);
-    return { x: c.x, y: c.y, hitWall: false };
+    return { x: clampX(wantX), y: clampY(wantY), hitWall: false };
   }
 
-  // Axis-separated wall slide
   let nx = x;
   let ny = y;
   let hitWall = false;
@@ -283,51 +337,37 @@ export function moveWithCollision(
   if (tryPos(nx, wantY)) ny = wantY;
   else hitWall = true;
 
-  const moved = Math.abs(nx - x) + Math.abs(ny - y);
-  const speed = Math.hypot(vx, vy);
+  if (allowCornerSlide) {
+    const moved = Math.abs(nx - x) + Math.abs(ny - y);
+    const speed = Math.hypot(vx, vy);
+    if (speed > 0.1 && moved < Math.abs(vx * dt) * 0.35 + Math.abs(vy * dt) * 0.35 + 1e-4) {
+      // Fewer probe steps than before — still slips into corridors
+      const steps = [0.12, 0.26, CORNER_SLIDE_MAX];
+      const horizDominant = Math.abs(vx) >= Math.abs(vy);
 
-  // Corner slide: when stuck (or barely moving) against a corner, nudge
-  // perpendicular to the dominant travel axis so the body slips into the gap.
-  if (speed > 0.1 && moved < Math.abs(vx * dt) * 0.35 + Math.abs(vy * dt) * 0.35 + 1e-4) {
-    const steps = [0.06, 0.12, 0.18, 0.26, 0.34, CORNER_SLIDE_MAX];
-    const horizDominant = Math.abs(vx) >= Math.abs(vy);
-
-    if (horizDominant && Math.abs(vx) > 0.05) {
-      for (const s of steps) {
-        for (const sign of [-1, 1] as const) {
-          const slideY = y + sign * s;
-          // Prefer full forward + slide; fall back to partial forward
-          if (tryPos(wantX, slideY)) {
-            const c = clamp(wantX, slideY);
-            return { x: c.x, y: c.y, hitWall: false };
-          }
-          const midX = x + vx * dt * 0.55;
-          if (tryPos(midX, slideY)) {
-            const c = clamp(midX, slideY);
-            return { x: c.x, y: c.y, hitWall: false };
+      if (horizDominant && Math.abs(vx) > 0.05) {
+        for (const s of steps) {
+          for (const sign of [-1, 1] as const) {
+            const slideY = y + sign * s;
+            if (tryPos(wantX, slideY)) {
+              return { x: clampX(wantX), y: clampY(slideY), hitWall: false };
+            }
           }
         }
-      }
-    } else if (Math.abs(vy) > 0.05) {
-      for (const s of steps) {
-        for (const sign of [-1, 1] as const) {
-          const slideX = x + sign * s;
-          if (tryPos(slideX, wantY)) {
-            const c = clamp(slideX, wantY);
-            return { x: c.x, y: c.y, hitWall: false };
-          }
-          const midY = y + vy * dt * 0.55;
-          if (tryPos(slideX, midY)) {
-            const c = clamp(slideX, midY);
-            return { x: c.x, y: c.y, hitWall: false };
+      } else if (Math.abs(vy) > 0.05) {
+        for (const s of steps) {
+          for (const sign of [-1, 1] as const) {
+            const slideX = x + sign * s;
+            if (tryPos(slideX, wantY)) {
+              return { x: clampX(slideX), y: clampY(wantY), hitWall: false };
+            }
           }
         }
       }
     }
   }
 
-  const c = clamp(nx, ny);
-  return { x: c.x, y: c.y, hitWall };
+  return { x: clampX(nx), y: clampY(ny), hitWall };
 }
 
 function clonePlayer(player: Player): Player {
@@ -464,7 +504,8 @@ function tryPlayerMelee(
   const killed = best.hp <= 0;
   clock.playerAttackCd = PLAYER_ATTACK_COOLDOWN;
 
-  hitstopSeconds = calculateHitstopSeconds(damage, best.maxHp, isCrit, false, killed);
+  // Realtime auto-melee: no gameplay hitstop (was freezing movement every swing)
+  hitstopSeconds = 0;
   attackEffects.push({
     type: isCrit ? 'crit_slash' : 'slash',
     x: player.x,
@@ -482,15 +523,18 @@ function tryPlayerMelee(
     isCrit
   });
   soundEvents.push(isCrit ? 'crit' : 'hit');
-  screenShake = isCrit ? 0.25 : 0.12;
-  logs.unshift({
-    id: `log_rt_atk_${Date.now()}`,
-    text: isCrit
-      ? `CRITICAL STRIKE! You strike ${best.name} for ${damage}!`
-      : `You strike ${best.name} for ${damage}.`,
-    type: isCrit ? 'critical' : 'player_attack',
-    turn
-  });
+  screenShake = isCrit ? 0.18 : 0.08;
+  // Skip combat-log spam for every auto-swing (React setState storms in crowds)
+  if (killed || isCrit) {
+    logs.unshift({
+      id: `log_rt_atk_${Date.now()}`,
+      text: isCrit
+        ? `CRITICAL STRIKE! You strike ${best.name} for ${damage}!`
+        : `You strike ${best.name} for ${damage}.`,
+      type: isCrit ? 'critical' : 'player_attack',
+      turn
+    });
+  }
 
   if (killed) {
     const idx = dungeon.monsters.findIndex(m => m.id === best!.id);
@@ -519,10 +563,18 @@ function tickMonsters(
 ): { screenShake: number } {
   let screenShake = 0;
   const envDmgMult = dungeon.activeEvent?.id === 'emp_surge' ? 1.15 : 1.0;
-  const blockers = [
-    { x: player.x, y: player.y, id: 'player' },
-    ...dungeon.monsters.map(m => ({ x: m.x, y: m.y, id: m.id }))
-  ];
+  const pTotals = getTotalStats(player);
+
+  // Build spatial hash once per tick (player + monsters)
+  const blockerList: Blocker[] = [{ x: player.x, y: player.y, id: 'player' }];
+  for (let i = 0; i < dungeon.monsters.length; i++) {
+    const m = dungeon.monsters[i];
+    blockerList.push({ x: m.x, y: m.y, id: m.id });
+  }
+  const spatial = buildSpatialHash(blockerList);
+
+  let alertSfxBudget = 1;
+  let attackSfxBudget = 2;
 
   for (const monster of dungeon.monsters) {
     clock.monsterAttackCd[monster.id] = Math.max(0, (clock.monsterAttackCd[monster.id] || 0) - dt);
@@ -534,32 +586,39 @@ function tickMonsters(
 
     if (!monster.alerted && (isVisible || dist <= 5)) {
       monster.alerted = true;
-      soundEvents.push('monster_alert');
+      if (alertSfxBudget > 0) {
+        soundEvents.push('monster_alert');
+        alertSfxBudget--;
+      }
     }
     if (!monster.alerted) continue;
 
-    // Far-away alerted packs: skip heavy chase/collision until the player is near
-    if (dist > 14 && monster.archetype !== 'core_synthesizer') continue;
+    // Far packs: skip chase until near (bosses always active)
+    if (dist > 12 && monster.archetype !== 'core_synthesizer') continue;
 
     const range = monsterAttackRange(monster);
     const cd = clock.monsterAttackCd[monster.id] || 0;
 
-    // Attack when in range
     if (dist <= range && cd <= 0) {
-      const pTotals = getTotalStats(player);
       if (monster.archetype === 'neon_stalker' && dist > 1.2) {
         const baseRanged = Math.max(1, monster.attack - 2 - Math.floor(pTotals.defense * 0.5));
         const rangedDmg = Math.max(1, Math.floor(baseRanged * envDmgMult));
-        soundEvents.push('monster_attack_stalker');
+        if (attackSfxBudget > 0) {
+          soundEvents.push('monster_attack_stalker');
+          attackSfxBudget--;
+        }
         applyMonsterDamageToPlayer(player, rangedDmg, monster.name, logs, soundEvents, floatingTexts, turn);
         clock.monsterAttackCd[monster.id] = monsterAttackCooldown(monster);
-        screenShake += 0.1;
+        screenShake += 0.08;
         continue;
       }
       if (monster.archetype === 'circuit_disruptor' && dist > 1.15) {
         player.stats.energy = Math.max(0, player.stats.energy - 8);
         const zapDmg = Math.max(1, Math.floor(monster.attack * 0.6 * envDmgMult));
-        soundEvents.push('monster_attack_disruptor');
+        if (attackSfxBudget > 0) {
+          soundEvents.push('monster_attack_disruptor');
+          attackSfxBudget--;
+        }
         applyMonsterDamageToPlayer(player, zapDmg, `${monster.name} (EMP Arc)`, logs, soundEvents, floatingTexts, turn);
         clock.monsterAttackCd[monster.id] = monsterAttackCooldown(monster);
         continue;
@@ -568,30 +627,46 @@ function tickMonsters(
         const mult = monster.archetype === 'cyber_behemoth' ? 2 : 1;
         const baseRaw = Math.max(1, monster.attack * mult - Math.floor(pTotals.defense * 0.6));
         const rawDmg = Math.max(1, Math.floor(baseRaw * envDmgMult));
-        soundEvents.push(
-          monster.archetype === 'core_synthesizer'
-            ? 'monster_attack_boss'
-            : monster.archetype === 'cyber_behemoth'
-              ? 'monster_attack_behemoth'
-              : 'monster_attack_swarmer'
-        );
+        if (attackSfxBudget > 0) {
+          soundEvents.push(
+            monster.archetype === 'core_synthesizer'
+              ? 'monster_attack_boss'
+              : monster.archetype === 'cyber_behemoth'
+                ? 'monster_attack_behemoth'
+                : 'monster_attack_swarmer'
+          );
+          attackSfxBudget--;
+        }
         applyMonsterDamageToPlayer(player, rawDmg, monster.name, logs, soundEvents, floatingTexts, turn);
         clock.monsterAttackCd[monster.id] = monsterAttackCooldown(monster);
-        screenShake += 0.12;
+        screenShake += 0.1;
         continue;
       }
     }
 
-    // Chase continuously toward player
+    // Chase — cheap axis slide only (no corner probes for mobs)
     if (dist > 0.85) {
-      const a = entityCenter(monster.x, monster.y);
-      const b = entityCenter(player.x, player.y);
-      let vx = b.cx - a.cx;
-      let vy = b.cy - a.cy;
+      const acx = monster.x + ENTITY_BODY * 0.5;
+      const acy = monster.y + ENTITY_BODY * 0.5;
+      const bcx = player.x + ENTITY_BODY * 0.5;
+      const bcy = player.y + ENTITY_BODY * 0.5;
+      let vx = bcx - acx;
+      let vy = bcy - acy;
       const len = Math.hypot(vx, vy) || 1;
-      vx = (vx / len) * monsterSpeed(monster);
-      vy = (vy / len) * monsterSpeed(monster);
-      const moved = moveWithCollision(dungeon, monster.x, monster.y, vx, vy, dt, blockers, monster.id);
+      const spd = monsterSpeed(monster);
+      vx = (vx / len) * spd;
+      vy = (vy / len) * spd;
+      const moved = moveWithCollision(
+        dungeon,
+        monster.x,
+        monster.y,
+        vx,
+        vy,
+        dt,
+        spatial,
+        monster.id,
+        false
+      );
       monster.x = moved.x;
       monster.y = moved.y;
     }
@@ -762,9 +837,9 @@ export function tickRealtime(
   turn: number,
   clock: RealtimeClock
 ): RealtimeTickResult {
-  // Mutate the live refs in place — clonePlayer only for a cheap shallow player copy
-  // so React can still receive a new object identity when we sync HUD.
-  const player = clonePlayer(playerIn);
+  // Mutate live player/dungeon in place — cloning inventory every frame caused GC stalls
+  // in crowded fights. React gets a shallow copy only when the HUD syncs.
+  const player = playerIn;
   const dungeon = liveDungeon(dungeonIn);
   const logs: CombatLogEntry[] = [];
   const soundEvents: SoundEventType[] = [];
@@ -810,7 +885,12 @@ export function tickRealtime(
     ix /= inputLen;
     iy /= inputLen;
 
-    const blockers = dungeon.monsters.map(m => ({ x: m.x, y: m.y, id: m.id }));
+    const blockers: Blocker[] = new Array(dungeon.monsters.length);
+    for (let i = 0; i < dungeon.monsters.length; i++) {
+      const m = dungeon.monsters[i];
+      blockers[i] = { x: m.x, y: m.y, id: m.id };
+    }
+    const spatial = buildSpatialHash(blockers);
     const next = moveWithCollision(
       dungeon,
       player.x,
@@ -818,8 +898,9 @@ export function tickRealtime(
       ix * PLAYER_SPEED,
       iy * PLAYER_SPEED,
       dt,
-      blockers,
-      'player'
+      spatial,
+      'player',
+      true
     );
     if (next.x !== player.x || next.y !== player.y) {
       player.x = next.x;
