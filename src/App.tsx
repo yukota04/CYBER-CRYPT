@@ -455,21 +455,35 @@ export default function App() {
       hitstopSeconds = 0,
       attackEffects: AttackEffect[] = []
     ) => {
+      // Cap SFX per frame — crowded fights used to spam dozens of overlapping hits
+      const seen = new Set<string>();
+      let sfxCount = 0;
       for (const ev of events) {
+        if (sfxCount >= 4) break;
+        if (seen.has(ev) && ev !== 'hit' && ev !== 'crit') continue;
+        if (ev === 'hit' && seen.has('hit') && sfxCount >= 2) continue;
+        seen.add(ev);
         soundEngine.playSFX(ev as any);
+        sfxCount++;
       }
       if (rendererRef.current) {
-        if (screenShake > 0) rendererRef.current.addTrauma(screenShake);
-        if (hitstopSeconds > 0) rendererRef.current.triggerHitstop(hitstopSeconds);
-        for (const fx of attackEffects) {
-          rendererRef.current.spawnAttackEffect(fx);
+        if (screenShake > 0) rendererRef.current.addTrauma(Math.min(0.35, screenShake));
+        // Visual-only micro freeze (does NOT pause movement/sim anymore)
+        if (hitstopSeconds > 0) rendererRef.current.triggerHitstop(Math.min(0.06, hitstopSeconds));
+        const maxFx = 3;
+        for (let i = 0; i < attackEffects.length && i < maxFx; i++) {
+          rendererRef.current.spawnAttackEffect(attackEffects[i]);
         }
       }
       for (const f of floaters) {
         floatingTextsRef.current.push({ ...f, life: 0 });
         if (f.isCrit && rendererRef.current) {
-          rendererRef.current.spawnParticles(f.x, f.y, '#ffe600', 18);
+          rendererRef.current.spawnParticles(f.x, f.y, '#ffe600', 10);
         }
+      }
+      // Bound floater list so crowded rooms don't accumulate forever
+      if (floatingTextsRef.current.length > 40) {
+        floatingTextsRef.current.splice(0, floatingTextsRef.current.length - 40);
       }
     },
     []
@@ -716,12 +730,12 @@ export default function App() {
       }
 
       // Offline free-movement simulation (player + mobs)
-      // Pause while inventory / skill / shop / options are open so UI edits stick.
+      // Never freeze the sim for hitstop — that made combat feel "stuck".
+      // Pause only while inventory / skills / shop / options are open.
       if (
         gameStateRef.current === 'playing' &&
         playModeRef.current === 'offline' &&
         !uiBlockedRef.current &&
-        renderer.getHitstopRemaining() <= 0 &&
         playerRef.current &&
         dungeonRef.current
       ) {
@@ -1387,13 +1401,18 @@ export default function App() {
         result.attackEffects.length > 0;
 
       // Canvas reads refs every frame; React HUD only needs ~10 Hz (or on events).
-      // Pushing full dungeon+player every move was starving audio & UI.
       hudSyncAccRef.current += dt;
       if (hasEvents || hudSyncAccRef.current >= 0.1) {
         hudSyncAccRef.current = 0;
-        setPlayer(result.player);
+        // Shallow copy so React sees a new identity after in-place sim mutations
+        const p = result.player;
+        setPlayer({
+          ...p,
+          stats: { ...p.stats },
+          buffs: { ...p.buffs },
+          activeCooldowns: { ...p.activeCooldowns }
+        });
         if (hasEvents) {
-          // New object identity so React/minimap notice monster/coin changes
           setDungeon({
             ...result.dungeon,
             monsters: result.dungeon.monsters.slice(),

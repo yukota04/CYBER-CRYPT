@@ -13,11 +13,23 @@ export interface AppSettings {
 
 export const APP_SETTINGS_STORAGE_KEY = 'cyber_crypt_settings_v4';
 
+function detectDefaultPerformanceMode(): PerformanceMode {
+  if (typeof window === 'undefined') return 'balanced';
+  const coarse = window.matchMedia?.('(pointer: coarse)')?.matches;
+  const small = window.matchMedia?.('(max-width: 900px)')?.matches;
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4;
+  // Phones / weak devices: start on balanced so glow/scanlines don't eat frames
+  if (coarse || small || cores <= 4) return 'balanced';
+  return 'high';
+}
+
+const DEFAULT_PERF = detectDefaultPerformanceMode();
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  performanceMode: 'high',
-  enableScanlines: true,
-  enableGlow: true,
-  enableParticles: true,
+  performanceMode: DEFAULT_PERF,
+  enableScanlines: DEFAULT_PERF === 'high',
+  enableGlow: DEFAULT_PERF !== 'performance',
+  enableParticles: DEFAULT_PERF !== 'performance',
   targetFps: 60,
   audio: {
     masterMuted: false,
@@ -25,7 +37,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     musicVolume: 1.0,
     sfxEnabled: true,
     sfxVolume: 1.0,
-    ambientReverbEnabled: true
+    ambientReverbEnabled: DEFAULT_PERF === 'high'
   }
 };
 
