@@ -776,3 +776,377 @@ export class GranularEngine {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// 8. FILTERED NOISE (Pink / Brown) + LFO LOWPASS — wind, rain, crypt breath
+// ---------------------------------------------------------------------------
+export type NoiseColor = 'white' | 'pink' | 'brown';
+
+export interface AmbientNoiseParams {
+  color: NoiseColor;
+  duration: number;
+  gain?: number;
+  pan?: number;
+  reverbSend?: number;
+  /** Starting lowpass cutoff Hz */
+  cutoffStart?: number;
+  /** Ending lowpass cutoff Hz */
+  cutoffEnd?: number;
+  /** LFO rate modulating the cutoff (Hz) */
+  lfoRateHz?: number;
+  /** How many Hz the LFO swings the cutoff */
+  lfoDepthHz?: number;
+  filterQ?: number;
+}
+
+const noiseColorCache = new Map<string, AudioBuffer>();
+
+function synthesizeColoredNoiseBuffer(
+  ctx: AudioContext,
+  color: NoiseColor,
+  durationSec: number
+): AudioBuffer {
+  const dur = Math.max(0.05, Math.min(8, durationSec));
+  const key = `${ctx.sampleRate}:${color}:${Math.round(dur * 20)}`;
+  const cached = noiseColorCache.get(key);
+  if (cached) return cached;
+
+  const sr = ctx.sampleRate;
+  const len = Math.max(64, Math.floor(sr * dur));
+  const buf = ctx.createBuffer(1, len, sr);
+  const out = buf.getChannelData(0);
+
+  let b0 = 0;
+  let b1 = 0;
+  let b2 = 0;
+  let b3 = 0;
+  let b4 = 0;
+  let b5 = 0;
+  let b6 = 0;
+  let brown = 0;
+
+  for (let i = 0; i < len; i++) {
+    const white = Math.random() * 2 - 1;
+    let sample = white;
+    if (color === 'pink') {
+      // Paul Kellet approximate pink noise
+      b0 = 0.99886 * b0 + white * 0.0555179;
+      b1 = 0.99332 * b1 + white * 0.0750759;
+      b2 = 0.969 * b2 + white * 0.153852;
+      b3 = 0.8665 * b3 + white * 0.3104856;
+      b4 = 0.55 * b4 + white * 0.5329522;
+      b5 = -0.7616 * b5 - white * 0.016898;
+      sample = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+      b6 = white * 0.115926;
+      sample *= 0.11;
+    } else if (color === 'brown') {
+      brown = (brown + 0.02 * white) / 1.02;
+      sample = brown * 3.5;
+    }
+    // Soft fade edges to avoid clicks when looping short bursts
+    const edge = Math.min(1, i / (sr * 0.012), (len - i) / (sr * 0.02));
+    out[i] = Math.max(-1, Math.min(1, sample * edge));
+  }
+
+  if (noiseColorCache.size > 48) {
+    const first = noiseColorCache.keys().next().value;
+    if (first) noiseColorCache.delete(first);
+  }
+  noiseColorCache.set(key, buf);
+  return buf;
+}
+
+export function playAmbientNoise(
+  ctx: AudioContext,
+  dryDest: AudioNode,
+  wetDest: AudioNode | null,
+  params: AmbientNoiseParams,
+  startTime: number
+) {
+  const t = humanizeTime(startTime, 0.008);
+  const dur = Math.max(0.08, params.duration);
+  const buf = synthesizeColoredNoiseBuffer(ctx, params.color, Math.min(4, dur + 0.15));
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.Q.setValueAtTime(params.filterQ ?? 1.1, t);
+  const cutStart = Math.max(60, params.cutoffStart ?? 900);
+  const cutEnd = Math.max(50, params.cutoffEnd ?? 420);
+  filter.frequency.setValueAtTime(cutStart, t);
+  filter.frequency.exponentialRampToValueAtTime(cutEnd, t + dur);
+
+  if ((params.lfoRateHz ?? 0) > 0 && (params.lfoDepthHz ?? 0) > 0) {
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(params.lfoRateHz ?? 0.18, t);
+    lfoGain.gain.setValueAtTime(params.lfoDepthHz ?? 180, t);
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    lfo.start(t);
+    lfo.stop(t + dur + 0.05);
+  }
+
+  const amp = ctx.createGain();
+  const peak = humanizeVel(params.gain ?? 0.08, 0.1);
+  amp.gain.setValueAtTime(0.0001, t);
+  amp.gain.linearRampToValueAtTime(peak, t + Math.min(0.35, dur * 0.25));
+  amp.gain.setValueAtTime(peak, t + Math.max(0.05, dur - 0.25));
+  amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+  src.connect(filter);
+  filter.connect(amp);
+
+  let tail: AudioNode = amp;
+  if (typeof ctx.createStereoPanner === 'function' && params.pan !== undefined) {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, params.pan)), t);
+    amp.connect(panner);
+    tail = panner;
+  }
+
+  tail.connect(dryDest);
+  if (wetDest && (params.reverbSend ?? 0.4) > 0) {
+    const send = ctx.createGain();
+    send.gain.setValueAtTime(params.reverbSend ?? 0.4, t);
+    tail.connect(send);
+    send.connect(wetDest);
+  }
+
+  src.start(t);
+  src.stop(t + dur + 0.02);
+}
+
+// ---------------------------------------------------------------------------
+// 9. WAVEGUIDE TUBE / FLUTE (scattering junction delay line)
+// ---------------------------------------------------------------------------
+export interface WaveguideParams {
+  freq: number;
+  duration: number;
+  gain?: number;
+  pan?: number;
+  reverbSend?: number;
+  /** Breath / turbulence mix 0..1 */
+  breath?: number;
+  /** Reflectivity / sustain of the tube 0.85..0.995 */
+  reflection?: number;
+  brightness?: number;
+}
+
+const waveguideCache = new Map<string, AudioBuffer>();
+
+export function synthesizeWaveguideBuffer(
+  ctx: AudioContext,
+  freq: number,
+  durationSec: number,
+  reflection = 0.97,
+  brightness = 0.55,
+  breath = 0.35
+): AudioBuffer {
+  const safeFreq = Math.max(55, Math.min(1800, freq));
+  const key = `${ctx.sampleRate}:${Math.round(safeFreq)}:${Math.round(durationSec * 25)}:${Math.round(reflection * 1000)}:${Math.round(brightness * 40)}:${Math.round(breath * 40)}`;
+  const cached = waveguideCache.get(key);
+  if (cached) return cached;
+
+  const sr = ctx.sampleRate;
+  const total = Math.max(256, Math.floor(sr * durationSec));
+  const buf = ctx.createBuffer(1, total, sr);
+  const out = buf.getChannelData(0);
+
+  // Half-period delay for closed-open tube approximation
+  const delayLen = Math.max(4, Math.floor(sr / (2 * safeFreq)));
+  const delay = new Float32Array(delayLen);
+  let write = 0;
+  let lp = 0;
+  const refl = Math.max(0.82, Math.min(0.995, reflection));
+  const bright = Math.max(0.12, Math.min(0.92, brightness));
+  const breathAmt = Math.max(0, Math.min(0.9, breath));
+
+  for (let i = 0; i < total; i++) {
+    const tNorm = i / total;
+    // Soft attack envelope for embouchure pressure
+    const pressure = Math.min(1, i / (sr * 0.04)) * (1 - tNorm * 0.55);
+    const turb = (Math.random() * 2 - 1) * breathAmt * pressure;
+    const delayed = delay[write];
+    // One-pole lowpass at reflection junction (wall losses)
+    lp = bright * delayed + (1 - bright) * lp;
+    const y = -refl * lp + turb;
+    delay[write] = y;
+    write = (write + 1) % delayLen;
+
+    const fade = i > total - sr * 0.03 ? (total - i) / (sr * 0.03) : 1;
+    out[i] = Math.max(-1, Math.min(1, y * fade * 0.85));
+  }
+
+  if (waveguideCache.size > 120) {
+    const first = waveguideCache.keys().next().value;
+    if (first) waveguideCache.delete(first);
+  }
+  waveguideCache.set(key, buf);
+  return buf;
+}
+
+export function playWaveguide(
+  ctx: AudioContext,
+  dryDest: AudioNode,
+  wetDest: AudioNode | null,
+  params: WaveguideParams,
+  startTime: number
+) {
+  const t = humanizeTime(startTime, 0.007);
+  const f = humanizeFreq(params.freq, 5);
+  const dur = Math.max(0.1, params.duration);
+  const buf = synthesizeWaveguideBuffer(
+    ctx,
+    f,
+    dur,
+    params.reflection ?? 0.97,
+    params.brightness ?? 0.55,
+    params.breath ?? 0.35
+  );
+
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+
+  const filter = ctx.createBiquadFilter();
+  applyADSRFilter(filter, t, dur, {
+    baseCutoff: Math.max(200, f * 1.2),
+    peakCutoff: Math.min(9000, f * 8),
+    sustainCutoff: Math.max(180, f * 2.4),
+    releaseCutoff: Math.max(120, f * 0.9),
+    q: 1.6,
+    env: { attack: 0.02, decay: dur * 0.4, sustain: 0.45, release: dur * 0.3 }
+  });
+
+  const amp = ctx.createGain();
+  applyADSRAmp(amp, t, dur, humanizeVel(params.gain ?? 0.12, 0.1), {
+    attack: 0.03,
+    decay: dur * 0.25,
+    sustain: 0.55,
+    release: Math.min(0.4, dur * 0.35)
+  });
+
+  src.connect(filter);
+  filter.connect(amp);
+
+  let tail: AudioNode = amp;
+  if (typeof ctx.createStereoPanner === 'function' && params.pan !== undefined) {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, params.pan)), t);
+    amp.connect(panner);
+    tail = panner;
+  }
+
+  tail.connect(dryDest);
+  if (wetDest && (params.reverbSend ?? 0.28) > 0) {
+    const send = ctx.createGain();
+    send.gain.setValueAtTime(params.reverbSend ?? 0.28, t);
+    tail.connect(send);
+    send.connect(wetDest);
+  }
+
+  src.start(t);
+  src.stop(t + dur + 0.02);
+}
+
+// ---------------------------------------------------------------------------
+// 10. ADDITIVE SYNTHESIS (partial stack with per-harmonic ADSR) — bells / glass
+// ---------------------------------------------------------------------------
+export interface AdditivePartial {
+  ratio: number;
+  weight: number;
+  decayScale?: number;
+}
+
+export interface AdditiveParams {
+  freq: number;
+  duration: number;
+  partials?: AdditivePartial[];
+  gain?: number;
+  pan?: number;
+  reverbSend?: number;
+  attack?: number;
+  inharmonicity?: number; // stretch partials slightly (bells)
+}
+
+export function playAdditiveBell(
+  ctx: AudioContext,
+  dryDest: AudioNode,
+  wetDest: AudioNode | null,
+  params: AdditiveParams,
+  startTime: number
+) {
+  const t = humanizeTime(startTime, 0.006);
+  const f0 = humanizeFreq(params.freq, 4);
+  const dur = Math.max(0.08, params.duration);
+  const peak = humanizeVel(params.gain ?? 0.14, 0.1);
+  const inharm = params.inharmonicity ?? 0.012;
+  const partials =
+    params.partials ??
+    [
+      { ratio: 1.0, weight: 1.0, decayScale: 1.0 },
+      { ratio: 2.0, weight: 0.55, decayScale: 1.35 },
+      { ratio: 2.76, weight: 0.42, decayScale: 1.6 },
+      { ratio: 4.07, weight: 0.28, decayScale: 2.0 },
+      { ratio: 5.4, weight: 0.18, decayScale: 2.4 },
+      { ratio: 6.75, weight: 0.1, decayScale: 2.8 }
+    ];
+
+  const bus = ctx.createGain();
+  bus.gain.setValueAtTime(peak, t);
+
+  const filter = ctx.createBiquadFilter();
+  applyADSRFilter(filter, t, dur, {
+    baseCutoff: Math.max(300, f0 * 2),
+    peakCutoff: Math.min(14000, f0 * 14),
+    sustainCutoff: Math.max(400, f0 * 4),
+    releaseCutoff: Math.max(200, f0 * 1.5),
+    q: 1.2,
+    env: {
+      attack: params.attack ?? 0.008,
+      decay: dur * 0.35,
+      sustain: 0.35,
+      release: dur * 0.4
+    }
+  });
+
+  bus.connect(filter);
+
+  let tail: AudioNode = filter;
+  if (typeof ctx.createStereoPanner === 'function' && params.pan !== undefined) {
+    const panner = ctx.createStereoPanner();
+    panner.pan.setValueAtTime(Math.max(-1, Math.min(1, params.pan)), t);
+    filter.connect(panner);
+    tail = panner;
+  }
+
+  tail.connect(dryDest);
+  if (wetDest && (params.reverbSend ?? 0.35) > 0) {
+    const send = ctx.createGain();
+    send.gain.setValueAtTime(params.reverbSend ?? 0.35, t);
+    tail.connect(send);
+    send.connect(wetDest);
+  }
+
+  partials.forEach((p, idx) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    const stretch = 1 + inharm * (p.ratio - 1);
+    const freq = f0 * p.ratio * stretch;
+    const modeDur = Math.max(0.05, dur / (p.decayScale ?? 1 + idx * 0.35));
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    applyADSRAmp(g, t, modeDur, p.weight, {
+      attack: params.attack ?? 0.006,
+      decay: modeDur * 0.35,
+      sustain: 0.25,
+      release: modeDur * 0.45
+    });
+    osc.connect(g);
+    g.connect(bus);
+    osc.start(t);
+    osc.stop(t + modeDur + 0.03);
+  });
+}

@@ -1026,21 +1026,39 @@ test('combat emits step, blocked, coin, creature-specific attack, and differenti
 
 test('generateFloorTheme produces distinct musical compositions per dungeon floor', async () => {
   const { generateFloorTheme } = await import('./audio');
-  const themes = [1, 2, 3, 4, 5].map(f => generateFloorTheme(f));
-  const rootSet = new Set(themes.map(t => t.rootMidi));
-  const bpmSet = new Set(themes.map(t => t.bpm));
-  const melodySigSet = new Set(themes.map(t => t.melodyExplore.join(',')));
+  const themes = [1, 2, 3, 4, 5, 8, 12].map(f => generateFloorTheme(f));
+  const rootSet = new Set(themes.slice(0, 5).map(t => t.rootMidi));
+  const bpmSet = new Set(themes.slice(0, 5).map(t => t.bpm));
+  const melodySigSet = new Set(themes.slice(0, 5).map(t => t.melodyExplore.join(',')));
+  const signatureSet = new Set(themes.map(t => t.signatureHash));
 
   assert.equal(rootSet.size, 5, 'Floors 1-5 use distinct tonal roots');
   assert.ok(bpmSet.size >= 4, 'Floors 1-5 vary tempo distinctly');
   assert.equal(melodySigSet.size, 5, 'Floors 1-5 each generate a distinct melody');
+  assert.equal(signatureSet.size, themes.length, 'Every floor has a unique music signature');
 
-  for (let i = 1; i < themes.length; i++) {
+  for (let i = 1; i < 5; i++) {
     assert.notEqual(
-      `${themes[i].rootMidi}:${themes[i].drumGroove}:${themes[i].arpMode}`,
-      `${themes[i - 1].rootMidi}:${themes[i - 1].drumGroove}:${themes[i - 1].arpMode}`,
-      'Adjacent floors always change harmonic/rhythmic character'
+      `${themes[i].rootMidi}:${themes[i].drumGroove}:${themes[i].arpMode}:${themes[i].leadEngine}`,
+      `${themes[i - 1].rootMidi}:${themes[i - 1].drumGroove}:${themes[i - 1].arpMode}:${themes[i - 1].leadEngine}`,
+      'Adjacent floors always change harmonic/rhythmic/engine character'
     );
   }
+
+  // Ascending tension: deeper floors must feel tighter
+  assert.ok(themes[0].tension < themes[4].tension, 'Floor 5 more tense than floor 1');
+  assert.ok(themes[4].tension < themes[6].tension, 'Floor 12 more tense than floor 5');
+  assert.ok(themes[6].bpm > themes[0].bpm, 'Deep floors run at higher BPM');
+  assert.ok(themes[6].ambientDensity > themes[0].ambientDensity, 'Deep floors denser ambient');
+});
+
+test('DSP exports physical / granular / additive music primitives', async () => {
+  const dsp = await import('./audioDSP');
+  assert.equal(typeof dsp.playKarplusStrong, 'function');
+  assert.equal(typeof dsp.playWaveguide, 'function');
+  assert.equal(typeof dsp.playAmbientNoise, 'function');
+  assert.equal(typeof dsp.playAdditiveBell, 'function');
+  assert.equal(typeof dsp.playModalMembrane, 'function');
+  assert.equal(typeof dsp.GranularEngine, 'function');
 });
 

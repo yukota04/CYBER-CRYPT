@@ -1,15 +1,13 @@
 import {
   GranularEngine,
+  NoiseColor,
   WavetableBank,
-  applyADSRFilter,
-  applyADSRAmp,
   createCryptImpulseResponse,
-  getSharedNoiseBuffer,
-  humanizeFreq,
-  humanizeTime,
-  humanizeVel,
+  playAdditiveBell,
+  playAmbientNoise,
   playKarplusStrong,
-  playModalMembrane
+  playModalMembrane,
+  playWaveguide
 } from './audioDSP';
 
 export type SoundEventType =
@@ -100,6 +98,8 @@ export interface FloorTheme {
   scaleName: string;
   rootMidi: number;
   bpm: number;
+  /** 0..1 — rises with dungeon depth; drives density, dissonance, noise */
+  tension: number;
   progressionA: FloorChordVoicing[];
   progressionB: FloorChordVoicing[];
   melodyExplore: number[];
@@ -111,6 +111,12 @@ export interface FloorTheme {
   arpMode: 'up' | 'down' | 'pendulum' | 'broken';
   kickFreq: number;
   bassBrightness: number;
+  noiseColor: NoiseColor;
+  ambientDensity: number;
+  dissonanceCents: number;
+  waveguideBreath: number;
+  leadEngine: 'wavetable' | 'karplus' | 'waveguide' | 'additive';
+  signatureHash: string;
 }
 
 const FLOOR_SCALES: { name: string; intervals: number[] }[] = [
@@ -146,16 +152,23 @@ function mulberry32(seed: number) {
 
 export function generateFloorTheme(floor: number): FloorTheme {
   const safeFloor = Math.max(1, Math.floor(floor));
-  const rng = mulberry32(safeFloor * 7919 + 4123);
+  // Unique seed per floor — adjacent floors never collide
+  const rng = mulberry32(safeFloor * 7919 + 4123 + safeFloor * safeFloor * 17);
+
+  // Tension rises with depth (asymptotic toward 1 after deep floors)
+  const tension = Math.min(1, (safeFloor - 1) / 14 + Math.max(0, safeFloor - 8) * 0.02);
 
   // Rotate scales & keys so adjacent floors ALWAYS change harmonic color
-  const scaleObj = FLOOR_SCALES[(safeFloor - 1 + Math.floor(rng() * 2)) % FLOOR_SCALES.length];
+  const scaleObj = FLOOR_SCALES[(safeFloor - 1) % FLOOR_SCALES.length];
   const rootPalette = [35, 38, 40, 33, 41, 36, 43, 34, 39, 37];
   const rootMidi = rootPalette[(safeFloor - 1) % rootPalette.length];
 
-  // Distinct tempo per floor (104..132 BPM)
-  const bpmPalette = [110, 122, 104, 128, 118, 108, 126, 114, 130, 106];
-  const bpm = bpmPalette[(safeFloor - 1) % bpmPalette.length] + Math.floor(rng() * 5) - 2;
+  // Ascending tempo: base palette + tension climb (never shared identically across floors)
+  const bpmPalette = [96, 104, 110, 116, 122, 108, 128, 114, 132, 120, 136, 124];
+  const bpm =
+    bpmPalette[(safeFloor - 1) % bpmPalette.length] +
+    Math.floor(tension * 18) +
+    Math.floor(rng() * 4);
 
   const scaleDegreeToMidi = (deg: number, octaveOffset: number): number => {
     const len = scaleObj.intervals.length;
@@ -166,12 +179,19 @@ export function generateFloorTheme(floor: number): FloorTheme {
 
   const buildVoicing = (degree: number, idx: number): FloorChordVoicing => {
     const r = scaleDegreeToMidi(degree, 0);
+    const third = scaleDegreeToMidi(degree + 2, 0);
     const fifth = scaleDegreeToMidi(degree + 4, 0);
     const seventh = scaleDegreeToMidi(degree + 6, 0);
-    const bassPattern =
-      idx % 2 === 0 ? [r, r, r + 12, fifth] : [r, fifth, r + 12, r];
+    // Higher floors add cluster / minor-2nd grit to pads
+    const grit =
+      tension > 0.45 && rng() < tension
+        ? scaleDegreeToMidi(degree + 1, 1)
+        : seventh + 12;
 
-    const arp = [
+    const bassPattern =
+      idx % 2 === 0 ? [r, r, r + 12, fifth] : [r, fifth, r + 12, third];
+
+    const arpBase = [
       scaleDegreeToMidi(degree, 1),
       scaleDegreeToMidi(degree + 2, 1),
       scaleDegreeToMidi(degree + 4, 1),
@@ -179,41 +199,43 @@ export function generateFloorTheme(floor: number): FloorTheme {
       scaleDegreeToMidi(degree + 1, 2),
       scaleDegreeToMidi(degree + 2, 2),
       scaleDegreeToMidi(degree + 4, 2),
-      scaleDegreeToMidi(degree + 2, 2)
+      scaleDegreeToMidi(degree + 3, 2)
     ];
+    // Shuffle arp order with floor seed so patterns never clone across floors
+    const arp = arpBase.map((n, i) => {
+      const swapWith = Math.floor(rng() * arpBase.length);
+      return i === swapWith ? arpBase[(i + safeFloor) % arpBase.length] : n;
+    });
 
-    const pad = [
-      r + 12,
-      scaleDegreeToMidi(degree + 2, 1),
-      scaleDegreeToMidi(degree + 4, 1),
-      seventh + 12
-    ];
+    const pad = [r + 12, scaleDegreeToMidi(degree + 2, 1), scaleDegreeToMidi(degree + 4, 1), grit];
 
     return { root: r, bass: bassPattern, arp, pad };
   };
 
   const degSetA = CHORD_DEGREE_PROGRESSIONS[(safeFloor - 1) % CHORD_DEGREE_PROGRESSIONS.length];
-  const degSetB = CHORD_DEGREE_PROGRESSIONS[(safeFloor + 2) % CHORD_DEGREE_PROGRESSIONS.length];
+  const degSetB = CHORD_DEGREE_PROGRESSIONS[(safeFloor + 3) % CHORD_DEGREE_PROGRESSIONS.length];
 
   const progressionA = degSetA.map((d, idx) => buildVoicing(d, idx));
   const progressionB = degSetB.map((d, idx) => buildVoicing(d, idx + 1));
 
-  // Generate original 32-step melodic motifs unique to this floor
+  // Density of notes rises with tension — unique motifs per floor
+  const exploreDensity = 0.42 + tension * 0.35;
+  const combatDensity = 0.55 + tension * 0.38;
   const melodyExplore: number[] = [];
   const melodyCombat: number[] = [];
   for (let i = 0; i < 32; i++) {
     const barChordDeg = degSetA[Math.floor(i / 8) % 4];
-    const playExplore = i % 2 === 0 && rng() < 0.62;
+    const playExplore = (i + safeFloor) % 3 !== 2 && rng() < exploreDensity;
     if (playExplore) {
-      const stepOffset = [0, 2, 4, 5, 6, 7][Math.floor(rng() * 6)];
+      const stepOffset = [0, 2, 4, 5, 6, 7, 9][Math.floor(rng() * (5 + Math.floor(tension * 2)))];
       melodyExplore.push(scaleDegreeToMidi(barChordDeg + stepOffset, 2));
     } else {
       melodyExplore.push(0);
     }
 
-    const playCombat = rng() < (i % 4 === 0 ? 0.85 : 0.58);
+    const playCombat = rng() < (i % 4 === 0 ? Math.min(0.95, combatDensity + 0.2) : combatDensity);
     if (playCombat) {
-      const stepOffset = [0, 1, 2, 4, 6, 7, 8][Math.floor(rng() * 7)];
+      const stepOffset = [0, 1, 2, 4, 6, 7, 8, 10][Math.floor(rng() * (6 + Math.floor(tension * 2)))];
       melodyCombat.push(scaleDegreeToMidi(barChordDeg + stepOffset, 2));
     } else {
       melodyCombat.push(0);
@@ -225,23 +247,60 @@ export function generateFloorTheme(floor: number): FloorTheme {
   const granSources: FloorTheme['granularSource'][] = ['crypt_choir', 'plasma_shimmer', 'beast_throat'];
   const drumGrooves: FloorTheme['drumGroove'][] = ['driving', 'syncopated', 'halftime', 'tribal'];
   const arpModes: FloorTheme['arpMode'][] = ['up', 'down', 'pendulum', 'broken'];
+  const noiseColors: NoiseColor[] = ['pink', 'brown', 'pink', 'brown'];
+  const leadEngines: FloorTheme['leadEngine'][] = ['karplus', 'waveguide', 'additive', 'wavetable'];
+
+  const leadTimbre = leadTimbres[(safeFloor - 1) % leadTimbres.length];
+  const padTimbre = padTimbres[(safeFloor + Math.floor(rng() * 2)) % padTimbres.length];
+  const granularSource = granSources[(safeFloor + Math.floor(rng() * granSources.length)) % granSources.length];
+  const drumGroove = drumGrooves[(safeFloor - 1) % drumGrooves.length];
+  const arpMode = arpModes[(safeFloor * 3 + Math.floor(rng() * 2)) % arpModes.length];
+  const leadEngine = leadEngines[(safeFloor - 1) % leadEngines.length];
+  const noiseColor = noiseColors[(safeFloor - 1) % noiseColors.length];
+  const kickFreq = 42 + ((safeFloor * 7) % 22) + Math.floor(tension * 8);
+  const bassBrightness = 0.32 + ((safeFloor * 13) % 40) / 100 + tension * 0.12;
+  const ambientDensity = 0.25 + tension * 0.7;
+  const dissonanceCents = Math.floor(tension * 28 + rng() * 6);
+  const waveguideBreath = 0.22 + tension * 0.45 + rng() * 0.08;
+
+  const signatureHash = [
+    safeFloor,
+    scaleObj.name,
+    rootMidi,
+    bpm,
+    leadTimbre,
+    padTimbre,
+    granularSource,
+    drumGroove,
+    arpMode,
+    leadEngine,
+    noiseColor,
+    melodyExplore.filter(Boolean).slice(0, 8).join('.')
+  ].join('|');
 
   return {
     floor: safeFloor,
     scaleName: scaleObj.name,
     rootMidi,
     bpm,
+    tension,
     progressionA,
     progressionB,
     melodyExplore,
     melodyCombat,
-    leadTimbre: leadTimbres[(safeFloor - 1) % leadTimbres.length],
-    padTimbre: padTimbres[(safeFloor + Math.floor(rng() * 2)) % padTimbres.length],
-    granularSource: granSources[(safeFloor - 1) % granSources.length],
-    drumGroove: drumGrooves[(safeFloor - 1) % drumGrooves.length],
-    arpMode: arpModes[(safeFloor - 1) % arpModes.length],
-    kickFreq: 48 + ((safeFloor * 7) % 16),
-    bassBrightness: 0.38 + ((safeFloor * 13) % 35) / 100
+    leadTimbre,
+    padTimbre,
+    granularSource,
+    drumGroove,
+    arpMode,
+    kickFreq,
+    bassBrightness,
+    noiseColor,
+    ambientDensity,
+    dissonanceCents,
+    waveguideBreath,
+    leadEngine,
+    signatureHash
   };
 }
 
@@ -269,7 +328,7 @@ class HybridAcousticAudioEngine {
   private granular: GranularEngine | null = null;
 
   private isMuted: boolean = false;
-  private musicEnabled: boolean = false;
+  private musicEnabled: boolean = true;
   private musicVolume: number = 0.7;
   private sfxEnabled: boolean = true;
   private sfxVolume: number = 0.85;
@@ -370,6 +429,7 @@ class HybridAcousticAudioEngine {
   }
 
   public setAudioSettings(partial: Partial<AudioConfig>) {
+    const wasMusicOn = this.musicEnabled && !this.isMuted;
     if (typeof partial.masterMuted === 'boolean') this.isMuted = partial.masterMuted;
     if (typeof partial.musicEnabled === 'boolean') this.musicEnabled = partial.musicEnabled;
     if (typeof partial.musicVolume === 'number') this.musicVolume = Math.max(0, Math.min(1, partial.musicVolume));
@@ -391,6 +451,9 @@ class HybridAcousticAudioEngine {
 
     if (!this.musicEnabled || this.isMuted) {
       this.stopMusic();
+    } else if (!wasMusicOn) {
+      // Music just turned on — boot the procedural scheduler
+      this.startMusic();
     }
   }
 
@@ -503,16 +566,137 @@ class HybridAcousticAudioEngine {
 
   private getCurrentStepDurationSec(): number {
     if (this.intensity === 'title') {
-      return 60 / 88 / 4;
+      // Fixed menu tempo — never tied to dungeon floor themes
+      return 60 / 86 / 4;
     }
-    const baseBpm = this.currentFloorTheme.bpm;
+    const theme = this.currentFloorTheme;
+    const tensionBoost = Math.floor(theme.tension * 14);
+    const baseBpm = theme.bpm;
     const bpm =
       this.intensity === 'explore'
         ? baseBpm
         : this.intensity === 'combat'
-        ? Math.min(144, baseBpm + 10)
-        : Math.min(152, baseBpm + 16);
+        ? Math.min(148, baseBpm + 8 + tensionBoost)
+        : Math.min(158, baseBpm + 14 + tensionBoost);
     return 60 / bpm / 4; // 16th-note step duration
+  }
+
+  private orderArpNotes(notes: number[], mode: FloorTheme['arpMode'], barTotal: number): number[] {
+    const copy = [...notes];
+    switch (mode) {
+      case 'down':
+        return copy.reverse();
+      case 'pendulum': {
+        const up = [...copy];
+        const down = [...copy].reverse().slice(1, -1);
+        return barTotal % 2 === 0 ? up : [...up, ...down];
+      }
+      case 'broken': {
+        const out: number[] = [];
+        for (let i = 0; i < copy.length; i += 2) {
+          out.push(copy[i]);
+          if (i + 1 < copy.length) out.push(copy[i + 1]);
+        }
+        // Rotate by floor so broken patterns differ per level
+        const rot = (this.currentFloorTheme.floor + barTotal) % Math.max(1, out.length);
+        return out.slice(rot).concat(out.slice(0, rot));
+      }
+      case 'up':
+      default:
+        return copy;
+    }
+  }
+
+  private playFloorLead(
+    dry: GainNode,
+    wet: GainNode | null,
+    midi: number,
+    when: number,
+    stepDur: number,
+    theme: FloorTheme
+  ) {
+    if (!this.ctx || !this.wavetables) return;
+    const cents = theme.dissonanceCents * (this.intensity === 'explore' ? 0.35 : 1);
+    const freq = midiToFreq(midi) * Math.pow(2, cents / 1200);
+    const gain =
+      this.intensity === 'explore' ? 0.07 : this.intensity === 'combat' ? 0.09 : 0.11;
+    const dur = stepDur * (2.8 + theme.tension * 1.4);
+    const pan = -0.16 + Math.sin(theme.floor + when) * 0.22;
+
+    switch (theme.leadEngine) {
+      case 'karplus':
+        playKarplusStrong(
+          this.ctx,
+          dry,
+          wet,
+          {
+            freq,
+            duration: dur * 1.2,
+            decay: 0.988 - theme.tension * 0.01,
+            brightness: 0.48 + theme.tension * 0.28,
+            pickPosition: 0.16 + (theme.floor % 5) * 0.04,
+            stiffness: theme.tension * 0.08,
+            dampingCutoff: 1800 + theme.tension * 3200,
+            gain,
+            pan,
+            reverbSend: this.ambientReverbEnabled ? 0.32 : 0.06
+          },
+          when
+        );
+        break;
+      case 'waveguide':
+        playWaveguide(
+          this.ctx,
+          dry,
+          wet,
+          {
+            freq,
+            duration: dur * 1.1,
+            breath: theme.waveguideBreath,
+            reflection: 0.96 - theme.tension * 0.04,
+            brightness: 0.4 + theme.tension * 0.35,
+            gain: gain * 0.95,
+            pan,
+            reverbSend: this.ambientReverbEnabled ? 0.38 : 0.06
+          },
+          when
+        );
+        break;
+      case 'additive':
+        playAdditiveBell(
+          this.ctx,
+          dry,
+          wet,
+          {
+            freq,
+            duration: dur * 1.35,
+            gain: gain * 0.85,
+            pan,
+            reverbSend: this.ambientReverbEnabled ? 0.42 : 0.06,
+            inharmonicity: 0.008 + theme.tension * 0.03,
+            attack: 0.01
+          },
+          when
+        );
+        break;
+      case 'wavetable':
+      default:
+        this.wavetables.playNote(dry, wet, {
+          freq,
+          startTime: when,
+          duration: dur,
+          timbre: this.intensity === 'boss' ? 'brass' : theme.leadTimbre,
+          gain,
+          pan,
+          reverbSend: this.ambientReverbEnabled ? 0.4 : 0.05,
+          vibratoDepthCents: 8 + theme.tension * 10,
+          filterCutoffPeak: 2200 + theme.tension * 2200,
+          filterCutoffSustain: 800 + theme.tension * 600,
+          attack: 0.035,
+          release: 0.32
+        });
+        break;
+    }
   }
 
   private scheduleMusicAhead() {
@@ -545,97 +729,134 @@ class HybridAcousticAudioEngine {
     const wet = this.musicWetSend;
 
     // =========================================================================
-    // A. MENU-ONLY SOUNDTRACK (Spacious & sparse — no repetitive background loop)
+    // A. MENU — FIXED soundtrack (never uses floor seeds / never plays in dungeon)
     // =========================================================================
     if (this.intensity === 'title') {
       const prog = sectionB ? MENU_PROGRESSION_B : MENU_PROGRESSION_A;
       const chord = prog[barTotal % 4];
 
-      // Gentle chord pad once every 4 bars with generous quiet breathing space
+      // Soft cello pad every 4 bars
       if (s === 0 && barTotal % 4 === 0) {
         chord.pad.forEach((midi, idx) => {
           this.wavetables!.playNote(dry, wet, {
             freq: midiToFreq(midi),
             startTime: when + idx * 0.06,
-            duration: stepDur * 26,
+            duration: stepDur * 28,
             timbre: 'cello',
-            gain: 0.055,
+            gain: 0.052,
             pan: -0.35 + idx * 0.22,
-            reverbSend: this.ambientReverbEnabled ? 0.5 : 0.05,
+            reverbSend: this.ambientReverbEnabled ? 0.52 : 0.05,
             vibratoDepthCents: 7,
-            filterCutoffPeak: 950,
-            filterCutoffSustain: 380,
-            attack: 0.65,
-            release: 1.1
+            filterCutoffPeak: 900,
+            filterCutoffSustain: 360,
+            attack: 0.7,
+            release: 1.2
           });
         });
       }
 
-      // Occasional single crystal note on bar 2 only
-      if (barTotal % 4 === 2 && s === 8) {
-        const melMidi = MENU_MELODY[(barTotal * 3) % MENU_MELODY.length];
-        if (melMidi > 0) {
-          this.wavetables.playNote(dry, wet, {
+      // Fixed Karplus-Strong bass pulse on downbeats of even bars
+      if (barTotal % 2 === 0 && s === 0) {
+        playKarplusStrong(
+          this.ctx,
+          dry,
+          wet,
+          {
+            freq: midiToFreq(chord.bass[0]),
+            duration: stepDur * 6,
+            decay: 0.991,
+            brightness: 0.42,
+            pickPosition: 0.22,
+            dampingCutoff: 900,
+            gain: 0.11,
+            reverbSend: 0.12
+          },
+          when
+        );
+      }
+
+      // Fixed additive glass motif (MENU_MELODY) — never procedural per floor
+      const melMidi = MENU_MELODY[s + (barTotal % 2) * 16];
+      if (melMidi > 0 && (s === 4 || s === 10 || s === 14)) {
+        playAdditiveBell(
+          this.ctx,
+          dry,
+          wet,
+          {
             freq: midiToFreq(melMidi),
-            startTime: when,
             duration: stepDur * 5,
-            timbre: 'glass',
-            gain: 0.045,
-            pan: 0.1,
-            reverbSend: this.ambientReverbEnabled ? 0.45 : 0.05,
-            vibratoDepthCents: 8,
-            filterCutoffPeak: 2100,
-            filterCutoffSustain: 700,
-            attack: 0.06,
-            release: 0.5
-          });
-        }
+            gain: 0.055,
+            pan: 0.12,
+            reverbSend: this.ambientReverbEnabled ? 0.48 : 0.05,
+            inharmonicity: 0.01,
+            attack: 0.02
+          },
+          when
+        );
+      }
+
+      // Sparse pink-noise crypt breeze (fixed, gentle)
+      if (s === 0 && barTotal % 8 === 0) {
+        playAmbientNoise(
+          this.ctx,
+          dry,
+          wet,
+          {
+            color: 'pink',
+            duration: stepDur * 20,
+            gain: 0.028,
+            pan: -0.2,
+            cutoffStart: 700,
+            cutoffEnd: 280,
+            lfoRateHz: 0.12,
+            lfoDepthHz: 120,
+            reverbSend: 0.55
+          },
+          when
+        );
       }
       return;
     }
 
     // =========================================================================
-    // B. PER-FLOOR PROCEDURAL SOUNDTRACK (Optional via Options; zero drone/shaker loops)
+    // B. PER-FLOOR PROCEDURAL SCORE (unique seed + ascending tension)
     // =========================================================================
     const theme = this.currentFloorTheme;
+    const tension = theme.tension;
     const prog = sectionB ? theme.progressionB : theme.progressionA;
     const chord = prog[barTotal % prog.length];
+    const combatLike = this.intensity === 'combat' || this.intensity === 'boss';
 
-    // 1. Wide-Spaced Harmonic Pad (only every 4 bars — no constant bar-by-bar drone)
+    // 1. Harmonic pad (every 4 bars; brighter/denser with tension)
     if (s === 0 && barTotal % 4 === 0) {
       const padNotes =
-        this.intensity === 'boss' ? [chord.pad[0] - 12, chord.pad[1], chord.pad[2]] : chord.pad;
+        this.intensity === 'boss'
+          ? [chord.pad[0] - 12, chord.pad[1], chord.pad[2], chord.pad[3]]
+          : chord.pad;
       padNotes.forEach((midi, idx) => {
         const timbre =
-          this.intensity === 'boss'
-            ? idx === 0
-              ? 'reese'
-              : 'brass'
-            : theme.padTimbre;
+          this.intensity === 'boss' ? (idx === 0 ? 'reese' : 'brass') : theme.padTimbre;
         this.wavetables!.playNote(dry, wet, {
-          freq: midiToFreq(midi),
-          startTime: when + idx * 0.04,
-          duration: stepDur * 22,
+          freq: midiToFreq(midi) * Math.pow(2, (idx === 3 ? theme.dissonanceCents * 0.4 : 0) / 1200),
+          startTime: when + idx * 0.035,
+          duration: stepDur * (20 + tension * 6),
           timbre,
-          gain: this.intensity === 'explore' ? 0.055 : 0.075,
-          pan: -0.4 + idx * 0.26,
-          reverbSend: this.ambientReverbEnabled ? 0.42 : 0.05,
-          vibratoDepthCents: 7,
-          filterCutoffPeak: this.intensity === 'boss' ? 2400 : 1400,
-          filterCutoffSustain: 550,
-          attack: 0.45,
-          release: 0.9
+          gain: (this.intensity === 'explore' ? 0.05 : 0.07) * (1 + tension * 0.25),
+          pan: -0.42 + idx * 0.26,
+          reverbSend: this.ambientReverbEnabled ? 0.4 + tension * 0.12 : 0.05,
+          vibratoDepthCents: 6 + tension * 8,
+          filterCutoffPeak: (this.intensity === 'boss' ? 2600 : 1200) + tension * 1600,
+          filterCutoffSustain: 480 + tension * 400,
+          attack: 0.4,
+          release: 0.85
         });
       });
     }
 
-    // 2. Sparse Plucked Bass Accent (only on beat 1 every 2 bars in explore, beat 1+3 in combat)
-    const bassHit =
-      this.intensity === 'explore'
-        ? barTotal % 2 === 0 && s === 0
-        : s === 0 || s === 8;
-
-    if (bassHit) {
+    // 2. Karplus-Strong bass — denser as floors deepen
+    const bassEvery =
+      this.intensity === 'explore' ? (tension > 0.55 ? 8 : 16) : tension > 0.4 ? 4 : 8;
+    if (s % bassEvery === 0) {
       const bassMidi = chord.bass[Math.floor(s / 4) % chord.bass.length];
       playKarplusStrong(
         this.ctx,
@@ -643,12 +864,14 @@ class HybridAcousticAudioEngine {
         wet,
         {
           freq: midiToFreq(bassMidi),
-          duration: stepDur * 4.5,
-          decay: 0.986,
-          brightness: this.intensity === 'combat' || this.intensity === 'boss' ? 0.54 : theme.bassBrightness * 0.78,
-          pickPosition: 0.18,
-          dampingCutoff: 1200,
-          gain: 0.14,
+          duration: stepDur * (3.8 + tension),
+          decay: 0.988 - tension * 0.012,
+          brightness:
+            combatLike ? Math.min(0.78, theme.bassBrightness + 0.12) : theme.bassBrightness,
+          pickPosition: 0.14 + (theme.floor % 4) * 0.05,
+          stiffness: tension * 0.06,
+          dampingCutoff: 1000 + tension * 1800,
+          gain: 0.12 + tension * 0.05,
           pan: 0,
           reverbSend: 0.08
         },
@@ -656,48 +879,148 @@ class HybridAcousticAudioEngine {
       );
     }
 
-    // 3. Evolving Floor Lead Phrase (only plays on even bars with quiet rests on odd bars)
-    if (barTotal % 2 === 0 || this.intensity === 'boss') {
+    // 3. Floor-unique Karplus / waveguide / additive / wavetable lead
+    const leadBars = combatLike || tension > 0.6 || barTotal % 2 === 0;
+    if (leadBars) {
       const melodyBank = this.intensity === 'explore' ? theme.melodyExplore : theme.melodyCombat;
-      const melStep = (globalStep + barTotal * 3) % melodyBank.length;
+      const melStep = (globalStep + theme.floor * 5 + barTotal * 3) % melodyBank.length;
       const melMidi = melodyBank[melStep];
-      if (melMidi > 0 && s % 4 === 0) {
-        this.wavetables.playNote(dry, wet, {
-          freq: midiToFreq(melMidi),
-          startTime: when,
-          duration: stepDur * 3.5,
-          timbre: this.intensity === 'boss' ? 'brass' : theme.leadTimbre,
-          gain: 0.08,
-          pan: -0.14 + Math.sin(barTotal + theme.floor) * 0.2,
-          reverbSend: this.ambientReverbEnabled ? 0.4 : 0.05,
-          vibratoDepthCents: 10,
-          filterCutoffPeak: 2800,
-          filterCutoffSustain: 950,
-          attack: 0.04,
-          release: 0.35
-        });
+      const leadStride = combatLike ? (tension > 0.7 ? 2 : 4) : 4;
+      if (melMidi > 0 && s % leadStride === 0) {
+        this.playFloorLead(dry, wet, melMidi, when, stepDur, theme);
       }
     }
 
-    // 4. Boss-Only Deep Drum Pulse (no explore/combat background drum or shaker loops)
-    if (this.intensity === 'boss' && (s === 0 || s === 8)) {
+    // 4. Arpeggio via Karplus-Strong (pattern unique per floor arpMode)
+    const arpActive =
+      combatLike || (tension > 0.35 && barTotal % 2 === 1) || (s === 0 && barTotal % 4 === 2);
+    if (arpActive && s % (combatLike ? 2 : 4) === 0) {
+      const ordered = this.orderArpNotes(chord.arp, theme.arpMode, barTotal);
+      const arpMidi = ordered[(Math.floor(s / 2) + theme.floor) % ordered.length];
+      playKarplusStrong(
+        this.ctx,
+        dry,
+        wet,
+        {
+          freq: midiToFreq(arpMidi),
+          duration: stepDur * 2.4,
+          decay: 0.984,
+          brightness: 0.55 + tension * 0.25,
+          pickPosition: 0.2 + (s % 3) * 0.06,
+          stiffness: 0.02 + tension * 0.07,
+          dampingCutoff: 2400 + tension * 3000,
+          gain: 0.045 + tension * 0.035,
+          pan: -0.35 + (s / 16) * 0.7,
+          reverbSend: this.ambientReverbEnabled ? 0.28 : 0.05
+        },
+        when
+      );
+    }
+
+    // 5. Waveguide tube ghost tones (wind instruments) — rarer early, constant later
+    if (s === 6 && (barTotal + theme.floor) % Math.max(1, 4 - Math.floor(tension * 3)) === 0) {
+      playWaveguide(
+        this.ctx,
+        dry,
+        wet,
+        {
+          freq: midiToFreq(chord.pad[1]),
+          duration: stepDur * (10 + tension * 8),
+          breath: theme.waveguideBreath,
+          reflection: 0.975 - tension * 0.05,
+          brightness: 0.35 + tension * 0.4,
+          gain: 0.04 + tension * 0.04,
+          pan: 0.3,
+          reverbSend: this.ambientReverbEnabled ? 0.5 : 0.06
+        },
+        when
+      );
+    }
+
+    // 6. Granular atmosphere cloud unique per floor source
+    if (s === 0 && barTotal % Math.max(2, 5 - Math.floor(tension * 3)) === 0) {
+      this.granular.playCloud(dry, wet, {
+        source: theme.granularSource,
+        startTime: when,
+        cloudDuration: stepDur * (12 + tension * 10),
+        grainCount: Math.floor(10 + theme.ambientDensity * 22),
+        grainSizeSec: 0.028 + tension * 0.02,
+        pitchRatio: 0.92 + (theme.floor % 5) * 0.04,
+        pitchJitter: 0.06 + tension * 0.08,
+        stereoSpread: 0.8,
+        lowpassStart: 2800 - tension * 900,
+        lowpassEnd: 700 - tension * 250,
+        gain: 0.035 + theme.ambientDensity * 0.05,
+        reverbSend: this.ambientReverbEnabled ? 0.55 : 0.08
+      });
+    }
+
+    // 7. Pink/Brown filtered noise — crypt wind intensifies with depth
+    if (s === 0 && barTotal % Math.max(1, 6 - Math.floor(tension * 4)) === 0) {
+      playAmbientNoise(
+        this.ctx,
+        dry,
+        wet,
+        {
+          color: theme.noiseColor,
+          duration: stepDur * (14 + tension * 12),
+          gain: 0.018 + theme.ambientDensity * 0.045,
+          pan: ((theme.floor % 2) * 2 - 1) * 0.35,
+          cutoffStart: 1100 - tension * 400,
+          cutoffEnd: 380 - tension * 160,
+          lfoRateHz: 0.1 + tension * 0.25,
+          lfoDepthHz: 140 + tension * 220,
+          reverbSend: 0.5
+        },
+        when
+      );
+    }
+
+    // 8. Percussion groove (modal membrane / waveguide drums) — denser with floor + combat
+    const groove = theme.drumGroove;
+    let hit = false;
+    if (groove === 'driving') hit = s === 0 || s === 8 || (combatLike && s === 4);
+    else if (groove === 'syncopated') hit = s === 2 || s === 6 || s === 10 || (combatLike && s === 14);
+    else if (groove === 'halftime') hit = s === 0 || (combatLike && s === 12);
+    else if (groove === 'tribal') hit = s === 0 || s === 3 || s === 6 || s === 10 || (tension > 0.5 && s === 13);
+
+    // Explore only gets sparse kick on deep floors; combat/boss always
+    if (hit && (combatLike || this.intensity === 'boss' || (tension > 0.5 && s === 0))) {
       playModalMembrane(
         this.ctx,
         dry,
         wet,
         {
-          baseFreq: 48,
-          startFreqMult: 2.2,
-          pitchDropTime: 0.045,
-          duration: 0.2,
-          modes: [1.0, 1.59],
-          modeWeights: [1.0, 0.2],
-          noiseBurstGain: 0.06,
-          noiseCutoff: 650,
-          filterPeak: 850,
-          filterEnd: 100,
-          gain: 0.22,
-          reverbSend: 0.12
+          baseFreq: theme.kickFreq,
+          startFreqMult: 2.0 + tension * 0.6,
+          pitchDropTime: 0.04,
+          duration: 0.16 + tension * 0.06,
+          modes: [1.0, 1.59, 2.14],
+          modeWeights: [1.0, 0.28, 0.12],
+          noiseBurstGain: 0.05 + tension * 0.06,
+          noiseCutoff: 600 + tension * 500,
+          filterPeak: 800 + tension * 400,
+          filterEnd: 90,
+          gain: this.intensity === 'boss' ? 0.24 : 0.14 + tension * 0.08,
+          reverbSend: 0.1
+        },
+        when
+      );
+    }
+
+    // 9. Boss / high-tension additive alarm bell
+    if ((this.intensity === 'boss' || tension > 0.75) && s === 12 && barTotal % 2 === 0) {
+      playAdditiveBell(
+        this.ctx,
+        dry,
+        wet,
+        {
+          freq: midiToFreq(chord.pad[0] + 19),
+          duration: stepDur * 6,
+          gain: 0.07 + tension * 0.04,
+          pan: -0.15,
+          reverbSend: 0.45,
+          inharmonicity: 0.02 + tension * 0.04
         },
         when
       );
