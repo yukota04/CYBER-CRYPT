@@ -80,6 +80,10 @@ export function getMinimapTileColor(tile: Tile): string | null {
     return '#00f0ff'; // Cyan shrine
   }
 
+  if (tile.type === 'checkpoint') {
+    return tile.checkpointActivated ? '#10b981' : '#f59e0b'; // Emerald active or amber dormant checkpoint
+  }
+
   if (tile.hazard && tile.visible) {
     return '#ff0055'; // Red hazard
   }

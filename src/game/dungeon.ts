@@ -1,4 +1,11 @@
-import { DungeonState, Monster, MonsterArchetype, Room, Tile } from './types';
+import {
+  DungeonState,
+  Monster,
+  MonsterArchetype,
+  MonsterVisualVariant,
+  Room,
+  Tile
+} from './types';
 import { generateRandomLoot } from './items';
 import { getEnvironmentalEventForFloor, generateShopItems } from './events';
 
@@ -19,6 +26,100 @@ const DEFAULT_CONFIG: DungeonConfig = {
   maxRoomSize: 10,
   floor: 1
 };
+
+const EVOLVED_SHAPES: MonsterVisualVariant['bodyShape'][] = [
+  'hex',
+  'diamond',
+  'octo',
+  'spiked',
+  'serpent',
+  'titan',
+  'core'
+];
+
+const EYE_STYLES: MonsterVisualVariant['eyeStyle'][] = [
+  'twin',
+  'single',
+  'tri',
+  'visor',
+  'halo'
+];
+
+const FLOOR_TIER_PREFIXES = [
+  '',
+  'Mk-II ',
+  'Overclocked ',
+  'Apex ',
+  'Void-Forged ',
+  'Singularity ',
+  'Omega '
+];
+
+function hslToHex(h: number, s: number, l: number): string {
+  const hue = ((h % 360) + 360) % 360;
+  const sat = Math.max(0, Math.min(100, s)) / 100;
+  const light = Math.max(0, Math.min(100, l)) / 100;
+  const a = sat * Math.min(light, 1 - light);
+  const f = (n: number) => {
+    const k = (n + hue / 30) % 12;
+    const color = light - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+export function buildMonsterVisualVariant(
+  floor: number,
+  archetype: MonsterArchetype,
+  seedNum: number
+): { visualVariant: MonsterVisualVariant; primaryColor: string; evolvedPrefix: string } {
+  const tier = Math.min(6, Math.floor((floor - 1) / 2) + 1);
+  const baseHue =
+    archetype === 'core_synthesizer'
+      ? 330
+      : archetype === 'cyber_behemoth'
+      ? 350
+      : archetype === 'neon_stalker'
+      ? 48
+      : archetype === 'circuit_disruptor'
+      ? 282
+      : 188;
+
+  // Deterministic procedural hue shift per floor & individual seed so enemies visibly evolve every floor
+  const hueShift = ((floor - 1) * 37 + (seedNum % 5) * 19) % 360;
+  const finalHue = (baseHue + hueShift) % 360;
+  const secondaryHue = (finalHue + 135) % 360;
+  const auraHue = (finalHue + 60) % 360;
+
+  const primaryColor = hslToHex(finalHue, 92, 56);
+  const secondaryColor = hslToHex(secondaryHue, 90, 62);
+  const auraColor = hslToHex(auraHue, 95, 65);
+
+  const shapeIdx = (floor - 1 + seedNum + archetype.length) % EVOLVED_SHAPES.length;
+  const eyeIdx = (floor + seedNum) % EYE_STYLES.length;
+
+  const visualVariant: MonsterVisualVariant = {
+    seed: seedNum,
+    tier,
+    hueShift,
+    bodyShape: archetype === 'core_synthesizer' ? 'core' : EVOLVED_SHAPES[shapeIdx],
+    plates: Math.min(6, Math.floor((floor + 1) / 2)),
+    spikes: Math.min(12, (floor - 1) + (archetype === 'cyber_behemoth' ? 4 : 2)),
+    eyeStyle: archetype === 'core_synthesizer' ? 'halo' : EYE_STYLES[eyeIdx],
+    auraColor,
+    secondaryColor,
+    crown: archetype === 'core_synthesizer' || floor >= 4
+  };
+
+  const prefixIdx = Math.min(FLOOR_TIER_PREFIXES.length - 1, Math.floor((floor - 1) / 2));
+  return {
+    visualVariant,
+    primaryColor,
+    evolvedPrefix: FLOOR_TIER_PREFIXES[prefixIdx]
+  };
+}
 
 export function createEmptyGrid(width: number, height: number): Tile[][] {
   const tiles: Tile[][] = [];
@@ -50,7 +151,18 @@ function makeRng(seed?: number) {
 }
 
 export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial<DungeonConfig>): DungeonState {
-  const config = { ...DEFAULT_CONFIG, floor, ...customConfig };
+  const scaledWidth = DEFAULT_CONFIG.width + Math.min(16, Math.max(0, floor - 1) * 2);
+  const scaledHeight = DEFAULT_CONFIG.height + Math.min(10, Math.max(0, floor - 1));
+  const scaledRooms = DEFAULT_CONFIG.maxRooms + Math.min(6, Math.floor(Math.max(0, floor - 1) / 2));
+
+  const config: DungeonConfig = {
+    ...DEFAULT_CONFIG,
+    width: scaledWidth,
+    height: scaledHeight,
+    maxRooms: scaledRooms,
+    floor,
+    ...customConfig
+  };
   const rng = makeRng(seed);
   const { width, height, maxRooms, minRoomSize, maxRoomSize } = config;
 
@@ -87,7 +199,6 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     }
 
     if (!failed) {
-      // Carve room
       for (let rx = newRoom.x; rx < newRoom.x + newRoom.w; rx++) {
         for (let ry = newRoom.y; ry < newRoom.y + newRoom.h; ry++) {
           tiles[ry][rx] = {
@@ -102,7 +213,6 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         }
       }
 
-      // Connect with previous room via L-corridor
       if (rooms.length > 0) {
         const prev = rooms[rooms.length - 1];
         if (rng() < 0.5) {
@@ -118,9 +228,7 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     }
   }
 
-  // Ensure at least 2 rooms exist
   if (rooms.length === 0) {
-    // Fallback safe room
     const fallback: Room = { x: 5, y: 5, w: 8, h: 8, centerX: 9, centerY: 9 };
     for (let rx = 5; rx < 13; rx++) {
       for (let ry = 5; ry < 13; ry++) {
@@ -135,11 +243,45 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
   const stairsPos = { x: lastRoom.centerX, y: lastRoom.centerY };
   tiles[stairsPos.y][stairsPos.x].type = 'stairs_down';
 
-  // Place Chests & Shrines & Traps
+  // Place strictly 2 Checkpoints per map: 1 at the start room and 1 at the final room
+  const checkpoints: { x: number; y: number; activated: boolean }[] = [];
+  const startRoom = rooms[0];
+  let startPlaced = false;
+  for (let ry = startRoom.y + 1; ry < startRoom.y + startRoom.h - 1 && !startPlaced; ry++) {
+    for (let rx = startRoom.x + 1; rx < startRoom.x + startRoom.w - 1 && !startPlaced; rx++) {
+      if (
+        tiles[ry]?.[rx]?.type === 'floor' &&
+        !(rx === startRoom.centerX && ry === startRoom.centerY) &&
+        !(rx === stairsPos.x && ry === stairsPos.y)
+      ) {
+        tiles[ry][rx].type = 'checkpoint';
+        tiles[ry][rx].checkpointActivated = true;
+        checkpoints.push({ x: rx, y: ry, activated: true });
+        startPlaced = true;
+      }
+    }
+  }
+
+  let endPlaced = false;
+  for (let ry = lastRoom.y + 1; ry < lastRoom.y + lastRoom.h - 1 && !endPlaced; ry++) {
+    for (let rx = lastRoom.x + lastRoom.w - 2; rx > lastRoom.x && !endPlaced; rx--) {
+      if (
+        tiles[ry]?.[rx]?.type === 'floor' &&
+        !(rx === stairsPos.x && ry === stairsPos.y) &&
+        !(rx === startRoom.centerX && ry === startRoom.centerY)
+      ) {
+        tiles[ry][rx].type = 'checkpoint';
+        tiles[ry][rx].checkpointActivated = false;
+        checkpoints.push({ x: rx, y: ry, activated: false });
+        endPlaced = true;
+      }
+    }
+  }
+
+  // Place Chests, Shrines & Traps
   for (let i = 1; i < rooms.length; i++) {
     const room = rooms[i];
-    // Chest placement
-    if (rng() < 0.65) {
+    if (rng() < 0.72) {
       const cx = room.x + 1;
       const cy = room.y + 1;
       if (tiles[cy][cx].type === 'floor' && !(cx === stairsPos.x && cy === stairsPos.y)) {
@@ -147,15 +289,13 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         tiles[cy][cx].item = generateRandomLoot(floor);
       }
     }
-    // Shrine placement (boost/heal)
-    if (rng() < 0.35 && i !== rooms.length - 1) {
+    if (rng() < 0.38 && i !== rooms.length - 1) {
       const sx = room.x + room.w - 2;
       const sy = room.y + room.h - 2;
       if (tiles[sy][sx].type === 'floor') {
         tiles[sy][sx].type = 'shrine';
       }
     }
-    // Hidden trap
     if (rng() < 0.40) {
       const tx = Math.floor(rng() * (room.w - 2)) + room.x + 1;
       const ty = Math.floor(rng() * (room.h - 2)) + room.y + 1;
@@ -165,36 +305,50 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     }
   }
 
-  // Spawn Monsters
+  // Balanced progressive monster scaling
   const monsters: Monster[] = [];
   let monsterIdCount = 1;
+  const hpCurve = 1 + (floor - 1) * 0.25 + Math.pow(Math.max(0, floor - 1), 1.28) * 0.03;
+  const atkScale = Math.floor((floor - 1) * 2.1);
+  const defScale = Math.floor((floor - 1) * 1.1);
+  const rewardScale = 1 + (floor - 1) * 0.24;
+
+  // Monster count per room scales progressively with floor
+  const minPerRoom = 1 + Math.floor((floor - 1) / 3);
+  const maxPerRoom = Math.min(6, 2 + Math.floor((floor - 1) / 2));
 
   for (let i = 1; i < rooms.length; i++) {
     const room = rooms[i];
-    const isBossRoom = (i === rooms.length - 1 && floor % 3 === 0);
+    const isBossRoom = i === rooms.length - 1 && floor % 3 === 0;
 
     if (isBossRoom) {
-      // Spawn Boss: The Core Synthesizer
+      const bossIdNum = monsterIdCount++;
+      const variant = buildMonsterVisualVariant(floor, 'core_synthesizer', bossIdNum);
+      const bossHp = Math.round(135 * hpCurve);
       monsters.push({
-        id: `boss_${floor}_${monsterIdCount++}`,
-        name: `CORE SYNTHESIZER MK-${floor}`,
+        id: `boss_${floor}_${bossIdNum}`,
+        name: `${variant.evolvedPrefix}CORE SYNTHESIZER MK-${floor}`,
+        level: floor + 4,
         archetype: 'core_synthesizer',
         x: room.centerX,
         y: Math.max(room.y + 1, room.centerY - 1),
-        hp: 120 + floor * 55,
-        maxHp: 120 + floor * 55,
-        attack: 16 + floor * 4,
-        defense: 10 + floor * 3,
-        expReward: 140 + floor * 50,
-        shardReward: 40 + floor * 15,
+        hp: bossHp,
+        maxHp: bossHp,
+        attack: 16 + Math.floor(floor * 3.2),
+        defense: 9 + Math.floor(floor * 1.6),
+        expReward: Math.round(145 * rewardScale),
+        shardReward: Math.round(40 * rewardScale),
         alerted: true,
-        color: '#ff007f',
-        symbol: 'Ω'
+        color: variant.primaryColor,
+        symbol: 'Ω',
+        visualVariant: variant.visualVariant
       });
-      continue;
     }
 
-    const numMonsters = Math.floor(rng() * 3) + 1; // 1 to 3 monsters per room
+    const numMonsters = isBossRoom
+      ? Math.min(3, 1 + Math.floor(floor / 4))
+      : Math.floor(rng() * (maxPerRoom - minPerRoom + 1)) + minPerRoom;
+
     for (let m = 0; m < numMonsters; m++) {
       const mx = Math.floor(rng() * (room.w - 2)) + room.x + 1;
       const my = Math.floor(rng() * (room.h - 2)) + room.y + 1;
@@ -206,53 +360,63 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         continue;
       }
 
-      // Pick archetype
       const archetypeRoll = rng();
       let archetype: MonsterArchetype = 'glitch_swarmer';
-      let name = 'Glitch Swarmer';
-      let hp = 24 + floor * 8;
-      let attack = 7 + floor * 2;
-      let defense = 2 + floor;
-      let color = '#00f0ff';
+      let baseName = 'Glitch Swarmer';
+      let baseHp = 24;
+      let baseAtk = 7;
+      let baseDef = 2;
       let symbol = '👾';
-      let expReward = 20 + floor * 5;
-      let shardReward = 5 + floor * 2;
+      let baseExp = 20;
+      let baseShard = 5;
 
-      if (archetypeRoll > 0.75) {
+      // Higher floors unlock stronger archetype weightings smoothly
+      const eliteBias = Math.min(0.25, (floor - 1) * 0.03);
+      if (archetypeRoll > 0.78 - eliteBias) {
         archetype = 'cyber_behemoth';
-        name = 'Cyber Behemoth';
-        hp = 55 + floor * 18;
-        attack = 13 + floor * 3;
-        defense = 6 + floor * 2;
-        color = '#ff3366';
+        baseName = 'Cyber Behemoth';
+        baseHp = 52;
+        baseAtk = 12;
+        baseDef = 5;
         symbol = '🤖';
-        expReward = 50 + floor * 12;
-        shardReward = 14 + floor * 4;
-      } else if (archetypeRoll > 0.45) {
+        baseExp = 48;
+        baseShard = 14;
+      } else if (archetypeRoll > 0.48 - eliteBias * 0.5) {
         archetype = 'neon_stalker';
-        name = 'Neon Stalker';
-        hp = 30 + floor * 9;
-        attack = 10 + floor * 3;
-        defense = 3 + floor;
-        color = '#ffe600';
+        baseName = 'Neon Stalker';
+        baseHp = 30;
+        baseAtk = 10;
+        baseDef = 3;
         symbol = '👁️';
-        expReward = 32 + floor * 8;
-        shardReward = 8 + floor * 3;
+        baseExp = 32;
+        baseShard = 8;
       } else if (archetypeRoll > 0.25) {
         archetype = 'circuit_disruptor';
-        name = 'Circuit Disruptor';
-        hp = 35 + floor * 10;
-        attack = 9 + floor * 2;
-        defense = 4 + floor;
-        color = '#bd00ff';
+        baseName = 'Circuit Disruptor';
+        baseHp = 34;
+        baseAtk = 9;
+        baseDef = 4;
         symbol = '⚡';
-        expReward = 38 + floor * 9;
-        shardReward = 10 + floor * 3;
+        baseExp = 36;
+        baseShard = 10;
       }
 
+      const idNum = monsterIdCount++;
+      const variant = buildMonsterVisualVariant(floor, archetype, idNum);
+      const hp = Math.round(baseHp * hpCurve);
+      const attack = baseAtk + atkScale;
+      const defense = baseDef + defScale;
+      const monsterLevel =
+        archetype === 'cyber_behemoth'
+          ? floor + 2
+          : archetype === 'neon_stalker' || archetype === 'circuit_disruptor'
+          ? floor + 1
+          : floor;
+
       monsters.push({
-        id: `mob_${floor}_${monsterIdCount++}`,
-        name,
+        id: `mob_${floor}_${idNum}`,
+        name: `${variant.evolvedPrefix}${baseName}`,
+        level: monsterLevel,
         archetype,
         x: mx,
         y: my,
@@ -260,28 +424,45 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
         maxHp: hp,
         attack,
         defense,
-        expReward,
-        shardReward,
+        expReward: Math.round(baseExp * rewardScale),
+        shardReward: Math.round(baseShard * rewardScale),
         alerted: false,
-        color,
-        symbol
+        color: variant.primaryColor,
+        symbol,
+        visualVariant: variant.visualVariant
       });
     }
   }
 
   // Check for Environmental Event (triggers every 5 floors)
   const activeEvent = getEnvironmentalEventForFloor(floor, seed);
-  let shopItems: DungeonState['shopItems'] = undefined;
 
+  // Place NPC Merchant Shop at the start of EVERY floor inside startRoom (rooms[0])
+  let shopPlaced = false;
+  for (let ry = startRoom.y + 1; ry < startRoom.y + startRoom.h - 1 && !shopPlaced; ry++) {
+    for (let rx = startRoom.x + startRoom.w - 2; rx > startRoom.x && !shopPlaced; rx--) {
+      if (
+        tiles[ry]?.[rx]?.type === 'floor' &&
+        !(rx === startRoom.centerX && ry === startRoom.centerY) &&
+        !(rx === stairsPos.x && ry === stairsPos.y)
+      ) {
+        tiles[ry][rx].type = 'shop';
+        shopPlaced = true;
+      }
+    }
+  }
+
+  // On Black Market event floors, also place a secondary bonus Black Market terminal mid-floor
   if (activeEvent?.id === 'black_market' && rooms.length > 1) {
     const shopRoom = rooms[Math.min(rooms.length - 1, Math.max(1, Math.floor(rooms.length / 2)))];
     const sx = shopRoom.centerX;
     const sy = shopRoom.centerY;
-    if (tiles[sy][sx].type !== 'stairs_down') {
+    if (tiles[sy][sx].type === 'floor') {
       tiles[sy][sx].type = 'shop';
     }
-    shopItems = generateShopItems(floor);
   }
+
+  const shopItems = generateShopItems(floor, activeEvent?.id === 'black_market');
 
   return {
     floor,
@@ -292,7 +473,10 @@ export function generateDungeon(floor = 1, seed?: number, customConfig?: Partial
     monsters,
     stairsPos,
     activeEvent,
-    shopItems
+    shopItems,
+    groundCoins: [],
+    checkpoints,
+    deathDrops: []
   };
 }
 
@@ -337,18 +521,17 @@ export function updateFOV(tiles: Tile[][], startX: number, startY: number, radiu
   const height = tiles.length;
   const width = tiles[0].length;
 
-  // Clear visibility
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       tiles[y][x].visible = false;
     }
   }
 
-  // Center is always visible and explored
-  tiles[startY][startX].visible = true;
-  tiles[startY][startX].explored = true;
+  if (tiles[startY]?.[startX]) {
+    tiles[startY][startX].visible = true;
+    tiles[startY][startX].explored = true;
+  }
 
-  // Raycast 360 degrees
   const steps = 180;
   for (let i = 0; i < steps; i++) {
     const angle = (i * 2 * Math.PI) / steps;
@@ -369,7 +552,6 @@ export function updateFOV(tiles: Tile[][], startX: number, startY: number, radiu
       tiles[ty][tx].visible = true;
       tiles[ty][tx].explored = true;
 
-      // Walls block further light
       if (!tiles[ty][tx].transparent) {
         break;
       }

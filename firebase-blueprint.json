@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated operative profile linked to Google Sign-In for cloud sync progression.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID matching the document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Sanitized operative display name.",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Optional avatar URL from Google profile.",
+          "maxLength": 512
+        },
+        "highestFloor": {
+          "type": "number",
+          "description": "Highest dungeon floor reached."
+        },
+        "bestScore": {
+          "type": "number",
+          "description": "Highest achieved run score."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last profile sync."
+        }
+      },
+      "required": ["uid", "displayName", "highestFloor", "bestScore", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/userProfiles/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner-only operative profile and progression summary."
+    }
+  }
+}

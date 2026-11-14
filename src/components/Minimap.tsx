@@ -132,6 +132,27 @@ export const Minimap: React.FC<MinimapProps> = ({
         ctx.stroke();
       }
 
+      // 2b. Draw Explored Death Drop Bags (Floating Skulls)
+      if (dungeon.deathDrops && dungeon.deathDrops.length > 0) {
+        for (const drop of dungeon.deathDrops) {
+          if (!dungeon.tiles[drop.y]?.[drop.x]?.explored) continue;
+          const dx = padding + drop.x * cellW + cellW / 2;
+          const dy = padding + drop.y * cellH + cellH / 2;
+          const ringR = Math.max(4, cellW * 1.3) + (Math.sin(pulseRef.current * 1.5) + 1) * 1.5;
+
+          ctx.strokeStyle = '#ff007f';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(dx, dy, ringR, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffe600';
+          ctx.beginPath();
+          ctx.arc(dx, dy, Math.max(2.6, cellW * 0.8), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       // 3. Draw Player Marker (Pulsing Cyan Beacon with Visor Direction)
       const plx = padding + player.x * cellW + cellW / 2;
       const ply = padding + player.y * cellH + cellH / 2;
@@ -178,7 +199,7 @@ export const Minimap: React.FC<MinimapProps> = ({
 
   if (!isOpen) return null;
 
-  const canvasDim = isExpanded ? 340 : 200;
+  const canvasDim = isExpanded ? 320 : 148;
 
   return (
     <div
@@ -186,8 +207,8 @@ export const Minimap: React.FC<MinimapProps> = ({
       aria-label="Minimap Overlay"
       className={`fixed z-30 transition-all duration-200 select-none font-mono ${
         isExpanded
-          ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px]'
-          : 'top-16 right-4 w-[232px]'
+          ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-[380px]'
+          : 'top-20 right-2 w-[164px] sm:top-16 sm:right-4 sm:w-[232px]'
       } bg-[#080516]/95 backdrop-blur-md border border-cyan-500/50 rounded-xl shadow-[0_0_25px_rgba(0,240,255,0.3)] overflow-hidden`}
     >
       {/* Header Bar */}
@@ -200,22 +221,24 @@ export const Minimap: React.FC<MinimapProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={() => setIsExpanded(prev => !prev)}
             aria-label={isExpanded ? 'Minimize Minimap' : 'Expand Minimap'}
-            className="p-1 hover:text-white hover:bg-cyan-500/20 rounded transition-colors text-cyan-400"
+            className="flex items-center justify-center w-8 h-8 hover:text-white bg-cyan-950/80 hover:bg-cyan-600/40 border border-cyan-400/60 rounded-lg transition-colors text-cyan-200 cursor-pointer"
             title={isExpanded ? 'Compact [M]' : 'Expand'}
           >
-            {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isExpanded ? <Minimize2 className="w-4 h-4 stroke-[2.25]" /> : <Maximize2 className="w-4 h-4 stroke-[2.25]" />}
           </button>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close Minimap"
-            className="p-1 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors text-slate-400"
+            className="flex items-center justify-center w-9 h-8 bg-rose-950/90 hover:bg-rose-600 text-rose-100 hover:text-white border-2 border-rose-400/85 shadow-[0_0_10px_rgba(244,63,94,0.4)] rounded-lg transition-colors cursor-pointer"
             title="Close [M]"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-5 h-5 stroke-[2.75]" />
           </button>
         </div>
       </div>

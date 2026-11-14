@@ -6,6 +6,7 @@ interface PauseModalProps {
   onResume: () => void;
   onRestart: () => void;
   onReturnToTitle: () => void;
+  onOpenOptions: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
   floor: number;
@@ -16,6 +17,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
   onResume,
   onRestart,
   onReturnToTitle,
+  onOpenOptions,
   isMuted,
   onToggleMute,
   floor,
@@ -37,6 +39,15 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             width={280}
             height={48}
             onClick={onResume}
+          />
+
+          <CanvasButton
+            label={t('optionsBtn', language).toUpperCase()}
+            icon="⚙"
+            theme="purple"
+            width={280}
+            height={44}
+            onClick={onOpenOptions}
           />
 
           <CanvasButton

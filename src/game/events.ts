@@ -1,5 +1,5 @@
 import { EnvironmentalEvent, GameItem, Monster, Player, DungeonState } from './types';
-import { createItem, BASE_ITEMS } from './items';
+import { createItem, BASE_ITEMS, getProbabilityStoneCost } from './items';
 
 export const ENVIRONMENTAL_EVENTS: EnvironmentalEvent[] = [
   {
@@ -59,57 +59,89 @@ export function getEnvironmentalEventForFloor(floor: number, seed = 0): Environm
 }
 
 /**
- * Generates high-tier shop inventory for Black Market floors.
+ * Generates NPC Merchant inventory at the start of every floor:
+ * - Tiered potions (Vitality, Energy, Dual, Regen Over Time, Igneous Burn, Aegis Shield, Cooldown Reset) in Cyber-Coins
+ * - Probability Stone (+60% Forge success) priced at 1000 Coins on Floor 1 scaling by floor
+ * - Elite cybernetic weapons & armor in Soul Shards (Diamonds)
  */
-export function generateShopItems(floor: number): GameItem[] {
-  const shopList: GameItem[] = [
+export function generateShopItems(floor: number, includeBlackMarketBonus = false): GameItem[] {
+  const uid = (tag: string) => `shop_${tag}_f${floor}_${Math.random().toString(36).substring(2, 6)}`;
+  const coinScale = 1 + Math.max(0, floor - 1) * 0.14;
+  const stoneCost = getProbabilityStoneCost(floor);
+
+  const potionKeys = [
+    'stim_pack',
+    'energy_cell',
+    'super_stim',
+    'hyper_cell',
+    'dual_elixir',
+    'regen_serum',
+    'igneous_potion',
+    'aegis_tonic',
+    'berserk_vial',
+    ...(floor >= 3 ? ['omega_medkit', 'grand_regen_serum', 'inferno_potion', 'omni_serum'] : ['overclock_serum'])
+  ];
+
+  const potions: GameItem[] = potionKeys.map(key => {
+    const item = createItem(key, uid(key));
+    return {
+      ...item,
+      currency: 'coins',
+      value: Math.round(item.value * coinScale)
+    };
+  });
+
+  const stoneItem: GameItem = {
+    id: uid('prob_stone'),
+    name: 'Probability Stone (+60%)',
+    type: 'consumable',
+    rarity: 'legendary',
+    description: 'Insert into the Forge upgrade slot to boost success rate by +60% (40%+ becomes 100% safe!).',
+    effectType: 'stone',
+    currency: 'coins',
+    value: stoneCost,
+    icon: '🔮'
+  };
+
+  const shardGear: GameItem[] = [
     {
-      id: `shop_stim_${floor}_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Hyper-Nanite Surge Injector',
-      type: 'consumable',
-      rarity: 'rare',
-      description: 'Military-grade medical nanites. Instantly restores 85 HP.',
-      healAmount: 85,
-      effectType: 'heal',
-      value: 35, // Soul shards cost
-      icon: '💉'
-    },
-    {
-      id: `shop_cell_${floor}_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Supercharged Tachyon Cell',
-      type: 'consumable',
-      rarity: 'rare',
-      description: 'Restores 60 Energy immediately and removes cooldowns.',
-      energyAmount: 60,
-      effectType: 'energy',
-      value: 30, // Soul shards cost
-      icon: '🔋'
-    },
-    {
-      id: `shop_wep_${floor}_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Plasma Arc Katana',
+      id: uid('wep'),
+      name: floor >= 5 ? 'Void-Edge Plasma Katana' : 'Plasma Arc Katana',
       type: 'weapon',
-      rarity: 'epic',
+      weaponCategory: 'katana',
+      allowedClasses: ['striker'],
+      rarity: floor >= 5 ? 'legendary' : 'epic',
       description: 'Superheated energy blade engineered for slicing rogue mainframe cores.',
-      attackBonus: 14 + Math.floor(floor * 1.5),
+      attackBonus: 14 + Math.floor(floor * 1.6),
       critBonus: 0.16,
-      value: 75, // Soul shards cost
+      currency: 'shards',
+      value: 65 + floor * 6,
       icon: '⚔️'
     },
     {
-      id: `shop_arm_${floor}_${Math.random().toString(36).substring(2, 6)}`,
+      id: uid('arm'),
       name: 'Aegis Carbon Nano-Weave',
-      type: 'armor',
-      rarity: 'epic',
+      type: 'chest',
+      rarity: floor >= 5 ? 'legendary' : 'epic',
       description: 'Hardened graphene composite armor with built-in kinetic dissipators.',
-      defenseBonus: 10 + Math.floor(floor * 1.2),
-      hpBonus: 35,
-      value: 80, // Soul shards cost
+      defenseBonus: 10 + Math.floor(floor * 1.3),
+      hpBonus: 35 + floor * 5,
+      currency: 'shards',
+      value: 70 + floor * 6,
       icon: '🛡️'
     }
   ];
 
-  return shopList;
+  if (includeBlackMarketBonus) {
+    const bonusRelic = createItem(floor >= 4 ? 'mythic_chronos_ring' : 'crimson_signet', uid('bm_relic'));
+    shardGear.push({
+      ...bonusRelic,
+      currency: 'shards',
+      value: 95 + floor * 8
+    });
+  }
+
+  return [stoneItem, ...potions, ...shardGear];
 }
 
 /**
