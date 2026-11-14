@@ -262,6 +262,10 @@ export interface Player {
   equipment: PlayerEquipment;
   inventory: GameItem[];
   maxInventory: number;
+  /** Extra backpack slots unlocked by watching ads (up to 8 → 24 total). */
+  inventoryBonusSlots?: number;
+  /** Epoch ms when all bonus slots expire together (timer resets on each new unlock). */
+  inventoryBonusExpiresAt?: number;
   activeCooldowns: Record<string, number>; // skillId -> remaining turns
   unlockedSkills: string[];
   facing: 'up' | 'down' | 'left' | 'right';

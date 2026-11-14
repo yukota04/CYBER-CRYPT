@@ -14,6 +14,15 @@ import {
 import { getTotalStats } from '../game/combat';
 import { getRarityStyle } from '../game/rarity';
 import { getLocalizedItemDescription, getLocalizedItemName } from '../game/itemI18n';
+import {
+  BASE_INVENTORY_SLOTS,
+  MAX_INVENTORY_SLOTS,
+  canUnlockInventorySlot,
+  formatBonusCountdown,
+  getActiveBonusSlots,
+  getBonusTimeRemainingMs
+} from '../game/inventorySlots';
+import { showAdsBitvexRewarded } from '../game/adsbitvex';
 import { X, Backpack, Shield, Hammer, Lock, AlertTriangle, Tv } from 'lucide-react';
 
 interface InventoryModalProps {
@@ -28,6 +37,7 @@ interface InventoryModalProps {
   destroyedItemPendingRecovery: GameItem | null;
   onRecoverDestroyedItem: () => void;
   onDeclineRecoverDestroyedItem: () => void;
+  onUnlockInventorySlot?: () => void;
   upgradeFeedback?: { status: 'success' | 'destroyed'; message: string } | null;
   language: Language;
 }
@@ -44,6 +54,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   destroyedItemPendingRecovery,
   onRecoverDestroyedItem,
   onDeclineRecoverDestroyedItem,
+  onUnlockInventorySlot,
   upgradeFeedback,
   language
 }) => {
@@ -57,6 +68,17 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const [adPhase, setAdPhase] = useState<'loading' | 'playing'>('loading');
   const [adProgress, setAdProgress] = useState<number>(0);
   const [adError, setAdError] = useState<string | null>(null);
+  const [slotAdPlaying, setSlotAdPlaying] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const activeBonus = getActiveBonusSlots(player, nowTick);
+  const bonusRemaining = getBonusTimeRemainingMs(player, nowTick);
+  const canAddSlot = canUnlockInventorySlot(player, nowTick) && !!onUnlockInventorySlot;
 
   const stoneCount = player.stats.probabilityStones || 0;
   const stoneActive = stoneInserted && stoneCount > 0;
@@ -271,14 +293,65 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
           <div className="md:col-span-7 flex flex-col gap-4">
             {activeTab === 'backpack' && (
               <div>
-                <div className="flex items-center justify-between text-xs text-cyan-400 font-bold mb-2">
+                <div className="flex items-center justify-between text-xs text-cyan-400 font-bold mb-2 gap-2">
                   <span>{t('inventoryCache', language)}</span>
                   <span className="text-slate-400">
                     {player.inventory.length} / {player.maxInventory}
+                    {activeBonus > 0 ? (
+                      <span className="text-amber-300 ml-1">(+{activeBonus})</span>
+                    ) : null}
                   </span>
                 </div>
+                <p className="text-[10px] text-slate-500 mb-2 leading-snug">
+                  {t('inventorySlotBonusHint', language)}
+                </p>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <button
+                    type="button"
+                    data-testid="unlock-inventory-slot-btn"
+                    disabled={!canAddSlot || slotAdPlaying}
+                    onClick={async () => {
+                      if (!onUnlockInventorySlot || !canAddSlot || slotAdPlaying) return;
+                      setSlotAdPlaying(true);
+                      setAdError(null);
+                      try {
+                        const result = await showAdsBitvexRewarded({});
+                        if (result.ok) onUnlockInventorySlot();
+                        else setAdError(result.message || result.reason);
+                      } catch {
+                        setAdError('Ad failed');
+                      } finally {
+                        setSlotAdPlaying(false);
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition ${
+                      canAddSlot && !slotAdPlaying
+                        ? 'bg-amber-950/80 border-amber-400/50 text-amber-200 hover:bg-amber-900/80 cursor-pointer'
+                        : 'bg-slate-900/60 border-slate-700 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Tv className="w-3.5 h-3.5" />
+                    {slotAdPlaying
+                      ? '...'
+                      : player.maxInventory >= MAX_INVENTORY_SLOTS && activeBonus >= MAX_INVENTORY_SLOTS - BASE_INVENTORY_SLOTS
+                      ? t('inventorySlotsMaxed', language)
+                      : t('unlockInventorySlot', language)}
+                  </button>
+                  {activeBonus > 0 && (
+                    <span
+                      data-testid="inventory-bonus-timer"
+                      className="text-[10px] font-bold text-pink-300 bg-pink-950/50 border border-pink-500/40 px-2 py-1 rounded"
+                    >
+                      {t('inventorySlotTimer', language)} {formatBonusCountdown(bonusRemaining)}
+                    </span>
+                  )}
+                </div>
+                {adError && activeTab === 'backpack' && (
+                  <div className="text-[10px] text-rose-300 mb-2">{adError}</div>
+                )}
                 <div className="grid grid-cols-4 gap-2">
                   {Array.from({ length: player.maxInventory }).map((_, idx) => {
+                    const isBonusSlot = idx >= BASE_INVENTORY_SLOTS;
                     const item = player.inventory[idx];
                     const isSelected = liveSelected && item && liveSelected.id === item.id;
                     const compatible = item
@@ -302,9 +375,14 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                             ? `${rStyle.cardClass} ${isSelected ? rStyle.selectedClass : ''} ${
                                 !compatible ? 'opacity-65' : ''
                               }`
+                            : isBonusSlot
+                            ? 'border-amber-500/35 bg-amber-950/20 cursor-default'
                             : 'border-slate-800/80 bg-slate-950/20 cursor-default'
                         }`}
                       >
+                        {isBonusSlot && (
+                          <span className="absolute bottom-0.5 left-0.5 text-[7px] font-bold text-amber-400/80">AD</span>
+                        )}
                         {item && rStyle ? (
                           <>
                             <div className={`absolute top-0 inset-x-0 h-0.5 ${rStyle.accentBarClass}`} />

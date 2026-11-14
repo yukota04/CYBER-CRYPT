@@ -504,6 +504,22 @@ app.post('/api/auth/register', authLimiter, (req, res) => {
   });
 });
 
+// Auth: restore persistent session ("keep signed in")
+app.get('/api/auth/me', authLimiter, authMiddleware, (req, res) => {
+  const user = (req as any).user as ServerUser;
+  ensureUserLoginField(user);
+  res.json({
+    user: {
+      id: user.id,
+      login: user.login,
+      username: user.username,
+      role: user.role,
+      email: user.email
+    },
+    token: user.token
+  });
+});
+
 // Auth: Login — by account login name (also accepts nick for backwards compatibility)
 app.post('/api/auth/login', authLimiter, (req, res) => {
   const { login, username, password, platform = 'web' } = req.body || {};

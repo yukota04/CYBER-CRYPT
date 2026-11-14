@@ -31,6 +31,14 @@ import {
   upgradeItem
 } from './items';
 import { generateShopItems } from './events';
+import {
+  BASE_INVENTORY_SLOTS,
+  MAX_INVENTORY_SLOTS,
+  canUnlockInventorySlot,
+  getActiveBonusSlots,
+  unlockInventorySlotFromAd,
+  refreshInventoryCapacity
+} from './inventorySlots';
 import { CoopRoomManager } from '../server/coopRooms';
 
 test('dungeon generator creates valid walkable rooms, stairs, and checkpoints', () => {
@@ -212,6 +220,35 @@ test('party size scales creature HP and attack', () => {
   const avgAtk = (list: typeof all1) => list.reduce((s, m) => s + m.attack, 0) / list.length;
   assert.ok(avgHp(all3) > avgHp(all1) * 1.4, '3P dungeon monsters should have much higher HP');
   assert.ok(avgAtk(all3) > avgAtk(all1) * 1.2, '3P dungeon monsters should hit harder');
+});
+
+test('ad inventory slots accumulate to 24 and share a resetting 24h timer', () => {
+  const player = createInitialPlayer('striker');
+  assert.equal(player.maxInventory, BASE_INVENTORY_SLOTS);
+  assert.equal(canUnlockInventorySlot(player), true);
+
+  const t0 = 1_700_000_000_000;
+  let r = unlockInventorySlotFromAd(player, t0);
+  assert.equal(r.ok, true);
+  assert.equal(getActiveBonusSlots(player, t0), 1);
+  assert.equal(player.maxInventory, BASE_INVENTORY_SLOTS + 1);
+  const firstExpiry = player.inventoryBonusExpiresAt || 0;
+
+  r = unlockInventorySlotFromAd(player, t0 + 60_000);
+  assert.equal(r.ok, true);
+  assert.equal(getActiveBonusSlots(player, t0 + 60_000), 2);
+  assert.ok((player.inventoryBonusExpiresAt || 0) > firstExpiry, 'new ad resets shared 24h timer');
+
+  const lastUnlock = t0 + 200_000;
+  for (let i = 0; i < 20; i++) unlockInventorySlotFromAd(player, lastUnlock);
+  assert.equal(player.maxInventory, MAX_INVENTORY_SLOTS);
+  assert.equal(canUnlockInventorySlot(player, lastUnlock), false);
+
+  // After 24h from the latest unlock, all bonus slots close
+  const afterExpiry = lastUnlock + 24 * 60 * 60 * 1000 + 1;
+  refreshInventoryCapacity(player, afterExpiry);
+  assert.equal(getActiveBonusSlots(player, afterExpiry), 0);
+  assert.equal(player.maxInventory, BASE_INVENTORY_SLOTS);
 });
 
 test('shop stock improves with floor depth', () => {

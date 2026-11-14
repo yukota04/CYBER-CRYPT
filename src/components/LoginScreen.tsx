@@ -17,6 +17,7 @@ import {
 export interface AuthCredentials {
   login: string;
   password: string;
+  keepSignedIn: boolean;
 }
 
 export interface RegisterPayload {
@@ -24,12 +25,13 @@ export interface RegisterPayload {
   nick: string;
   password: string;
   passwordConfirm: string;
+  keepSignedIn: boolean;
 }
 
 interface LoginScreenProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
-  onGuestLogin: () => void;
+  onGuestLogin: (opts: { keepSignedIn: boolean }) => void;
   onPasswordLogin: (creds: AuthCredentials) => void | Promise<void>;
   onRegister: (payload: RegisterPayload) => void | Promise<void>;
   isAuthLoading: boolean;
@@ -39,6 +41,8 @@ interface LoginScreenProps {
   canInstallPwa?: boolean;
   onInstallPwa?: () => void;
   isInstallBusy?: boolean;
+  /** Prefill for "keep signed in" (default true). */
+  initialKeepSignedIn?: boolean;
 }
 
 type Panel = 'menu' | 'login' | 'register';
@@ -95,13 +99,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onToggleFullscreen,
   canInstallPwa = false,
   onInstallPwa,
-  isInstallBusy = false
+  isInstallBusy = false,
+  initialKeepSignedIn = true
 }) => {
   const [panel, setPanel] = useState<Panel>('menu');
   const [loginName, setLoginName] = useState('');
   const [nick, setNick] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [keepSignedIn, setKeepSignedIn] = useState(initialKeepSignedIn);
   const [loginStatus, setLoginStatus] = useState<FieldStatus>('idle');
   const [nickStatus, setNickStatus] = useState<FieldStatus>('idle');
   const [localError, setLocalError] = useState<string | null>(null);
@@ -176,7 +182,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setLocalError(t('authFillRequired', language));
       return;
     }
-    await onPasswordLogin({ login: cleanLogin, password });
+    await onPasswordLogin({ login: cleanLogin, password, keepSignedIn });
   };
 
   const handleRegisterSubmit = async () => {
@@ -208,9 +214,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       login: cleanLogin,
       nick: cleanNick,
       password,
-      passwordConfirm
+      passwordConfirm,
+      keepSignedIn
     });
   };
+
+  const KeepSignedInToggle = (
+    <label
+      data-testid="keep-signed-in-toggle"
+      className="flex items-center gap-2.5 w-full px-1 py-1.5 text-left cursor-pointer select-none"
+    >
+      <input
+        type="checkbox"
+        checked={keepSignedIn}
+        onChange={e => setKeepSignedIn(e.target.checked)}
+        className="w-4 h-4 accent-cyan-400 rounded border-cyan-500/60 bg-slate-950"
+      />
+      <span className="text-[11px] text-cyan-100/90 font-semibold tracking-wide">
+        {t('keepSignedIn', language)}
+      </span>
+    </label>
+  );
 
   const notice = localError || authNotice;
   const registerReady =
@@ -327,11 +351,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <span className="text-[10px] text-slate-500 uppercase">OR</span>
                 <div className="flex-1 h-px bg-slate-800" />
               </div>
+              {KeepSignedInToggle}
               <button
                 type="button"
                 data-testid="login-guest-btn"
                 disabled={isAuthLoading}
-                onClick={onGuestLogin}
+                onClick={() => onGuestLogin({ keepSignedIn })}
                 className="w-full min-h-[50px] px-4 py-3 rounded-xl bg-gradient-to-r from-cyan-950/90 to-purple-950/90 border border-cyan-400/60 text-cyan-100 font-bold text-sm flex items-center justify-center gap-2.5 shadow-[0_0_20px_rgba(0,240,255,0.2)] transition cursor-pointer disabled:opacity-40 enabled:hover:from-cyan-900 enabled:hover:to-purple-900 enabled:active:scale-[0.98]"
               >
                 <UserCheck className="w-4 h-4 text-cyan-300" />
@@ -373,6 +398,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 }}
                 className="w-full min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono"
               />
+              {KeepSignedInToggle}
               <button
                 type="button"
                 data-testid="login-submit-btn"
@@ -471,6 +497,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 }}
                 className="w-full min-h-[46px] px-3 py-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/50 focus:border-cyan-300 focus:outline-none text-white text-sm font-mono"
               />
+
+              {KeepSignedInToggle}
 
               <button
                 type="button"
