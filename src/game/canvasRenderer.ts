@@ -304,18 +304,20 @@ export class CanvasRenderer {
   }
 
   private drawProceduralMonster(ctx: CanvasRenderingContext2D, monster: Monster, mx: number, my: number, nowSec: number) {
+    const scale = Math.max(1, monster.renderScale || (monster.isFloorBoss ? 1.7 : 1));
     const cx = mx + 16;
     const cy = my + 16;
     const bodyColor = monster.color;
 
     // Fast path for performance preset — skip aura/spikes/polygons
     if (this.simpleEntities) {
+      const s = 10 * scale;
       ctx.fillStyle = bodyColor;
-      ctx.fillRect(mx + 6, my + 6, 20, 20);
+      ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
       ctx.fillStyle = '#0a0718';
-      ctx.fillRect(mx + 10, my + 10, 12, 12);
+      ctx.fillRect(cx - s * 0.45, cy - s * 0.45, s * 0.9, s * 0.9);
       ctx.fillStyle = bodyColor;
-      ctx.font = '14px monospace';
+      ctx.font = `${Math.round(12 * scale)}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(monster.symbol || '?', cx, cy + 1);
@@ -328,12 +330,17 @@ export class CanvasRenderer {
     const tier = v?.tier || 1;
     const shape = v?.bodyShape || (monster.archetype === 'core_synthesizer' ? 'core' : 'hex');
 
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -cy);
+
     // Evolving Outer Aura Halo on Tier >= 2
-    if (tier >= 2) {
+    if (tier >= 2 || monster.isFloorBoss) {
       const pulse = 12 + Math.sin(nowSec * 4 + (v?.seed || 1)) * 2 + tier * 0.5;
       ctx.strokeStyle = auraColor;
-      ctx.globalAlpha = 0.28;
-      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = monster.isFloorBoss ? 0.4 : 0.28;
+      ctx.lineWidth = monster.isFloorBoss ? 2.2 : 1.5;
       ctx.beginPath();
       ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
       ctx.stroke();
@@ -429,6 +436,8 @@ export class CanvasRenderer {
       ctx.fillRect(cx - 6, cy - 3, 4, 4);
       ctx.fillRect(cx + 2, cy - 3, 4, 4);
     }
+
+    ctx.restore(); // end boss scale
   }
 
   private gearColor(item: GameItem | null | undefined, fallback: string): string {
@@ -816,16 +825,29 @@ export class CanvasRenderer {
           }
 
           if (tile.type === 'stairs_down') {
-            ctx.fillStyle = isLit ? theme.accent : '#007788';
+            const locked = !!dungeon.stairsLocked;
+            ctx.fillStyle = isLit
+              ? locked
+                ? '#4a1528'
+                : theme.accent
+              : locked
+                ? '#2a0c16'
+                : '#007788';
             ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
             ctx.fillStyle = theme.floorDark;
             ctx.fillRect(screenX + 8, screenY + 8, this.tileSize - 16, this.tileSize - 16);
             if (detail) {
-              ctx.fillStyle = isLit ? '#ffe600' : '#887700';
+              ctx.fillStyle = locked
+                ? isLit
+                  ? '#ff6688'
+                  : '#884455'
+                : isLit
+                  ? '#ffe600'
+                  : '#887700';
               ctx.font = '14px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
-              ctx.fillText('▼', screenX + 16, screenY + 16);
+              ctx.fillText(locked ? '✕' : '▼', screenX + 16, screenY + 16);
             }
           } else if (tile.type === 'checkpoint') {
             const cpActive = !!tile.checkpointActivated;
@@ -912,25 +934,28 @@ export class CanvasRenderer {
       }
     }
 
-    // 1a. Pushable crates
+    // 1a. Pushable crates — muted debris look (no neon glow); skip broken
     if (dungeon.crates && dungeon.crates.length) {
       for (const crate of dungeon.crates) {
+        if (crate.broken) continue;
         const tx = Math.floor(crate.x);
         const ty = Math.floor(crate.y);
         const tile = dungeon.tiles[ty]?.[tx];
         if (!tile || !tile.explored) continue;
         const screenX = tx * this.tileSize;
         const screenY = ty * this.tileSize;
-        const bob = Math.sin(nowSec * 3 + tx) * 0.8;
-        ctx.fillStyle = tile.visible ? '#8b5a2b' : '#4a3018';
-        ctx.fillRect(screenX + 5, screenY + 5 + bob, this.tileSize - 10, this.tileSize - 10);
-        ctx.fillStyle = tile.visible ? '#c4a574' : '#6a5040';
-        ctx.fillRect(screenX + 8, screenY + 8 + bob, this.tileSize - 16, 4);
-        ctx.fillRect(screenX + 8, screenY + 18 + bob, this.tileSize - 16, 4);
-        if (tile.visible) {
-          ctx.strokeStyle = `rgba(${pr},${pg},${pb},${0.25 + pulse * 0.3})`;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(screenX + 5, screenY + 5 + bob, this.tileSize - 10, this.tileSize - 10);
+        // Blend into floor palette so crates read as scenery until inspected
+        ctx.fillStyle = tile.visible ? '#3a3228' : '#1e1a14';
+        ctx.fillRect(screenX + 6, screenY + 7, this.tileSize - 12, this.tileSize - 13);
+        ctx.fillStyle = tile.visible ? '#524636' : '#2a241c';
+        ctx.fillRect(screenX + 8, screenY + 9, this.tileSize - 16, 3);
+        ctx.fillRect(screenX + 8, screenY + 16, this.tileSize - 16, 3);
+        if (tile.visible && crate.hp < crate.maxHp) {
+          const pct = Math.max(0, crate.hp / crate.maxHp);
+          ctx.fillStyle = '#1a1510';
+          ctx.fillRect(screenX + 8, screenY + 4, this.tileSize - 16, 2);
+          ctx.fillStyle = '#a67c52';
+          ctx.fillRect(screenX + 8, screenY + 4, (this.tileSize - 16) * pct, 2);
         }
       }
     }

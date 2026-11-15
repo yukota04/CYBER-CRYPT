@@ -25,6 +25,9 @@ interface GameHUDProps {
   coopRoom?: CoopRoomState | null;
   localPlayerId?: string;
   fps?: number;
+  /** Round-trip latency in ms — only shown in online mode */
+  pingMs?: number | null;
+  isOnlineCoop?: boolean;
   onToggleMinimap: () => void;
   onToggleMute: () => void;
   onOpenInventory: () => void;
@@ -48,6 +51,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   coopRoom,
   localPlayerId,
   fps = 0,
+  pingMs = null,
+  isOnlineCoop = false,
   onToggleMinimap,
   onToggleMute,
   onOpenInventory,
@@ -217,9 +222,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <div
             data-testid="fps-counter"
             className="col-span-3 sm:col-span-1 sm:order-first px-2 py-1 rounded bg-black/50 border border-slate-700 text-[10px] font-mono text-emerald-300 tabular-nums text-center"
-            title="Frames per second"
+            title={isOnlineCoop ? 'Frames per second / network RTT' : 'Frames per second'}
           >
             {Math.round(fps)} FPS
+            {isOnlineCoop && typeof pingMs === 'number' ? (
+              <span
+                data-testid="ping-ms"
+                className={`ml-1.5 ${
+                  pingMs < 100 ? 'text-emerald-300' : pingMs < 200 ? 'text-amber-300' : 'text-rose-300'
+                }`}
+              >
+                {Math.round(pingMs)} ms
+              </span>
+            ) : null}
           </div>
           <button
             onClick={onToggleMinimap}

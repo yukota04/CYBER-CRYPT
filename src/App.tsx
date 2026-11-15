@@ -276,6 +276,9 @@ export default function App() {
   /** Online client-side prediction — last authoritative server pose */
   const serverPoseRef = useRef<{ x: number; y: number; seq: number } | null>(null);
   const predSeqRef = useRef(0);
+  const [pingMs, setPingMs] = useState<number | null>(null);
+  const pingMsRef = useRef<number | null>(null);
+  pingMsRef.current = pingMs;
 
   /** Apply a player mutation to BOTH the live sim ref and React state (offline-safe). */
   const commitPlayer = useCallback((updater: (prev: Player) => Player) => {
@@ -1133,20 +1136,20 @@ export default function App() {
             const localP = playerRef.current;
             serverPoseRef.current = { x: serverP.x, y: serverP.y, seq: predSeqRef.current };
 
-            // Reconcile prediction: soft-correct if close, snap if desynced
+            // High-RTT friendly reconcile: trust local prediction for display.
+            // Soft blending toward a 200–400ms-stale server pose causes rubber-band lag.
             let mergedX = serverP.x;
             let mergedY = serverP.y;
             if (localP && mySlot.alive) {
               const err = Math.hypot(localP.x - serverP.x, localP.y - serverP.y);
-              if (err < 0.08) {
+              const rtt = pingMsRef.current ?? 0;
+              // Allow larger prediction window when RTT is high (≈ speed * one-way delay * 1.5)
+              const maxTrust = Math.max(2.8, Math.min(6.5, 2.2 + (rtt / 1000) * PLAYER_SPEED * 1.6));
+              if (err < maxTrust) {
                 mergedX = localP.x;
                 mergedY = localP.y;
-              } else if (err < 1.75) {
-                const blend = Math.min(0.55, 0.22 + err * 0.15);
-                mergedX = localP.x + (serverP.x - localP.x) * blend;
-                mergedY = localP.y + (serverP.y - localP.y) * blend;
               }
-              // else hard snap to server
+              // else hard snap — severe desync / teleport
             }
 
             const mergedPlayer = {
@@ -1156,7 +1159,18 @@ export default function App() {
               facing: localP?.facing || serverP.facing
             };
             playerRef.current = mergedPlayer;
-            setPlayer(mergedPlayer);
+            // HUD at lower rate — avoid React thrash; canvas already reads refs
+            setPlayer(prev => {
+              if (
+                Math.abs(prev.x - mergedPlayer.x) < 0.01 &&
+                Math.abs(prev.y - mergedPlayer.y) < 0.01 &&
+                prev.stats.hp === mergedPlayer.stats.hp &&
+                prev.stats.energy === mergedPlayer.stats.energy
+              ) {
+                return prev;
+              }
+              return mergedPlayer;
+            });
             setTurn(msg.room.turn);
             setScore(msg.room.score);
             setMonstersSlain(msg.room.monstersSlain);
@@ -1188,6 +1202,9 @@ export default function App() {
               setGameState('gameover');
             }
           }
+        } else if (msg.type === 'coop:pong' && typeof msg.t === 'number') {
+          const rtt = Math.max(0, performance.now() - msg.t);
+          setPingMs(Math.round(rtt));
         } else if (msg.type === 'coop:upgrade_result') {
           if (msg.status === 'destroyed') {
             setUpgradeFeedback({
@@ -1267,10 +1284,10 @@ export default function App() {
     }
   }, []);
 
-  // Stream free-move input to server while online (same cadence as offline feel)
+  // Stream free-move input @ ~30Hz + RTT ping samples
   useEffect(() => {
     if (playMode !== 'online' || gameState !== 'playing') return;
-    const id = window.setInterval(() => {
+    const inputId = window.setInterval(() => {
       if (coopRoomRef.current?.status !== 'playing') return;
       if (uiBlockedRef.current) {
         sendCoopWs({
@@ -1290,10 +1307,20 @@ export default function App() {
         aimDx: inp.aimDx,
         aimDy: inp.aimDy,
         autoAttack: autoAttackRef.current,
-        attackHeld: attackHeldRef.current
+        attackHeld: attackHeldRef.current,
+        // Help server dead-reckon when packets bunch up
+        px: playerRef.current?.x,
+        py: playerRef.current?.y
       });
-    }, 50);
-    return () => window.clearInterval(id);
+    }, 33);
+    const pingId = window.setInterval(() => {
+      sendCoopWs({ type: 'coop:ping', t: performance.now() });
+    }, 1000);
+    sendCoopWs({ type: 'coop:ping', t: performance.now() });
+    return () => {
+      window.clearInterval(inputId);
+      window.clearInterval(pingId);
+    };
   }, [playMode, gameState, sendCoopWs]);
 
   const tradeExecutedRef = useRef(false);
@@ -3060,6 +3087,8 @@ export default function App() {
             coopRoom={playMode === 'online' ? coopRoom : null}
             localPlayerId={localPlayerId}
             fps={fps}
+            pingMs={pingMs}
+            isOnlineCoop={playMode === 'online'}
             onToggleMinimap={() => setShowMinimap(prev => !prev)}
             onToggleMute={handleToggleMasterMute}
             onOpenInventory={openInventory}

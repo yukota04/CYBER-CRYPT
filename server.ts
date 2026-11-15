@@ -1407,6 +1407,9 @@ async function setupServer() {
           }
           schedulePersist();
           broadcastToRoom(meta.roomId, { type: 'coop:started', room: res.room });
+        } else if (type === 'coop:ping') {
+          // Echo client timestamp for RTT measurement (does not touch game state)
+          ws.send(JSON.stringify({ type: 'coop:pong', t: msg.t }));
         } else if (type === 'coop:input') {
           // Continuous free-move input (same MoveInput as offline)
           const res = coopManager.setRealtimeInput(meta.roomId, meta.playerId, {
@@ -1570,16 +1573,16 @@ async function setupServer() {
     });
   });
 
-  // Online free-move sim @ 20Hz — same rules as offline tickRealtime
+  // Online free-move sim @ 30Hz — tighter snapshots; client prediction covers RTT
   setInterval(() => {
-    const ticks = coopManager.tickPlayingRooms(1 / 20);
+    const ticks = coopManager.tickPlayingRooms(1 / 30);
     for (const { roomId, broadcast } of ticks) {
       broadcastToRoom(roomId, { type: 'coop:realtime_tick', ...broadcast });
       if (broadcast.room.status === 'gameover') {
         schedulePersist();
       }
     }
-  }, 50);
+  }, 33);
 
   httpServer.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`[CYBER-CRYPT] HTTP + WebSocket Server running on port ${PORT}`);

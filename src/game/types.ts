@@ -39,11 +39,20 @@ export interface Tile {
   checkpointActivated?: boolean;
 }
 
-/** Pushable puzzle crate (tile-aligned). */
+/** Pushable puzzle crate (tile-aligned, destructible, respawns at home). */
 export interface PuzzleCrate {
   id: string;
   x: number;
   y: number;
+  /** Respawn anchor */
+  homeX: number;
+  homeY: number;
+  hp: number;
+  maxHp: number;
+  /** Broken crates have no collision until respawn */
+  broken?: boolean;
+  /** Seconds until respawn at home */
+  respawnIn?: number;
 }
 
 export type PuzzleKind = 'crate_pit' | 'button_gate' | 'dual_button' | 'timed_gate';
@@ -237,7 +246,12 @@ export type MonsterArchetype =
   | 'neon_stalker'
   | 'cyber_behemoth'
   | 'circuit_disruptor'
-  | 'core_synthesizer'; // Boss
+  | 'core_synthesizer' // Legacy event boss
+  | 'boss_assassin'
+  | 'boss_mage'
+  | 'boss_tank';
+
+export type FloorBossRole = 'assassin' | 'mage' | 'tank';
 
 export interface MonsterVisualVariant {
   seed: number;
@@ -273,6 +287,11 @@ export interface Monster {
   color: string;
   symbol: string;
   visualVariant?: MonsterVisualVariant;
+  /** Draw / collision scale (>1 for floor bosses) */
+  renderScale?: number;
+  /** Guards stairs until slain */
+  isFloorBoss?: boolean;
+  bossRole?: FloorBossRole;
 }
 
 export interface PlayerEquipment {
@@ -389,6 +408,9 @@ export interface PendingMonsterSpawn {
   color: string;
   symbol: string;
   visualVariant?: MonsterVisualVariant;
+  renderScale?: number;
+  isFloorBoss?: boolean;
+  bossRole?: FloorBossRole;
 }
 
 export interface DungeonState {
@@ -401,6 +423,9 @@ export interface DungeonState {
   /** Inactive until player is nearby — keeps far rooms cheap to simulate */
   pendingSpawns?: PendingMonsterSpawn[];
   stairsPos: { x: number; y: number };
+  /** True while the floor guardian boss still lives — stairs stay sealed */
+  stairsLocked?: boolean;
+  floorBossId?: string;
   activeEvent?: EnvironmentalEvent | null;
   shopItems?: GameItem[];
   groundCoins: GroundCoin[];
