@@ -18,3 +18,13 @@ View your app in AI Studio: https://ai.studio/apps/393b54c3-1a9c-407e-ab8c-a6043
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Low-latency VPS (Oracle Always Free)
+
+Render free is often high-ping. To host the game server on Oracle Cloud Ampere:
+
+See [`deploy/oracle/README.md`](deploy/oracle/README.md) (`setup.sh`, nginx, Neon `DATABASE_URL`).
+
+Optional build flag to point the browser WebSocket at the VPS while keeping the static site elsewhere:
+
+`VITE_WS_HOST=tu-vps-dominio.com npm run build`

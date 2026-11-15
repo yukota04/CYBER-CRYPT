@@ -1467,6 +1467,15 @@ test('crates are destructible and respawn at home', async () => {
   assert.equal(crateBlocksTile(dungeon, 5, 5), true);
 });
 
+test('regular mobs spawn with 3x HP versus the base curve', () => {
+  const d = generateDungeon(1, 202, { partySize: 1 });
+  const all = [...(d.pendingSpawns || []), ...d.monsters].filter(m => !m.isFloorBoss);
+  assert.ok(all.length > 0, 'expected regular mobs');
+  // Floor 1 swarmer base 24 * hpCurve(~1) * 3 = ~72
+  const minHp = Math.min(...all.map(m => m.maxHp));
+  assert.ok(minHp >= 70, `expected 3x mob HP, got min ${minHp}`);
+});
+
 test('every floor has a stair-guard boss and locked stairs until cleared', async () => {
   const { unlockStairsIfBossClear } = await import('./realtime');
   const { floorBossRoleForFloor } = await import('./floorBosses');

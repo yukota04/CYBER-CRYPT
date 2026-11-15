@@ -420,6 +420,8 @@ export function generateDungeon(
   const partyThreat = getPartyThreatMultipliers(partySize);
   const hpCurve =
     (1 + (floor - 1) * 0.25 + Math.pow(Math.max(0, floor - 1), 1.28) * 0.03) * partyThreat.hp;
+  /** Regular mobs are 3× tankier than the original curve (bosses keep their own multipliers). */
+  const MOB_HP_MULT = 3;
   const atkScale = Math.floor((floor - 1) * 2.1 * partyThreat.attack);
   const defScale = Math.floor((floor - 1) * 1.1 * partyThreat.defense);
   const rewardScale = 1 + (floor - 1) * 0.24;
@@ -524,7 +526,7 @@ export function generateDungeon(
 
       const idNum = monsterIdCount++;
       const variant = buildMonsterVisualVariant(floor, archetype, idNum);
-      const hp = Math.round(baseHp * hpCurve);
+      const hp = Math.round(baseHp * hpCurve * MOB_HP_MULT);
       // atkScale already includes party attack; baseAtk gets a light party bump too
       const attackFinal = Math.round(baseAtk * partyThreat.attack + atkScale);
       const defense = Math.round(baseDef * partyThreat.defense + defScale);
