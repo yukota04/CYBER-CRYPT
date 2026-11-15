@@ -1407,6 +1407,19 @@ async function setupServer() {
           }
           schedulePersist();
           broadcastToRoom(meta.roomId, { type: 'coop:started', room: res.room });
+        } else if (type === 'coop:input') {
+          // Continuous free-move input (same MoveInput as offline)
+          const res = coopManager.setRealtimeInput(meta.roomId, meta.playerId, {
+            dx: typeof msg.dx === 'number' ? msg.dx : 0,
+            dy: typeof msg.dy === 'number' ? msg.dy : 0,
+            aimDx: typeof msg.aimDx === 'number' ? msg.aimDx : undefined,
+            aimDy: typeof msg.aimDy === 'number' ? msg.aimDy : undefined,
+            autoAttack: typeof msg.autoAttack === 'boolean' ? msg.autoAttack : undefined,
+            attackHeld: typeof msg.attackHeld === 'boolean' ? msg.attackHeld : undefined
+          });
+          if (!res.ok) {
+            ws.send(JSON.stringify({ type: 'coop:error', error: res.error }));
+          }
         } else if (type === 'coop:submit_action') {
           const res = coopManager.submitAction(meta.roomId, meta.playerId, {
             playerId: meta.playerId,
@@ -1423,8 +1436,9 @@ async function setupServer() {
           }
           if (res.resolved && res.broadcast) {
             schedulePersist();
+            broadcastToRoom(meta.roomId, { type: 'coop:realtime_tick', ...res.broadcast });
             broadcastToRoom(meta.roomId, { type: 'coop:turn_resolved', ...res.broadcast });
-          } else {
+          } else if (res.room) {
             broadcastToRoom(meta.roomId, { type: 'coop:room_update', room: res.room });
           }
         } else if (type === 'coop:revive_checkpoint') {
@@ -1555,6 +1569,17 @@ async function setupServer() {
       }
     });
   });
+
+  // Online free-move sim @ 20Hz — same rules as offline tickRealtime
+  setInterval(() => {
+    const ticks = coopManager.tickPlayingRooms(1 / 20);
+    for (const { roomId, broadcast } of ticks) {
+      broadcastToRoom(roomId, { type: 'coop:realtime_tick', ...broadcast });
+      if (broadcast.room.status === 'gameover') {
+        schedulePersist();
+      }
+    }
+  }, 50);
 
   httpServer.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`[CYBER-CRYPT] HTTP + WebSocket Server running on port ${PORT}`);

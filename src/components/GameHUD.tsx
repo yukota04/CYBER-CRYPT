@@ -10,7 +10,6 @@ import {
   Backpack,
   Sparkles,
   Compass,
-  Lock,
   Crosshair,
 } from 'lucide-react';
 import { GameIcon } from './GameIcon';
@@ -74,7 +73,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
 
   const localCoopSlot = coopRoom?.players.find(p => p.playerId === localPlayerId);
-  const movedCount = coopRoom?.players.filter(p => p.alive && p.movedThisTurn).length || 0;
   const aliveCount = coopRoom?.players.filter(p => p.alive).length || 0;
 
   return (
@@ -160,27 +158,20 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </div>
           </div>
 
-          {/* 3P Co-Op Turn-Sync Banner */}
+          {/* Online squad status — free-move (no turn lock) */}
           {coopRoom && coopRoom.status === 'playing' && (
             <div
               data-testid="coop-turn-banner"
-              className={`mt-1 px-2 py-1 rounded border text-[10px] font-bold flex items-center justify-between ${
-                localCoopSlot?.movedThisTurn
-                  ? 'bg-amber-950/70 border-amber-500/50 text-amber-300'
-                  : 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
-              }`}
+              className="mt-1 px-2 py-1 rounded border text-[10px] font-bold flex items-center justify-between bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
             >
               <span className="flex items-center gap-1 truncate">
-                {localCoopSlot?.movedThisTurn && <Lock className="w-3 h-3 flex-shrink-0" />}
                 <span>
-                  {localCoopSlot?.movedThisTurn
+                  {localCoopSlot?.alive === false
                     ? t('yourTurnLocked', language)
-                    : `${t('squadTurnProgress', language)} T${coopRoom.turn}`}
+                    : `CO-OP FREE-MOVE · ${aliveCount} UP`}
                 </span>
               </span>
-              <span className="ml-2 flex-shrink-0">
-                {movedCount}/{aliveCount}
-              </span>
+              <span className="ml-2 flex-shrink-0">F{dungeon.floor}</span>
             </div>
           )}
 
@@ -318,19 +309,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           <button
             data-testid="hud-ranged-btn"
-            onClick={() => !localCoopSlot?.movedThisTurn && onRangedAttack()}
+            onClick={() => localCoopSlot?.alive !== false && onRangedAttack()}
             onPointerDown={e => {
-              if (localCoopSlot?.movedThisTurn) return;
+              if (localCoopSlot?.alive === false) return;
               e.currentTarget.setPointerCapture?.(e.pointerId);
               onAttackHold?.(true);
             }}
             onPointerUp={() => onAttackHold?.(false)}
             onPointerCancel={() => onAttackHold?.(false)}
-            disabled={!!localCoopSlot?.movedThisTurn}
+            disabled={localCoopSlot?.alive === false}
             title={`${t('rangedStrikeBtn', language)} (${attackRange} tiles) — Click enemy or press F`}
             aria-label={`Ranged Attack (${attackRange} tiles)`}
             className={`relative flex flex-col items-center justify-center w-[4.5rem] h-[4.5rem] rounded-full border-2 transition cursor-pointer active:scale-[0.86] active:brightness-125 shrink-0 ${
-              localCoopSlot?.movedThisTurn
+              localCoopSlot?.alive === false
                 ? 'opacity-50 border-slate-700 bg-slate-900/60 cursor-not-allowed'
                 : 'border-amber-400 bg-amber-950/70 text-amber-200 shadow-[0_0_14px_rgba(255,230,0,0.35)]'
             }`}
@@ -357,7 +348,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 const cd = player.activeCooldowns[skill.id] || 0;
                 const energyNeeded = getEffectiveSkillEnergyCost(skill.energyCost || 15, dungeon.activeEvent);
                 const canAfford = player.stats.energy >= energyNeeded;
-                const isReady = cd === 0 && canAfford && !localCoopSlot?.movedThisTurn;
+                const isReady = cd === 0 && canAfford && localCoopSlot?.alive !== false;
 
                 return (
                   <button

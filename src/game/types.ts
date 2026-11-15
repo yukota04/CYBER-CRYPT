@@ -15,7 +15,16 @@ export type TileType =
   | 'shop'
   | 'checkpoint'
   | 'trap_hidden'
-  | 'trap_revealed';
+  | 'trap_revealed'
+  /** Void gap — not walkable until a crate is pushed in */
+  | 'pit'
+  /** Pit sealed by a crate — walkable bridge */
+  | 'pit_filled'
+  /** Opens linked gates while pressed (player or crate) */
+  | 'pressure_plate'
+  /** Sealed barrier controlled by pressure plates */
+  | 'gate_closed'
+  | 'gate_open';
 
 export interface Tile {
   x: number;
@@ -28,6 +37,31 @@ export interface Tile {
   hazard?: 'spikes' | 'glitch_wire' | 'acid_leak';
   item?: GameItem;
   checkpointActivated?: boolean;
+}
+
+/** Pushable puzzle crate (tile-aligned). */
+export interface PuzzleCrate {
+  id: string;
+  x: number;
+  y: number;
+}
+
+export type PuzzleKind = 'crate_pit' | 'button_gate' | 'dual_button' | 'timed_gate';
+
+/** Links plates/crates to gates or pits. */
+export interface PuzzleLink {
+  id: string;
+  kind: PuzzleKind;
+  buttonTiles?: Array<{ x: number; y: number }>;
+  gateTiles?: Array<{ x: number; y: number }>;
+  pitTile?: { x: number; y: number };
+  crateId?: string;
+  requiredPresses?: number;
+  open: boolean;
+  /** When true, gate closes if plates are released */
+  holdOpen?: boolean;
+  openSeconds?: number;
+  openTimer?: number;
 }
 
 export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic' | 'cyber-relic';
@@ -372,6 +406,10 @@ export interface DungeonState {
   groundCoins: GroundCoin[];
   checkpoints: { x: number; y: number; activated: boolean }[];
   deathDrops: DeathDropBag[];
+  /** Pushable crates for pit/button puzzles */
+  crates?: PuzzleCrate[];
+  /** Pressure-plate / gate / pit wiring */
+  puzzleLinks?: PuzzleLink[];
 }
 
 export interface CheckpointSnapshot {

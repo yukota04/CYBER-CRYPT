@@ -1,5 +1,6 @@
 import { AttackEffect, CharacterClass, DungeonState, GameItem, Monster, Player } from './types';
 import { getRarityStyle } from './rarity';
+import { getFloorVisualTheme, mapPulseAmount } from './floorVisual';
 
 export interface Particle {
   active: boolean;
@@ -770,8 +771,12 @@ export class CanvasRenderer {
       this.trauma = Math.max(0, this.trauma - simDt * 1.5);
     }
 
+    const theme = getFloorVisualTheme(dungeon.floor || 1);
+    const pulse = mapPulseAmount(nowSec, dungeon.floor || 1);
+    const [pr, pg, pb] = theme.pulseRgb;
+
     ctx.save();
-    ctx.fillStyle = '#080614';
+    ctx.fillStyle = theme.void;
     ctx.fillRect(0, 0, width, height);
 
     ctx.translate(-Math.floor(this.cameraX + shakeOffsetX), -Math.floor(this.cameraY + shakeOffsetY));
@@ -793,20 +798,27 @@ export class CanvasRenderer {
         const isLit = tile.visible;
 
         if (tile.type === 'wall') {
-          ctx.fillStyle = isLit ? '#1b1238' : '#0e0920';
+          ctx.fillStyle = isLit ? theme.wallLit : theme.wallDark;
           ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
           if (detail) {
-            ctx.fillStyle = isLit ? '#492c85' : '#231444';
+            ctx.fillStyle = isLit ? theme.wallTrim : theme.wallLit;
             ctx.fillRect(screenX, screenY, this.tileSize, 3);
           }
         } else {
-          ctx.fillStyle = isLit ? '#120d26' : '#0a0718';
+          ctx.fillStyle = isLit ? theme.floorLit : theme.floorDark;
           ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
 
+          // Soft map pulse — breathing glow on walkable / special cells
+          if (isLit && tile.walkable) {
+            const cellPulse = pulse * (0.85 + 0.15 * Math.sin(nowSec * 2.4 + x * 0.35 + y * 0.28));
+            ctx.fillStyle = `rgba(${pr},${pg},${pb},${0.045 + cellPulse * 0.07})`;
+            ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
+          }
+
           if (tile.type === 'stairs_down') {
-            ctx.fillStyle = isLit ? '#00f0ff' : '#007788';
+            ctx.fillStyle = isLit ? theme.accent : '#007788';
             ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
-            ctx.fillStyle = '#0a0718';
+            ctx.fillStyle = theme.floorDark;
             ctx.fillRect(screenX + 8, screenY + 8, this.tileSize - 16, this.tileSize - 16);
             if (detail) {
               ctx.fillStyle = isLit ? '#ffe600' : '#887700';
@@ -857,6 +869,36 @@ export class CanvasRenderer {
             ctx.fillRect(screenX + 11, screenY + 7, 10, 8);
             ctx.fillStyle = isLit ? '#00f0ff' : '#0891b2';
             ctx.fillRect(screenX + 13, screenY + 10, 6, 2);
+          } else if (tile.type === 'pit') {
+            ctx.fillStyle = '#020208';
+            ctx.fillRect(screenX + 3, screenY + 3, this.tileSize - 6, this.tileSize - 6);
+            ctx.strokeStyle = isLit ? `rgba(${pr},${pg},${pb},${0.35 + pulse * 0.35})` : 'rgba(80,80,120,0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(screenX + 5, screenY + 5, this.tileSize - 10, this.tileSize - 10);
+          } else if (tile.type === 'pit_filled') {
+            ctx.fillStyle = isLit ? '#5b4630' : '#3a2e20';
+            ctx.fillRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
+            ctx.fillStyle = isLit ? '#8b6914' : '#5a4510';
+            ctx.fillRect(screenX + 8, screenY + 8, this.tileSize - 16, this.tileSize - 16);
+          } else if (tile.type === 'pressure_plate') {
+            const glow = 0.25 + pulse * 0.35;
+            ctx.fillStyle = isLit ? `rgba(${pr},${pg},${pb},${glow})` : 'rgba(80,80,100,0.2)';
+            ctx.fillRect(screenX + 5, screenY + 5, this.tileSize - 10, this.tileSize - 10);
+            ctx.strokeStyle = theme.accent;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(screenX + 7, screenY + 7, this.tileSize - 14, this.tileSize - 14);
+          } else if (tile.type === 'gate_closed') {
+            ctx.fillStyle = isLit ? theme.wallTrim : theme.wallLit;
+            ctx.fillRect(screenX + 2, screenY + 2, this.tileSize - 4, this.tileSize - 4);
+            ctx.fillStyle = isLit ? `rgba(${pr},${pg},${pb},0.45)` : 'rgba(100,100,140,0.25)';
+            ctx.fillRect(screenX + 10, screenY + 4, 4, this.tileSize - 8);
+            ctx.fillRect(screenX + 18, screenY + 4, 4, this.tileSize - 8);
+          } else if (tile.type === 'gate_open') {
+            ctx.fillStyle = isLit ? `rgba(${pr},${pg},${pb},0.12)` : 'rgba(60,60,90,0.1)';
+            ctx.fillRect(screenX + 2, screenY + 2, this.tileSize - 4, this.tileSize - 4);
+            ctx.strokeStyle = isLit ? theme.accent : '#445';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(screenX + 4, screenY + 4, this.tileSize - 8, this.tileSize - 8);
           } else if (tile.hazard && isLit) {
             ctx.fillStyle = 'rgba(255, 0, 85, 0.35)';
             ctx.fillRect(screenX + 8, screenY + 8, 16, 16);
@@ -866,6 +908,29 @@ export class CanvasRenderer {
         if (!isLit) {
           ctx.fillStyle = 'rgba(8, 6, 20, 0.55)';
           ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize);
+        }
+      }
+    }
+
+    // 1a. Pushable crates
+    if (dungeon.crates && dungeon.crates.length) {
+      for (const crate of dungeon.crates) {
+        const tx = Math.floor(crate.x);
+        const ty = Math.floor(crate.y);
+        const tile = dungeon.tiles[ty]?.[tx];
+        if (!tile || !tile.explored) continue;
+        const screenX = tx * this.tileSize;
+        const screenY = ty * this.tileSize;
+        const bob = Math.sin(nowSec * 3 + tx) * 0.8;
+        ctx.fillStyle = tile.visible ? '#8b5a2b' : '#4a3018';
+        ctx.fillRect(screenX + 5, screenY + 5 + bob, this.tileSize - 10, this.tileSize - 10);
+        ctx.fillStyle = tile.visible ? '#c4a574' : '#6a5040';
+        ctx.fillRect(screenX + 8, screenY + 8 + bob, this.tileSize - 16, 4);
+        ctx.fillRect(screenX + 8, screenY + 18 + bob, this.tileSize - 16, 4);
+        if (tile.visible) {
+          ctx.strokeStyle = `rgba(${pr},${pg},${pb},${0.25 + pulse * 0.3})`;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(screenX + 5, screenY + 5 + bob, this.tileSize - 10, this.tileSize - 10);
         }
       }
     }

@@ -25,6 +25,7 @@ import {
 import { applyEnvironmentalTurnEffects } from './events';
 import { SoundEventType } from './audio';
 import { activateNearbySpawns, updateFOVIncremental } from './dungeon';
+import { crateBlockers, tickPuzzleState, tryPushCrate } from './puzzles';
 
 /** Footprint in tiles — < 1 so an entity can straddle two cells. */
 export const ENTITY_BODY = 0.72;
@@ -71,6 +72,8 @@ export interface RealtimeClock {
   fovAcc: number;
   /** Brief world freeze on hit — player can still move; monsters pause for impact feel */
   impactFreeze: number;
+  /** Cooldown between crate pushes */
+  cratePushCd: number;
 }
 
 export function createRealtimeClock(): RealtimeClock {
@@ -83,7 +86,8 @@ export function createRealtimeClock(): RealtimeClock {
     lastFovTx: -9999,
     lastFovTy: -9999,
     fovAcc: 0,
-    impactFreeze: 0
+    impactFreeze: 0,
+    cratePushCd: 0
   };
 }
 
@@ -552,8 +556,23 @@ function tryPlayerMelee(
   return { screenShake, hitstopSeconds, kills };
 }
 
+function nearestPlayer(monster: Monster, players: Player[]): { player: Player; dist: number } | null {
+  let best: Player | null = null;
+  let bestDist = Infinity;
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    if (p.stats.hp <= 0) continue;
+    const d = distanceCenters(monster.x, monster.y, p.x, p.y);
+    if (d < bestDist) {
+      bestDist = d;
+      best = p;
+    }
+  }
+  return best ? { player: best, dist: bestDist } : null;
+}
+
 function tickMonsters(
-  player: Player,
+  targetOrTargets: Player | Player[],
   dungeon: DungeonState,
   clock: RealtimeClock,
   dt: number,
@@ -564,19 +583,30 @@ function tickMonsters(
 ): { screenShake: number } {
   let screenShake = 0;
   const envDmgMult = dungeon.activeEvent?.id === 'emp_surge' ? 1.15 : 1.0;
-  const pTotals = getTotalStats(player);
+  const players = Array.isArray(targetOrTargets) ? targetOrTargets : [targetOrTargets];
+  const living = players.filter(p => p.stats.hp > 0);
+  if (living.length === 0) return { screenShake: 0 };
 
   // Spatial hash only for nearby entities (visionRange+pad) — far packs never collide/path
   const AI_ACTIVE_RANGE = 12;
   const HASH_PAD = 5;
   const HASH_RANGE = AI_ACTIVE_RANGE + HASH_PAD;
-  const blockerList: Blocker[] = [{ x: player.x, y: player.y, id: 'player' }];
+  const blockerList: Blocker[] = [];
+  for (let i = 0; i < living.length; i++) {
+    blockerList.push({ x: living[i].x, y: living[i].y, id: `player_${i}` });
+  }
   for (let i = 0; i < dungeon.monsters.length; i++) {
     const m = dungeon.monsters[i];
-    const d = distanceCenters(m.x, m.y, player.x, player.y);
-    if (d <= HASH_RANGE || m.archetype === 'core_synthesizer') {
-      blockerList.push({ x: m.x, y: m.y, id: m.id });
+    let near = m.archetype === 'core_synthesizer';
+    if (!near) {
+      for (let j = 0; j < living.length; j++) {
+        if (distanceCenters(m.x, m.y, living[j].x, living[j].y) <= HASH_RANGE) {
+          near = true;
+          break;
+        }
+      }
     }
+    if (near) blockerList.push({ x: m.x, y: m.y, id: m.id });
   }
   const spatial = buildSpatialHash(blockerList);
 
@@ -584,7 +614,11 @@ function tickMonsters(
   let attackSfxBudget = 2;
 
   for (const monster of dungeon.monsters) {
-    const dist = distanceCenters(monster.x, monster.y, player.x, player.y);
+    const nearest = nearestPlayer(monster, living);
+    if (!nearest) continue;
+    const { player, dist } = nearest;
+    const pTotals = getTotalStats(player);
+
     // Far dormant packs: skip CD + AI entirely (bosses always tick)
     if (dist > HASH_RANGE && monster.archetype !== 'core_synthesizer' && !monster.alerted) {
       continue;
@@ -687,6 +721,136 @@ function tickMonsters(
   return { screenShake };
 }
 
+export interface CoopRealtimeAgent {
+  id: string;
+  player: Player;
+  input: MoveInput;
+  clock: RealtimeClock;
+}
+
+export interface CoopRealtimeTickResult {
+  dungeon: DungeonState;
+  logs: CombatLogEntry[];
+  soundEvents: SoundEventType[];
+  floatingTexts: RealtimeTickResult['floatingTexts'];
+  attackEffects: AttackEffect[];
+  screenShake: number;
+  hitstopSeconds: number;
+  floorCompleted: boolean;
+  kills: number;
+  agentResults: Map<string, { gameOver: boolean; openShop: boolean; checkpointTriggered: boolean; deathDropCreated: boolean; kills: number }>;
+}
+
+/**
+ * One shared free-movement frame for online co-op — same rules as offline tickRealtime.
+ * Each operative moves/fights with ally collision; monsters chase the nearest living operative.
+ */
+export function tickCoopRealtime(
+  agents: CoopRealtimeAgent[],
+  dungeonIn: DungeonState,
+  dt: number,
+  turn: number,
+  monsterClock: RealtimeClock
+): CoopRealtimeTickResult {
+  const dungeon = liveDungeon(dungeonIn);
+  const logs: CombatLogEntry[] = [];
+  const soundEvents: SoundEventType[] = [];
+  const floatingTexts: RealtimeTickResult['floatingTexts'] = [];
+  const attackEffects: AttackEffect[] = [];
+  let screenShake = 0;
+  let hitstopSeconds = 0;
+  let floorCompleted = false;
+  let kills = 0;
+  const agentResults = new Map<
+    string,
+    { gameOver: boolean; openShop: boolean; checkpointTriggered: boolean; deathDropCreated: boolean; kills: number }
+  >();
+
+  const livingAgents = agents.filter(a => a.player.stats.hp > 0);
+  for (const agent of livingAgents) {
+    activateNearbySpawns(dungeon, agent.player.x, agent.player.y, 11);
+  }
+
+  for (const agent of livingAgents) {
+    const allies = livingAgents
+      .filter(a => a.id !== agent.id)
+      .map(a => ({ x: a.player.x, y: a.player.y, id: a.id }));
+    const result = tickRealtime(agent.player, dungeon, agent.input, dt, turn, agent.clock, {
+      skipMonsters: true,
+      skipFov: true,
+      extraBlockers: allies,
+      deathDropOwnerId: agent.id
+    });
+    logs.push(...result.logs);
+    soundEvents.push(...result.soundEvents);
+    floatingTexts.push(...result.floatingTexts);
+    attackEffects.push(...result.attackEffects);
+    screenShake += result.screenShake;
+    hitstopSeconds = Math.max(hitstopSeconds, result.hitstopSeconds);
+    kills += result.kills;
+    if (result.floorCompleted) floorCompleted = true;
+    agentResults.set(agent.id, {
+      gameOver: result.gameOver,
+      openShop: result.openShop,
+      checkpointTriggered: result.checkpointTriggered,
+      deathDropCreated: result.deathDropCreated,
+      kills: result.kills
+    });
+  }
+
+  // Squad-wide pressure plates (multiplayer can hold multiple buttons)
+  const pz = tickPuzzleState(
+    dungeon,
+    livingAgents.map(a => ({ x: a.player.x, y: a.player.y })),
+    dt,
+    turn,
+    logs
+  );
+  for (const s of pz.soundEvents) soundEvents.push(s as SoundEventType);
+
+  const anyImpact = livingAgents.some(a => a.clock.impactFreeze > 0);
+  if (!floorCompleted && !anyImpact && livingAgents.length > 0) {
+    const mon = tickMonsters(
+      livingAgents.map(a => a.player),
+      dungeon,
+      monsterClock,
+      dt,
+      turn,
+      logs,
+      soundEvents,
+      floatingTexts
+    );
+    screenShake += mon.screenShake;
+  }
+
+  for (const agent of livingAgents) {
+    if (agent.player.stats.hp <= 0) {
+      const prev = agentResults.get(agent.id) || {
+        gameOver: false,
+        openShop: false,
+        checkpointTriggered: false,
+        deathDropCreated: false,
+        kills: 0
+      };
+      prev.gameOver = true;
+      agentResults.set(agent.id, prev);
+    }
+  }
+
+  return {
+    dungeon,
+    logs,
+    soundEvents,
+    floatingTexts,
+    attackEffects,
+    screenShake,
+    hitstopSeconds,
+    floorCompleted,
+    kills,
+    agentResults
+  };
+}
+
 function interactOccupiedTiles(
   player: Player,
   dungeon: DungeonState,
@@ -695,7 +859,8 @@ function interactOccupiedTiles(
   logs: CombatLogEntry[],
   soundEvents: SoundEventType[],
   floatingTexts: RealtimeTickResult['floatingTexts'],
-  checkCoins = true
+  checkCoins = true,
+  deathDropOwnerId = 'solo'
 ): {
   floorCompleted: boolean;
   openShop: boolean;
@@ -733,7 +898,7 @@ function interactOccupiedTiles(
     }
   }
 
-  const recovered = collectDeathDropBagsAt(player, dungeon, 'solo');
+  const recovered = collectDeathDropBagsAt(player, dungeon, deathDropOwnerId);
   if (recovered.recoveredBags > 0) {
     soundEvents.push('chest');
     floatingTexts.push({ text: `☠️ GEAR RECOVERED!`, x: player.x, y: player.y, color: '#ffe600', isCrit: true });
@@ -838,8 +1003,19 @@ function interactOccupiedTiles(
   return { floorCompleted, openShop, checkpointTriggered, gameOver, deathDropCreated, screenShake, hitstopSeconds };
 }
 
+export interface TickRealtimeOpts {
+  /** Skip monster AI/attacks this frame (co-op runs monsters once for the whole squad). */
+  skipMonsters?: boolean;
+  /** Skip FOV update (co-op refreshes squad FOV separately). */
+  skipFov?: boolean;
+  /** Extra collision bodies (allies). */
+  extraBlockers?: Array<{ x: number; y: number; id?: string }>;
+  /** Owner filter for Floating Skull loot (offline = 'solo', online = playerId). */
+  deathDropOwnerId?: string;
+}
+
 /**
- * Advance one realtime simulation frame for offline free-movement mode.
+ * Advance one realtime simulation frame (offline free-movement, or one co-op operative).
  */
 export function tickRealtime(
   playerIn: Player,
@@ -847,12 +1023,15 @@ export function tickRealtime(
   input: MoveInput,
   dt: number,
   turn: number,
-  clock: RealtimeClock
+  clock: RealtimeClock,
+  opts?: TickRealtimeOpts
 ): RealtimeTickResult {
   // Mutate live player/dungeon in place — cloning inventory every frame caused GC stalls
   // in crowded fights. React gets a shallow copy only when the HUD syncs.
   const player = playerIn;
   const dungeon = liveDungeon(dungeonIn);
+  const skipMonsters = !!opts?.skipMonsters;
+  const skipFov = !!opts?.skipFov;
   const logs: CombatLogEntry[] = [];
   const soundEvents: SoundEventType[] = [];
   const floatingTexts: RealtimeTickResult['floatingTexts'] = [];
@@ -900,14 +1079,21 @@ export function tickRealtime(
     }
   }
 
+  clock.cratePushCd = Math.max(0, clock.cratePushCd - dt);
+
   if (inputLen > 1e-6) {
     ix /= inputLen;
     iy /= inputLen;
 
-    const blockers: Blocker[] = new Array(dungeon.monsters.length);
+    const blockers: Blocker[] = [];
     for (let i = 0; i < dungeon.monsters.length; i++) {
       const m = dungeon.monsters[i];
-      blockers[i] = { x: m.x, y: m.y, id: m.id };
+      blockers.push({ x: m.x, y: m.y, id: m.id });
+    }
+    const crates = crateBlockers(dungeon);
+    for (let i = 0; i < crates.length; i++) blockers.push(crates[i]);
+    if (opts?.extraBlockers) {
+      for (let i = 0; i < opts.extraBlockers.length; i++) blockers.push(opts.extraBlockers[i]);
     }
     const spatial = buildSpatialHash(blockers);
     const next = moveWithCollision(
@@ -925,6 +1111,13 @@ export function tickRealtime(
       player.x = next.x;
       player.y = next.y;
       moved = true;
+    } else if (clock.cratePushCd <= 0) {
+      // Blocked — try sokoban push into the obstacle
+      const push = tryPushCrate(dungeon, player.x, player.y, ix, iy, turn, logs);
+      if (push.pushed) {
+        clock.cratePushCd = 0.22;
+        soundEvents.push(...(push.soundEvents as SoundEventType[]));
+      }
     }
   }
 
@@ -959,7 +1152,8 @@ export function tickRealtime(
     logs,
     soundEvents,
     floatingTexts,
-    moved
+    moved,
+    opts?.deathDropOwnerId ?? 'solo'
   );
   floorCompleted = interact.floorCompleted;
   openShop = interact.openShop;
@@ -971,8 +1165,14 @@ export function tickRealtime(
     deathDropCreated = interact.deathDropCreated;
   }
 
+  // Pressure plates / gates (offline single-body). Co-op re-evaluates with full squad after.
+  if (!opts?.skipMonsters) {
+    const pz = tickPuzzleState(dungeon, [{ x: player.x, y: player.y }], dt, turn, logs);
+    for (const s of pz.soundEvents) soundEvents.push(s as SoundEventType);
+  }
+
   // During impact freeze: pause monster AI (player movement above stays full-speed)
-  if (!floorCompleted && !gameOver && !inImpact) {
+  if (!skipMonsters && !floorCompleted && !gameOver && !inImpact) {
     const mon = tickMonsters(player, dungeon, clock, dt, turn, logs, soundEvents, floatingTexts);
     screenShake += mon.screenShake;
   }
@@ -987,16 +1187,18 @@ export function tickRealtime(
   }
 
   // FOV: incremental clear + throttle (~12 Hz) unless the player entered a new tile
-  const center = entityCenter(player.x, player.y);
-  const fovTx = Math.floor(center.cx);
-  const fovTy = Math.floor(center.cy);
-  const fovMoved = fovTx !== clock.lastFovTx || fovTy !== clock.lastFovTy;
-  clock.fovAcc += dt;
-  if (fovMoved || clock.fovAcc >= 0.08) {
-    clock.fovAcc = 0;
-    clock.lastFovTx = fovTx;
-    clock.lastFovTy = fovTy;
-    updateFOVIncremental(dungeon.tiles, fovTx, fovTy, getFovRadius(dungeon), clock.lastVisible);
+  if (!skipFov) {
+    const center = entityCenter(player.x, player.y);
+    const fovTx = Math.floor(center.cx);
+    const fovTy = Math.floor(center.cy);
+    const fovMoved = fovTx !== clock.lastFovTx || fovTy !== clock.lastFovTy;
+    clock.fovAcc += dt;
+    if (fovMoved || clock.fovAcc >= 0.08) {
+      clock.fovAcc = 0;
+      clock.lastFovTx = fovTx;
+      clock.lastFovTy = fovTy;
+      updateFOVIncremental(dungeon.tiles, fovTx, fovTy, getFovRadius(dungeon), clock.lastVisible);
+    }
   }
 
   if (!gameOver && player.stats.hp <= 0) {

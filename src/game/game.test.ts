@@ -446,7 +446,7 @@ test('gravity_shift reduces skill energy cost by 30% and vanguard_barrier works 
   assert.equal(barrierRes.player.buffs.shieldAmount, 40);
 });
 
-test('3-player co-op room enforces unique roles, 3 ready gate, and 1-tile turn-barrier locking', () => {
+test('3-player co-op room enforces unique roles, 3 ready gate, and free-move like offline', () => {
   const mgr = new CoopRoomManager();
   assert.equal(mgr.joinRoom('SQ1', 'p1', 'Alpha').ok, true);
   assert.equal(mgr.joinRoom('SQ1', 'p2', 'Beta').ok, true);
@@ -472,25 +472,20 @@ test('3-player co-op room enforces unique roles, 3 ready gate, and 1-tile turn-b
   assert.equal(started.ok, true);
   assert.equal(started.room?.status, 'playing');
 
-  // Turn 1 movement lock: p1 moves once, then is locked until p2 & p3 move
-  const m1 = mgr.submitAction('SQ1', 'p1', { playerId: 'p1', type: 'move', dx: 0, dy: 0 });
-  assert.equal(m1.ok, true);
-  assert.equal(m1.resolved, false);
+  // Free-move: no turn lock — same player can stream input repeatedly
+  assert.equal(mgr.setRealtimeInput('SQ1', 'p1', { dx: 1, dy: 0, autoAttack: true }).ok, true);
+  assert.equal(mgr.setRealtimeInput('SQ1', 'p1', { dx: 1, dy: 0 }).ok, true);
+  assert.equal(mgr.setRealtimeInput('SQ1', 'p2', { dx: 0, dy: 1 }).ok, true);
+  assert.equal(mgr.setRealtimeInput('SQ1', 'p3', { dx: -1, dy: 0 }).ok, true);
 
-  const m1Extra = mgr.submitAction('SQ1', 'p1', { playerId: 'p1', type: 'move', dx: 1, dy: 0 });
-  assert.equal(m1Extra.ok, false);
-  assert.equal(m1Extra.error, 'TURN_LOCKED_WAITING_FOR_TEAMMATES');
-
-  const m2 = mgr.submitAction('SQ1', 'p2', { playerId: 'p2', type: 'move', dx: 0, dy: 0 });
-  assert.equal(m2.ok, true);
-  assert.equal(m2.resolved, false);
-
-  const m3 = mgr.submitAction('SQ1', 'p3', { playerId: 'p3', type: 'move', dx: 0, dy: 0 });
-  assert.equal(m3.ok, true);
-  assert.equal(m3.resolved, true);
-  assert.equal(m3.room?.turn, 2);
-  // After 3/3 resolved, p1 is unlocked for turn 2
-  assert.equal(m3.room?.players.every(p => !p.movedThisTurn), true);
+  const p1Before = started.room!.players.find(p => p.playerId === 'p1')!.player!;
+  const x0 = p1Before.x;
+  const ticks = mgr.tickPlayingRooms(0.2);
+  assert.ok(ticks.length >= 1, 'playing rooms should emit realtime ticks');
+  const after = ticks[ticks.length - 1].broadcast.room.players.find(p => p.playerId === 'p1')!.player!;
+  // Operative should have slid in free-move (not stuck waiting for teammates)
+  assert.ok(Math.hypot(after.x - x0, after.y - p1Before.y) > 0.05 || after.x !== x0, 'p1 should move freely');
+  assert.equal(ticks[ticks.length - 1].broadcast.room.players.every(p => !p.movedThisTurn), true);
 });
 
 test('i18n translation dictionaries have 100% key parity across all 5 languages', async () => {
@@ -905,12 +900,16 @@ test('online co-op preserves pre-death loadout, creates Floating Skull on death,
     }
   ];
 
-  // All 3 wait -> monster kills p1
-  mgr.submitAction('CHK1', 'p1', { playerId: 'p1', type: 'wait' });
-  mgr.submitAction('CHK1', 'p2', { playerId: 'p2', type: 'wait' });
-  const turnRes = mgr.submitAction('CHK1', 'p3', { playerId: 'p3', type: 'wait' });
-  assert.equal(turnRes.resolved, true);
-  assert.equal(p1Slot.alive, false);
+  // Free-move: stand still next to lethal mob until realtime tick kills p1
+  mgr.setRealtimeInput('CHK1', 'p1', { dx: 0, dy: 0 });
+  mgr.setRealtimeInput('CHK1', 'p2', { dx: 0, dy: 0 });
+  mgr.setRealtimeInput('CHK1', 'p3', { dx: 0, dy: 0 });
+  let died = false;
+  for (let i = 0; i < 40 && !died; i++) {
+    mgr.tickPlayingRooms(0.1);
+    died = !p1Slot.alive;
+  }
+  assert.equal(p1Slot.alive, false, 'realtime combat should down p1');
   assert.equal(p1.stats.coins, 0, 'Coins dropped on online death');
   assert.equal(p1.equipment.weapon, null, 'Equipped weapon dropped on online death');
   assert.equal(dungeon.deathDrops.length, 1, 'Floating Skull created at death coordinates');
@@ -931,17 +930,29 @@ test('online co-op preserves pre-death loadout, creates Floating Skull on death,
   assert.ok(p1.stats.hp > 0);
   assert.equal(dungeon.deathDrops.length, 1, 'Floating Skull remains on map until collected');
 
-  // Clear monsters and step onto skull to recover
+  // Clear monsters and walk onto skull via free-move
   dungeon.monsters = [];
   const skull = dungeon.deathDrops[0];
-  p1.x = skull.x - 1;
-  p1.y = skull.y;
-  dungeon.tiles[skull.y][skull.x - 1].walkable = true;
-  dungeon.tiles[skull.y][skull.x].walkable = true;
+  const sx = Math.floor(skull.x);
+  const sy = Math.floor(skull.y);
+  p1.x = sx - 0.9;
+  p1.y = sy;
+  if (dungeon.tiles[sy]?.[sx - 1]) {
+    dungeon.tiles[sy][sx - 1].walkable = true;
+    dungeon.tiles[sy][sx - 1].type = 'floor';
+  }
+  if (dungeon.tiles[sy]?.[sx]) {
+    dungeon.tiles[sy][sx].walkable = true;
+    dungeon.tiles[sy][sx].type = 'floor';
+  }
 
-  mgr.submitAction('CHK1', 'p1', { playerId: 'p1', type: 'move', dx: 1, dy: 0 });
-  mgr.submitAction('CHK1', 'p2', { playerId: 'p2', type: 'wait' });
-  mgr.submitAction('CHK1', 'p3', { playerId: 'p3', type: 'wait' });
+  // Stand on the skull tile — realtime interact recovers by ownerId
+  p1.x = skull.x;
+  p1.y = skull.y;
+  mgr.setRealtimeInput('CHK1', 'p1', { dx: 0, dy: 0 });
+  for (let i = 0; i < 20 && dungeon.deathDrops.length > 0; i++) {
+    mgr.tickPlayingRooms(0.05);
+  }
 
   assert.equal(dungeon.deathDrops.length, 0, 'Floating Skull collected upon stepping on tile');
   assert.equal(p1.stats.coins, 420, 'Recovered coins online');
@@ -1361,4 +1372,67 @@ test('realtime melee respects Auto OFF until attackHeld, then swings like Auto O
   const clock3 = createRealtimeClock();
   tickRealtime(player, dungeon, { dx: 1, dy: 0, autoAttack: true }, 0.05, 3, clock3);
   assert.ok(dungeon.monsters[0].hp < 200, 'Auto ON swings without holding ATK');
+});
+
+test('floor visual theme band shifts every 5 floors with pulse helper', async () => {
+  const { getFloorBand, getFloorVisualTheme, mapPulseAmount } = await import('./floorVisual');
+  assert.equal(getFloorBand(1), 0);
+  assert.equal(getFloorBand(5), 0);
+  assert.equal(getFloorBand(6), 1);
+  assert.equal(getFloorBand(10), 1);
+  assert.equal(getFloorBand(11), 2);
+  const t1 = getFloorVisualTheme(1);
+  const t6 = getFloorVisualTheme(6);
+  assert.notEqual(t1.floorLit, t6.floorLit, 'palette changes every 5 floors');
+  assert.notEqual(t1.name, t6.name);
+  const p = mapPulseAmount(1.2, 3);
+  assert.ok(p >= 0 && p <= 1.2, 'pulse amount stays in sensible range');
+});
+
+test('solo dungeons spawn puzzle crates; multiplayer button gates omit helper crates', () => {
+  const solo = generateDungeon(2, 4242, { partySize: 1 });
+  const multi = generateDungeon(2, 4242, { partySize: 3 });
+  assert.ok((solo.crates?.length || 0) >= 1, 'solo should have at least one crate');
+  assert.ok((solo.puzzleLinks?.length || 0) >= 1, 'solo should wire puzzle links');
+  const soloPit = solo.tiles.flat().some(t => t.type === 'pit');
+  const multiPit = multi.tiles.flat().some(t => t.type === 'pit');
+  // Same seed + different partySize may still place pits; button helper crates differ
+  const soloBtn = solo.puzzleLinks?.find(l => l.kind === 'button_gate');
+  const multiBtn = multi.puzzleLinks?.find(l => l.kind === 'button_gate');
+  if (soloBtn && multiBtn) {
+    assert.ok(soloBtn.crateId, 'solo button gate gets a helper crate id');
+    assert.equal(multiBtn.crateId, undefined, 'multi button gate has no helper crate');
+  }
+  assert.ok(soloPit || multiPit || (solo.crates?.length || 0) > 0, 'puzzles placed somehow');
+});
+
+test('pushing a crate into a pit fills the gap', async () => {
+  const { tryPushCrate } = await import('./puzzles');
+  const dungeon = generateDungeon(1, 7, { partySize: 1 });
+  // Build a minimal pit+crate scene
+  dungeon.tiles[10][10] = {
+    x: 10,
+    y: 10,
+    type: 'pit',
+    walkable: false,
+    transparent: true,
+    explored: true,
+    visible: true
+  };
+  dungeon.tiles[10][9] = {
+    x: 9,
+    y: 10,
+    type: 'floor',
+    walkable: true,
+    transparent: true,
+    explored: true,
+    visible: true
+  };
+  dungeon.crates = [{ id: 'c1', x: 9, y: 10 }];
+  const logs: any[] = [];
+  const res = tryPushCrate(dungeon, 8.1, 10.1, 1, 0, 1, logs);
+  assert.equal(res.pushed, true);
+  assert.equal(dungeon.tiles[10][10].type, 'pit_filled');
+  assert.equal(dungeon.tiles[10][10].walkable, true);
+  assert.equal(dungeon.crates.length, 0);
 });
