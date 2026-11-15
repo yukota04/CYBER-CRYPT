@@ -28,6 +28,7 @@ import { activateNearbySpawns, updateFOVIncremental } from './dungeon';
 import {
   crateBlockers,
   crateBlocksTile,
+  nearestLivingCrate,
   tickCrateRespawns,
   tickPuzzleState,
   tryDamageCrate,
@@ -531,15 +532,19 @@ function tryPlayerMelee(
       best = m;
     }
   }
-  if (!best) {
-    // No monster in cone — try smashing a solid crate
-    const crateHit = tryDamageCrate(dungeon, player.x, player.y, Math.max(8, Math.floor(getTotalStats(player).attack * 0.85)), turn, logs);
+
+  // Crates are valid melee targets — prefer them when closer / overlapping the swing
+  const nearCrate = nearestLivingCrate(dungeon, player.x, player.y, PLAYER_MELEE_RANGE);
+  const preferCrate = !!nearCrate && (!best || nearCrate.dist <= bestScore + 0.2);
+  if (preferCrate && nearCrate) {
+    const crateDmg = Math.max(10, Math.floor(getTotalStats(player).attack * 1.05));
+    const crateHit = tryDamageCrate(dungeon, player.x, player.y, crateDmg, turn, logs);
     if (crateHit.hit) {
-      clock.playerAttackCd = PLAYER_ATTACK_COOLDOWN * 0.85;
+      clock.playerAttackCd = PLAYER_ATTACK_COOLDOWN * 0.8;
       soundEvents.push(...(crateHit.soundEvents as SoundEventType[]));
       if (crateHit.x != null && crateHit.y != null) {
         floatingTexts.push({
-          text: crateHit.destroyed ? 'CRATE SHATTERED' : 'THUD',
+          text: crateHit.destroyed ? 'CRATE SHATTERED' : `-${crateDmg}`,
           x: crateHit.x,
           y: crateHit.y,
           color: '#c4a574'
@@ -551,13 +556,14 @@ function tryPlayerMelee(
           targetX: crateHit.x,
           targetY: crateHit.y,
           color: '#c4a574',
-          radius: 0.9
+          radius: 0.95
         });
       }
-      screenShake += 0.05;
+      screenShake += crateHit.destroyed ? 0.1 : 0.05;
+      return { screenShake, hitstopSeconds, kills };
     }
-    return { screenShake, hitstopSeconds, kills };
   }
+  if (!best) return { screenShake, hitstopSeconds, kills };
 
   const { damage, isCrit } = calculatePlayerDamage(player, best, dungeon.activeEvent);
   best.hp -= damage;
@@ -1219,12 +1225,31 @@ export function tickRealtime(
       player.x = next.x;
       player.y = next.y;
       moved = true;
-    } else if (clock.cratePushCd <= 0) {
-      // Blocked — try sokoban push into the obstacle
+    }
+
+    // Push whenever driving into a crate (not only when fully stuck — sliding used to skip push)
+    if (clock.cratePushCd <= 0) {
       const push = tryPushCrate(dungeon, player.x, player.y, ix, iy, turn, logs);
       if (push.pushed) {
-        clock.cratePushCd = 0.22;
+        clock.cratePushCd = 0.16;
         soundEvents.push(...(push.soundEvents as SoundEventType[]));
+        // Step into the space freed by the push for snappier feel
+        const after = moveWithCollision(
+          dungeon,
+          player.x,
+          player.y,
+          ix * PLAYER_SPEED,
+          iy * PLAYER_SPEED,
+          dt,
+          spatial,
+          'player',
+          true
+        );
+        if (after.x !== player.x || after.y !== player.y) {
+          player.x = after.x;
+          player.y = after.y;
+          moved = true;
+        }
       }
     }
   }

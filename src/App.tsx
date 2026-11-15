@@ -1042,7 +1042,13 @@ export default function App() {
     }
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${proto}//${window.location.host}/ws`;
+    // Optional dedicated game host (Oracle VPS) — set VITE_WS_HOST=host:port at build time
+    const wsHost =
+      (typeof import.meta !== 'undefined' &&
+        (import.meta as any).env &&
+        (import.meta as any).env.VITE_WS_HOST) ||
+      window.location.host;
+    const wsUrl = `${proto}//${wsHost}/ws`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 

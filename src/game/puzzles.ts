@@ -6,8 +6,8 @@ import { CombatLogEntry, DungeonState, PuzzleCrate, PuzzleLink, Room, Tile } fro
 
 /** Match realtime ENTITY_BODY — keep local to avoid circular imports. */
 const ENTITY_BODY = 0.72;
-const CRATE_MAX_HP = 45;
-const CRATE_RESPAWN_SEC = 12;
+const CRATE_MAX_HP = 36;
+const CRATE_RESPAWN_SEC = 10;
 
 export type PuzzleRng = () => number;
 
@@ -573,6 +573,31 @@ export function tryPushCrate(
   return { pushed: true, soundEvents };
 }
 
+/** Nearest living crate within melee reach (no mutation). */
+export function nearestLivingCrate(
+  dungeon: DungeonState,
+  playerX: number,
+  playerY: number,
+  maxDist = 1.7
+): { crate: PuzzleCrate; dist: number } | null {
+  const living = livingCrates(dungeon);
+  if (!living.length) return null;
+  let best: PuzzleCrate | null = null;
+  let bestD = Infinity;
+  const pcx = playerX + ENTITY_BODY * 0.5;
+  const pcy = playerY + ENTITY_BODY * 0.5;
+  for (const c of living) {
+    const ccx = Math.floor(c.x) + 0.5;
+    const ccy = Math.floor(c.y) + 0.5;
+    const d = Math.hypot(pcx - ccx, pcy - ccy);
+    if (d <= maxDist && d < bestD) {
+      best = c;
+      bestD = d;
+    }
+  }
+  return best ? { crate: best, dist: bestD } : null;
+}
+
 /** Damage a crate in melee range; breaks and schedules respawn at home. */
 export function tryDamageCrate(
   dungeon: DungeonState,
@@ -583,23 +608,9 @@ export function tryDamageCrate(
   logs: CombatLogEntry[]
 ): { hit: boolean; destroyed: boolean; soundEvents: string[]; x?: number; y?: number } {
   const soundEvents: string[] = [];
-  const living = livingCrates(dungeon);
-  if (!living.length) return { hit: false, destroyed: false, soundEvents };
-
-  let best: PuzzleCrate | null = null;
-  let bestD = Infinity;
-  const pcx = playerX + ENTITY_BODY * 0.5;
-  const pcy = playerY + ENTITY_BODY * 0.5;
-  for (const c of living) {
-    const ccx = Math.floor(c.x) + 0.5;
-    const ccy = Math.floor(c.y) + 0.5;
-    const d = Math.hypot(pcx - ccx, pcy - ccy);
-    if (d <= 1.65 && d < bestD) {
-      best = c;
-      bestD = d;
-    }
-  }
-  if (!best) return { hit: false, destroyed: false, soundEvents };
+  const found = nearestLivingCrate(dungeon, playerX, playerY);
+  if (!found) return { hit: false, destroyed: false, soundEvents };
+  const best = found.crate;
 
   best.hp = Math.max(0, best.hp - Math.max(1, damage));
   soundEvents.push('hit');
