@@ -2917,8 +2917,11 @@ export default function App() {
             e.nativeEvent.offsetX,
             e.nativeEvent.offsetY
           );
-          // PC: aim / face / melee toward mouse pointer
-          if (playModeRef.current === 'offline' && !joystickActiveRef.current) {
+          // PC: aim / face / melee toward mouse (offline + online prediction stream)
+          if (
+            (playModeRef.current === 'offline' || playModeRef.current === 'online') &&
+            !joystickActiveRef.current
+          ) {
             updateMouseAim(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
           }
         }}
