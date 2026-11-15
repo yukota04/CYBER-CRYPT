@@ -6,8 +6,40 @@ import { CombatLogEntry, DungeonState, PuzzleCrate, PuzzleLink, Room, Tile } fro
 
 /** Match realtime ENTITY_BODY — keep local to avoid circular imports. */
 const ENTITY_BODY = 0.72;
+const CRATE_MAX_HP = 45;
+const CRATE_RESPAWN_SEC = 12;
 
 export type PuzzleRng = () => number;
+
+export function makeCrate(id: string, x: number, y: number): PuzzleCrate {
+  return {
+    id,
+    x,
+    y,
+    homeX: x,
+    homeY: y,
+    hp: CRATE_MAX_HP,
+    maxHp: CRATE_MAX_HP,
+    broken: false,
+    respawnIn: 0
+  };
+}
+
+/** Solid tile occupancy — crates block walk like walls until broken. */
+export function crateBlocksTile(dungeon: DungeonState, tx: number, ty: number): boolean {
+  const crates = dungeon.crates;
+  if (!crates || !crates.length) return false;
+  for (let i = 0; i < crates.length; i++) {
+    const c = crates[i];
+    if (c.broken) continue;
+    if (Math.floor(c.x) === tx && Math.floor(c.y) === ty) return true;
+  }
+  return false;
+}
+
+export function livingCrates(dungeon: DungeonState): PuzzleCrate[] {
+  return (dungeon.crates || []).filter(c => !c.broken);
+}
 
 function isFloorish(t: Tile | undefined): boolean {
   return !!t && t.walkable && (t.type === 'floor' || t.type === 'corridor');
@@ -52,10 +84,45 @@ function tileFreeForCrate(dungeon: DungeonState, x: number, y: number, ignoreCra
   if (t.type === 'gate_closed') return false;
   const crates = dungeon.crates || [];
   for (const c of crates) {
+    if (c.broken) continue;
     if (ignoreCrateId && c.id === ignoreCrateId) continue;
     if (Math.floor(c.x) === x && Math.floor(c.y) === y) return false;
   }
   return true;
+}
+
+/** Prefer a quiet corner in a nearby room — not glued to the pit/plate. */
+function findHiddenCrateSpot(
+  tiles: Tile[][],
+  rooms: Room[],
+  near: { x: number; y: number },
+  used: Set<string>,
+  rng: PuzzleRng
+): { x: number; y: number } | null {
+  const scored: Array<{ x: number; y: number; score: number }> = [];
+  for (const room of rooms) {
+    for (let ry = room.y + 1; ry < room.y + room.h - 1; ry++) {
+      for (let rx = room.x + 1; rx < room.x + room.w - 1; rx++) {
+        const key = `${rx},${ry}`;
+        if (used.has(key)) continue;
+        if (!isFloorish(tiles[ry]?.[rx])) continue;
+        // Prefer corners / edges so it reads as scenery
+        const edge =
+          rx === room.x + 1 ||
+          rx === room.x + room.w - 2 ||
+          ry === room.y + 1 ||
+          ry === room.y + room.h - 2;
+        if (!edge) continue;
+        const dist = Math.hypot(rx - near.x, ry - near.y);
+        if (dist < 3 || dist > 18) continue;
+        scored.push({ x: rx, y: ry, score: dist + (edge ? 0 : 4) + rng() });
+      }
+    }
+  }
+  if (!scored.length) return null;
+  scored.sort((a, b) => a.score - b.score);
+  const pick = scored[Math.min(scored.length - 1, Math.floor(rng() * Math.min(5, scored.length)))];
+  return { x: pick.x, y: pick.y };
 }
 
 /** Find a short corridor run between rooms suitable for a pit. */
@@ -186,10 +253,13 @@ export function placePuzzles(
       continue;
     }
     setPit(tiles[spot.pit.y][spot.pit.x]);
-    // Mark corridor neighbors so path still reads as corridor
-    if (tiles[spot.crate.y][spot.crate.x].type === 'floor' || tiles[spot.crate.y][spot.crate.x].type === 'corridor') {
+    // Hide the crate in a nearby room corner — player must search, not trip over it
+    const hidden =
+      findHiddenCrateSpot(tiles, rooms, spot.pit, used, rng) ||
+      (isFloorish(tiles[spot.crate.y]?.[spot.crate.x]) ? spot.crate : null);
+    if (hidden) {
       const id = `crate_${dungeon.floor}_${crateSeq++}`;
-      crates.push({ id, x: spot.crate.x, y: spot.crate.y });
+      crates.push(makeCrate(id, hidden.x, hidden.y));
       links.push({
         id: `pitlink_${i}`,
         kind: 'crate_pit',
@@ -198,6 +268,7 @@ export function placePuzzles(
         open: false
       });
       used.add(pk);
+      used.add(`${hidden.x},${hidden.y}`);
       used.add(ck);
     }
   }
@@ -216,10 +287,15 @@ export function placePuzzles(
       used.add(`${gateSpot.plate.x},${gateSpot.plate.y}`);
     }
     let helperCrateId: string | undefined;
-    if (solo && isFloorish(tiles[gateSpot.crateSpot.y]?.[gateSpot.crateSpot.x])) {
-      helperCrateId = `crate_${dungeon.floor}_${crateSeq++}`;
-      crates.push({ id: helperCrateId, x: gateSpot.crateSpot.x, y: gateSpot.crateSpot.y });
-      used.add(`${gateSpot.crateSpot.x},${gateSpot.crateSpot.y}`);
+    if (solo) {
+      const hidden =
+        findHiddenCrateSpot(tiles, rooms, gateSpot.plate, used, rng) ||
+        (isFloorish(tiles[gateSpot.crateSpot.y]?.[gateSpot.crateSpot.x]) ? gateSpot.crateSpot : null);
+      if (hidden) {
+        helperCrateId = `crate_${dungeon.floor}_${crateSeq++}`;
+        crates.push(makeCrate(helperCrateId, hidden.x, hidden.y));
+        used.add(`${hidden.x},${hidden.y}`);
+      }
     }
     links.push({
       id: `gate_btn_0`,
@@ -258,9 +334,15 @@ export function placePuzzles(
       if (isFloorish(tiles[p1.y]?.[p1.x])) setPlate(tiles[p1.y][p1.x]);
       if (isFloorish(tiles[p2.y]?.[p2.x])) setPlate(tiles[p2.y][p2.x]);
       let weightCrate: string | undefined;
-      if (solo && isFloorish(tiles[p2.y]?.[p2.x + 1])) {
-        weightCrate = `crate_${dungeon.floor}_${crateSeq++}`;
-        crates.push({ id: weightCrate, x: p2.x + 1, y: p2.y });
+      if (solo) {
+        const hidden =
+          findHiddenCrateSpot(tiles, rooms, p2, used, rng) ||
+          (isFloorish(tiles[p2.y]?.[p2.x + 1]) ? { x: p2.x + 1, y: p2.y } : null);
+        if (hidden) {
+          weightCrate = `crate_${dungeon.floor}_${crateSeq++}`;
+          crates.push(makeCrate(weightCrate, hidden.x, hidden.y));
+          used.add(`${hidden.x},${hidden.y}`);
+        }
       }
       links.push({
         id: 'dual_gate_0',
@@ -286,9 +368,15 @@ export function placePuzzles(
       if (isFloorish(tiles[plate.y]?.[plate.x])) {
         setPlate(tiles[plate.y][plate.x]);
         let helper: string | undefined;
-        if (solo && isFloorish(tiles[plate.y]?.[plate.x + 1])) {
-          helper = `crate_${dungeon.floor}_${crateSeq++}`;
-          crates.push({ id: helper, x: plate.x + 1, y: plate.y });
+        if (solo) {
+          const hidden =
+            findHiddenCrateSpot(tiles, rooms, plate, used, rng) ||
+            (isFloorish(tiles[plate.y]?.[plate.x + 1]) ? { x: plate.x + 1, y: plate.y } : null);
+          if (hidden) {
+            helper = `crate_${dungeon.floor}_${crateSeq++}`;
+            crates.push(makeCrate(helper, hidden.x, hidden.y));
+            used.add(`${hidden.x},${hidden.y}`);
+          }
         }
         links.push({
           id: 'timed_gate_0',
@@ -327,6 +415,7 @@ function isPressed(
     if (bodyOnTile(o.x, o.y, tile.x, tile.y)) return true;
   }
   for (const c of dungeon.crates || []) {
+    if (c.broken) continue;
     if (Math.floor(c.x) === tile.x && Math.floor(c.y) === tile.y) return true;
   }
   return false;
@@ -437,19 +526,24 @@ export function tryPushCrate(
 ): { pushed: boolean; soundEvents: string[] } {
   const soundEvents: string[] = [];
   if (!dungeon.crates?.length) return { pushed: false, soundEvents };
-  if (Math.hypot(ix, iy) < 0.35) return { pushed: false, soundEvents };
+  if (Math.hypot(ix, iy) < 0.2) return { pushed: false, soundEvents };
 
   const dirX = Math.abs(ix) >= Math.abs(iy) ? Math.sign(ix) : 0;
   const dirY = Math.abs(iy) > Math.abs(ix) ? Math.sign(iy) : 0;
   if (dirX === 0 && dirY === 0) return { pushed: false, soundEvents };
 
-  // Front cell of the player body
+  // Probe several cells ahead so free-move always contacts solid crates
   const pcx = playerX + ENTITY_BODY * 0.5;
   const pcy = playerY + ENTITY_BODY * 0.5;
-  const frontX = Math.floor(pcx + dirX * 0.55);
-  const frontY = Math.floor(pcy + dirY * 0.55);
-
-  const crate = dungeon.crates.find(c => Math.floor(c.x) === frontX && Math.floor(c.y) === frontY);
+  let crate: PuzzleCrate | undefined;
+  for (const dist of [0.45, 0.75, 1.05, 1.35]) {
+    const frontX = Math.floor(pcx + dirX * dist);
+    const frontY = Math.floor(pcy + dirY * dist);
+    crate = dungeon.crates.find(
+      c => !c.broken && Math.floor(c.x) === frontX && Math.floor(c.y) === frontY
+    );
+    if (crate) break;
+  }
   if (!crate) return { pushed: false, soundEvents };
 
   const nx = Math.floor(crate.x) + dirX;
@@ -461,11 +555,12 @@ export function tryPushCrate(
 
   if (dest.type === 'pit') {
     setPitFilled(dest);
-    dungeon.crates = dungeon.crates.filter(c => c.id !== crate.id);
+    // Crate consumed by the pit — no respawn (puzzle solved)
+    dungeon.crates = dungeon.crates.filter(c => c.id !== crate!.id);
     soundEvents.push('chest');
     logs.unshift({
       id: `crate_pit_${turn}_${crate.id}`,
-      text: '📦 Crate sealed the void — path restored!',
+      text: 'Crate sealed the void — path restored.',
       type: 'info',
       turn
     });
@@ -478,16 +573,94 @@ export function tryPushCrate(
   return { pushed: true, soundEvents };
 }
 
-/** Crate AABBs for collision (tile-centered blockers). */
+/** Damage a crate in melee range; breaks and schedules respawn at home. */
+export function tryDamageCrate(
+  dungeon: DungeonState,
+  playerX: number,
+  playerY: number,
+  damage: number,
+  turn: number,
+  logs: CombatLogEntry[]
+): { hit: boolean; destroyed: boolean; soundEvents: string[]; x?: number; y?: number } {
+  const soundEvents: string[] = [];
+  const living = livingCrates(dungeon);
+  if (!living.length) return { hit: false, destroyed: false, soundEvents };
+
+  let best: PuzzleCrate | null = null;
+  let bestD = Infinity;
+  const pcx = playerX + ENTITY_BODY * 0.5;
+  const pcy = playerY + ENTITY_BODY * 0.5;
+  for (const c of living) {
+    const ccx = Math.floor(c.x) + 0.5;
+    const ccy = Math.floor(c.y) + 0.5;
+    const d = Math.hypot(pcx - ccx, pcy - ccy);
+    if (d <= 1.65 && d < bestD) {
+      best = c;
+      bestD = d;
+    }
+  }
+  if (!best) return { hit: false, destroyed: false, soundEvents };
+
+  best.hp = Math.max(0, best.hp - Math.max(1, damage));
+  soundEvents.push('hit');
+  if (best.hp <= 0) {
+    best.broken = true;
+    best.respawnIn = CRATE_RESPAWN_SEC;
+    soundEvents.push('blocked');
+    logs.unshift({
+      id: `crate_break_${turn}_${best.id}`,
+      text: 'Storage crate shattered — nano-fabricators will rebuild it.',
+      type: 'info',
+      turn
+    });
+    return { hit: true, destroyed: true, soundEvents, x: best.x, y: best.y };
+  }
+  return { hit: true, destroyed: false, soundEvents, x: best.x, y: best.y };
+}
+
+/** Tick broken-crate respawn timers. */
+export function tickCrateRespawns(
+  dungeon: DungeonState,
+  dt: number,
+  turn: number,
+  logs: CombatLogEntry[]
+): string[] {
+  const soundEvents: string[] = [];
+  if (!dungeon.crates?.length) return soundEvents;
+  for (const c of dungeon.crates) {
+    if (!c.broken) continue;
+    c.respawnIn = Math.max(0, (c.respawnIn || 0) - dt);
+    if ((c.respawnIn || 0) > 0) continue;
+    if (!tileFreeForCrate(dungeon, c.homeX, c.homeY, c.id)) {
+      c.respawnIn = 1.5;
+      continue;
+    }
+    c.x = c.homeX;
+    c.y = c.homeY;
+    c.hp = c.maxHp || CRATE_MAX_HP;
+    c.broken = false;
+    c.respawnIn = 0;
+    soundEvents.push('shrine');
+    logs.unshift({
+      id: `crate_respawn_${turn}_${c.id}`,
+      text: 'A storage crate reassembles in the shadows.',
+      type: 'info',
+      turn
+    });
+  }
+  return soundEvents;
+}
+
+/** Crate AABBs for entity hash (living only). */
 export function crateBlockers(dungeon: DungeonState): Array<{ x: number; y: number; id: string }> {
-  return (dungeon.crates || []).map(c => ({
+  return livingCrates(dungeon).map(c => ({
     x: Math.floor(c.x) + (1 - ENTITY_BODY) * 0.5,
     y: Math.floor(c.y) + (1 - ENTITY_BODY) * 0.5,
     id: c.id
   }));
 }
 
-/** Lightweight prediction helper — move local player without combat. */
+/** Lightweight prediction — solid crates + local push for zero-latency feel. */
 export function predictMoveOnly(
   dungeon: DungeonState,
   x: number,
@@ -498,8 +671,7 @@ export function predictMoveOnly(
   dt: number,
   extraBlockers: Array<{ x: number; y: number; id?: string }> = []
 ): { x: number; y: number } {
-  // Lazy import avoided — use local walkable check + crate blockers
-  const blockers = [...crateBlockers(dungeon), ...extraBlockers];
+  const blockers = [...extraBlockers];
   let ix = dx;
   let iy = dy;
   const len = Math.hypot(ix, iy);
@@ -515,6 +687,7 @@ export function predictMoveOnly(
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         if (!dungeon.tiles[ty]?.[tx]?.walkable) return false;
+        if (crateBlocksTile(dungeon, tx, ty)) return false;
       }
     }
     const pcx = px + ENTITY_BODY * 0.5;
@@ -522,7 +695,7 @@ export function predictMoveOnly(
     for (const b of blockers) {
       const bcx = b.x + ENTITY_BODY * 0.5;
       const bcy = b.y + ENTITY_BODY * 0.5;
-      if ((pcx - bcx) ** 2 + (pcy - bcy) ** 2 < (ENTITY_BODY * 0.5) ** 2) return false;
+      if ((pcx - bcx) ** 2 + (pcy - bcy) ** 2 < (ENTITY_BODY * 0.55) ** 2) return false;
     }
     return true;
   };
@@ -532,5 +705,14 @@ export function predictMoveOnly(
   if (tryPos(wantX, wantY)) return { x: wantX, y: wantY };
   if (tryPos(wantX, y)) return { x: wantX, y };
   if (tryPos(x, wantY)) return { x, y: wantY };
+
+  // Blocked by crate → push locally so online prediction feels solid
+  const dummyLogs: CombatLogEntry[] = [];
+  const push = tryPushCrate(dungeon, x, y, ix, iy, 0, dummyLogs);
+  if (push.pushed) {
+    if (tryPos(wantX, wantY)) return { x: wantX, y: wantY };
+    if (tryPos(wantX, y)) return { x: wantX, y };
+    if (tryPos(x, wantY)) return { x, y: wantY };
+  }
   return { x, y };
 }

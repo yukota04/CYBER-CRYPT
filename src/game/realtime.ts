@@ -25,7 +25,15 @@ import {
 import { applyEnvironmentalTurnEffects } from './events';
 import { SoundEventType } from './audio';
 import { activateNearbySpawns, updateFOVIncremental } from './dungeon';
-import { crateBlockers, tickPuzzleState, tryPushCrate } from './puzzles';
+import {
+  crateBlockers,
+  crateBlocksTile,
+  tickCrateRespawns,
+  tickPuzzleState,
+  tryDamageCrate,
+  tryPushCrate
+} from './puzzles';
+import { bossAttackRange, bossMoveSpeed, floorBossStillAlive, isFloorBossArchetype } from './floorBosses';
 
 /** Footprint in tiles — < 1 so an entity can straddle two cells. */
 export const ENTITY_BODY = 0.72;
@@ -135,7 +143,10 @@ export function tileKey(tx: number, ty: number): string {
 
 function isWalkableAt(dungeon: DungeonState, tx: number, ty: number): boolean {
   if (tx < 0 || ty < 0 || tx >= dungeon.width || ty >= dungeon.height) return false;
-  return !!dungeon.tiles[ty]?.[tx]?.walkable;
+  if (!dungeon.tiles[ty]?.[tx]?.walkable) return false;
+  // Solid crates occupy tiles like walls
+  if (crateBlocksTile(dungeon, tx, ty)) return false;
+  return true;
 }
 
 /** True if the entity body at (x,y) only overlaps walkable tiles (no array alloc). */
@@ -148,6 +159,20 @@ export function canOccupy(dungeon: DungeonState, x: number, y: number, body = EN
     for (let tx = x0; tx <= x1; tx++) {
       if (!isWalkableAt(dungeon, tx, ty)) return false;
     }
+  }
+  return true;
+}
+
+export function unlockStairsIfBossClear(dungeon: DungeonState): boolean {
+  if (!dungeon.stairsLocked) return false;
+  if (floorBossStillAlive(dungeon.monsters, dungeon.floorBossId)) return false;
+  dungeon.stairsLocked = false;
+  const sx = dungeon.stairsPos?.x;
+  const sy = dungeon.stairsPos?.y;
+  if (typeof sx === 'number' && typeof sy === 'number' && dungeon.tiles[sy]?.[sx]) {
+    dungeon.tiles[sy][sx].walkable = true;
+    dungeon.tiles[sy][sx].transparent = true;
+    dungeon.tiles[sy][sx].type = 'stairs_down';
   }
   return true;
 }
@@ -265,6 +290,7 @@ function inMeleeArc(player: Player, mx: number, my: number, moveDx = 0, moveDy =
 }
 
 function monsterSpeed(m: Monster): number {
+  if (isFloorBossArchetype(m.archetype)) return bossMoveSpeed(m.archetype);
   switch (m.archetype) {
     case 'glitch_swarmer':
       return 3.6;
@@ -274,8 +300,6 @@ function monsterSpeed(m: Monster): number {
       return 2.8;
     case 'cyber_behemoth':
       return 2.1;
-    case 'core_synthesizer':
-      return 2.4;
     default:
       return 3.0;
   }
@@ -293,12 +317,19 @@ function monsterAttackCooldown(m: Monster): number {
       return 1.6;
     case 'core_synthesizer':
       return 1.35;
+    case 'boss_assassin':
+      return 0.85;
+    case 'boss_mage':
+      return 1.45;
+    case 'boss_tank':
+      return 1.7;
     default:
       return 0.9;
   }
 }
 
 function monsterAttackRange(m: Monster): number {
+  if (isFloorBossArchetype(m.archetype)) return bossAttackRange(m.archetype);
   switch (m.archetype) {
     case 'neon_stalker':
       return 3.6;
@@ -500,7 +531,33 @@ function tryPlayerMelee(
       best = m;
     }
   }
-  if (!best) return { screenShake, hitstopSeconds, kills };
+  if (!best) {
+    // No monster in cone — try smashing a solid crate
+    const crateHit = tryDamageCrate(dungeon, player.x, player.y, Math.max(8, Math.floor(getTotalStats(player).attack * 0.85)), turn, logs);
+    if (crateHit.hit) {
+      clock.playerAttackCd = PLAYER_ATTACK_COOLDOWN * 0.85;
+      soundEvents.push(...(crateHit.soundEvents as SoundEventType[]));
+      if (crateHit.x != null && crateHit.y != null) {
+        floatingTexts.push({
+          text: crateHit.destroyed ? 'CRATE SHATTERED' : 'THUD',
+          x: crateHit.x,
+          y: crateHit.y,
+          color: '#c4a574'
+        });
+        attackEffects.push({
+          type: 'slash',
+          x: player.x,
+          y: player.y,
+          targetX: crateHit.x,
+          targetY: crateHit.y,
+          color: '#c4a574',
+          radius: 0.9
+        });
+      }
+      screenShake += 0.05;
+    }
+    return { screenShake, hitstopSeconds, kills };
+  }
 
   const { damage, isCrit } = calculatePlayerDamage(player, best, dungeon.activeEvent);
   best.hp -= damage;
@@ -546,11 +603,26 @@ function tryPlayerMelee(
     if (idx >= 0) dungeon.monsters.splice(idx, 1);
     const shardMultiplier = dungeon.activeEvent?.id === 'glitch_storm' ? 1.6 : 1.0;
     player.stats.soulShards += Math.floor(best.shardReward * shardMultiplier);
-    dropCoinsAround(dungeon, Math.floor(best.x), Math.floor(best.y), dungeon.floor, best.archetype === 'core_synthesizer');
+    dropCoinsAround(
+      dungeon,
+      Math.floor(best.x),
+      Math.floor(best.y),
+      dungeon.floor,
+      isFloorBossArchetype(best.archetype) || best.isFloorBoss
+    );
     soundEvents.push('kill');
     kills = 1;
     const leveled = awardXP(player, best.expReward, logs, turn);
     if (leveled) soundEvents.push('level_up');
+    if ((best.isFloorBoss || isFloorBossArchetype(best.archetype)) && unlockStairsIfBossClear(dungeon)) {
+      soundEvents.push('teleport');
+      logs.unshift({
+        id: `log_boss_stairs_${Date.now()}`,
+        text: `Floor Guardian down — stairs to Sub-Level ${dungeon.floor + 1} unlocked!`,
+        type: 'level_up',
+        turn
+      });
+    }
   }
 
   return { screenShake, hitstopSeconds, kills };
@@ -597,7 +669,7 @@ function tickMonsters(
   }
   for (let i = 0; i < dungeon.monsters.length; i++) {
     const m = dungeon.monsters[i];
-    let near = m.archetype === 'core_synthesizer';
+    let near = isFloorBossArchetype(m.archetype) || !!m.isFloorBoss;
     if (!near) {
       for (let j = 0; j < living.length; j++) {
         if (distanceCenters(m.x, m.y, living[j].x, living[j].y) <= HASH_RANGE) {
@@ -639,23 +711,27 @@ function tickMonsters(
     }
     if (!monster.alerted) continue;
 
-    // Far packs: skip chase until near (bosses always active)
-    if (dist > AI_ACTIVE_RANGE && monster.archetype !== 'core_synthesizer') continue;
+    // Far packs: skip chase until near (floor bosses always active)
+    if (dist > AI_ACTIVE_RANGE && !isFloorBossArchetype(monster.archetype) && !monster.isFloorBoss) continue;
 
     const range = monsterAttackRange(monster);
     const cd = clock.monsterAttackCd[monster.id] || 0;
 
     if (dist <= range && cd <= 0) {
-      if (monster.archetype === 'neon_stalker' && dist > 1.2) {
-        const baseRanged = Math.max(1, monster.attack - 2 - Math.floor(pTotals.defense * 0.5));
+      if ((monster.archetype === 'neon_stalker' || monster.archetype === 'boss_mage') && dist > 1.2) {
+        const mageBonus = monster.archetype === 'boss_mage' ? 1.35 : 1;
+        const baseRanged = Math.max(
+          1,
+          Math.floor((monster.attack - 2 - Math.floor(pTotals.defense * 0.35)) * mageBonus)
+        );
         const rangedDmg = Math.max(1, Math.floor(baseRanged * envDmgMult));
         if (attackSfxBudget > 0) {
-          soundEvents.push('monster_attack_stalker');
+          soundEvents.push(monster.archetype === 'boss_mage' ? 'monster_attack_boss' : 'monster_attack_stalker');
           attackSfxBudget--;
         }
         applyMonsterDamageToPlayer(player, rangedDmg, monster.name, logs, soundEvents, floatingTexts, turn);
         clock.monsterAttackCd[monster.id] = monsterAttackCooldown(monster);
-        screenShake += 0.08;
+        screenShake += monster.archetype === 'boss_mage' ? 0.16 : 0.08;
         continue;
       }
       if (monster.archetype === 'circuit_disruptor' && dist > 1.15) {
@@ -669,13 +745,22 @@ function tickMonsters(
         clock.monsterAttackCd[monster.id] = monsterAttackCooldown(monster);
         continue;
       }
-      if (dist <= 1.25) {
-        const mult = monster.archetype === 'cyber_behemoth' ? 2 : 1;
-        const baseRaw = Math.max(1, monster.attack * mult - Math.floor(pTotals.defense * 0.6));
+      if (dist <= Math.max(1.25, range * 0.55)) {
+        const mult =
+          monster.archetype === 'cyber_behemoth' || monster.archetype === 'boss_tank'
+            ? 2.2
+            : monster.archetype === 'boss_assassin'
+              ? 1.85
+              : monster.isFloorBoss
+                ? 1.6
+                : 1;
+        // Floor bosses: hard burst (defense only softens slightly)
+        const defFactor = monster.isFloorBoss || isFloorBossArchetype(monster.archetype) ? 0.35 : 0.6;
+        const baseRaw = Math.max(1, monster.attack * mult - Math.floor(pTotals.defense * defFactor));
         const rawDmg = Math.max(1, Math.floor(baseRaw * envDmgMult));
         if (attackSfxBudget > 0) {
           soundEvents.push(
-            monster.archetype === 'core_synthesizer'
+            isFloorBossArchetype(monster.archetype) || monster.isFloorBoss
               ? 'monster_attack_boss'
               : monster.archetype === 'cyber_behemoth'
                 ? 'monster_attack_behemoth'
@@ -685,7 +770,7 @@ function tickMonsters(
         }
         applyMonsterDamageToPlayer(player, rawDmg, monster.name, logs, soundEvents, floatingTexts, turn);
         clock.monsterAttackCd[monster.id] = monsterAttackCooldown(monster);
-        screenShake += 0.1;
+        screenShake += monster.isFloorBoss ? 0.22 : 0.1;
         continue;
       }
     }
@@ -807,6 +892,17 @@ export function tickCoopRealtime(
     logs
   );
   for (const s of pz.soundEvents) soundEvents.push(s as SoundEventType);
+  const crateSfx = tickCrateRespawns(dungeon, dt, turn, logs);
+  for (const s of crateSfx) soundEvents.push(s as SoundEventType);
+  if (unlockStairsIfBossClear(dungeon)) {
+    soundEvents.push('teleport');
+    logs.unshift({
+      id: `log_boss_stairs_${Date.now()}`,
+      text: `Floor Guardian down — stairs unlocked!`,
+      type: 'level_up',
+      turn
+    });
+  }
 
   const anyImpact = livingAgents.some(a => a.clock.impactFreeze > 0);
   if (!floorCompleted && !anyImpact && livingAgents.length > 0) {
@@ -910,6 +1006,18 @@ function interactOccupiedTiles(
     const key = tileKey(tx, ty);
 
     if (tile.type === 'stairs_down') {
+      if (dungeon.stairsLocked || floorBossStillAlive(dungeon.monsters, dungeon.floorBossId)) {
+        if (!clock.triggeredTiles.has(`stairs_lock_${tx}_${ty}`)) {
+          clock.triggeredTiles.add(`stairs_lock_${tx}_${ty}`);
+          logs.unshift({
+            id: `log_stairs_lock_${Date.now()}`,
+            text: 'Stairs sealed — defeat the Floor Guardian first.',
+            type: 'info',
+            turn
+          });
+        }
+        continue;
+      }
       floorCompleted = true;
       soundEvents.push('teleport');
       logs.unshift({
@@ -1169,6 +1277,17 @@ export function tickRealtime(
   if (!opts?.skipMonsters) {
     const pz = tickPuzzleState(dungeon, [{ x: player.x, y: player.y }], dt, turn, logs);
     for (const s of pz.soundEvents) soundEvents.push(s as SoundEventType);
+    const crateSfx = tickCrateRespawns(dungeon, dt, turn, logs);
+    for (const s of crateSfx) soundEvents.push(s as SoundEventType);
+    if (unlockStairsIfBossClear(dungeon)) {
+      soundEvents.push('teleport');
+      logs.unshift({
+        id: `log_boss_stairs_${Date.now()}`,
+        text: `Floor Guardian down — stairs unlocked!`,
+        type: 'level_up',
+        turn
+      });
+    }
   }
 
   // During impact freeze: pause monster AI (player movement above stays full-speed)

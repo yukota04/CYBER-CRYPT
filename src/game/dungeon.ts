@@ -10,6 +10,7 @@ import {
 import { generateRandomLoot } from './items';
 import { getEnvironmentalEventForFloor, generateShopItems } from './events';
 import { placePuzzles } from './puzzles';
+import { buildFloorBossSpawn, getFloorBossBlueprint } from './floorBosses';
 
 /** Diamonds (soul shards) drop at 20% of previous rates (−80%). */
 const SHARD_DROP_MULT = 0.2;
@@ -97,8 +98,12 @@ export function buildMonsterVisualVariant(
 ): { visualVariant: MonsterVisualVariant; primaryColor: string; evolvedPrefix: string } {
   const tier = Math.min(6, Math.floor((floor - 1) / 2) + 1);
   const baseHue =
-    archetype === 'core_synthesizer'
+    archetype === 'core_synthesizer' || archetype === 'boss_assassin'
       ? 330
+      : archetype === 'boss_mage'
+      ? 280
+      : archetype === 'boss_tank'
+      ? 210
       : archetype === 'cyber_behemoth'
       ? 350
       : archetype === 'neon_stalker'
@@ -124,13 +129,29 @@ export function buildMonsterVisualVariant(
     seed: seedNum,
     tier,
     hueShift,
-    bodyShape: archetype === 'core_synthesizer' ? 'core' : EVOLVED_SHAPES[shapeIdx],
-    plates: Math.min(6, Math.floor((floor + 1) / 2)),
-    spikes: Math.min(12, (floor - 1) + (archetype === 'cyber_behemoth' ? 4 : 2)),
-    eyeStyle: archetype === 'core_synthesizer' ? 'halo' : EYE_STYLES[eyeIdx],
+    bodyShape:
+      archetype === 'core_synthesizer' || archetype === 'boss_mage'
+        ? 'core'
+        : archetype === 'boss_tank'
+          ? 'titan'
+          : archetype === 'boss_assassin'
+            ? 'spiked'
+            : EVOLVED_SHAPES[shapeIdx],
+    plates: Math.min(6, Math.floor((floor + 1) / 2) + (archetype.startsWith('boss_') ? 2 : 0)),
+    spikes: Math.min(
+      12,
+      (floor - 1) +
+        (archetype === 'cyber_behemoth' || archetype === 'boss_assassin' ? 4 : 2)
+    ),
+    eyeStyle:
+      archetype === 'core_synthesizer' || archetype === 'boss_mage'
+        ? 'halo'
+        : archetype === 'boss_assassin'
+          ? 'visor'
+          : EYE_STYLES[eyeIdx],
     auraColor,
     secondaryColor,
-    crown: archetype === 'core_synthesizer' || floor >= 4
+    crown: archetype === 'core_synthesizer' || archetype.startsWith('boss_') || floor >= 4
   };
 
   const prefixIdx = Math.min(FLOOR_TIER_PREFIXES.length - 1, Math.floor((floor - 1) / 2));
@@ -409,35 +430,43 @@ export function generateDungeon(
   const occupiedPending = (mx: number, my: number) =>
     pendingSpawns.some(mon => Math.floor(mon.x) === mx && Math.floor(mon.y) === my);
 
+  // Every floor: a unique guardian boss that seals the stairs until slain
+  let floorBossId: string | undefined;
+  {
+    const lastRoom = rooms[rooms.length - 1];
+    const bossIdNum = monsterIdCount++;
+    const bp = getFloorBossBlueprint(floor);
+    const variant = buildMonsterVisualVariant(floor, bp.archetype, bossIdNum);
+    const eliteHp = Math.round(52 * hpCurve);
+    const eliteAtk = Math.round(12 * partyThreat.attack + atkScale);
+    const eliteDef = Math.round(5 * partyThreat.defense + defScale);
+    const bx = lastRoom.centerX;
+    const by = Math.max(lastRoom.y + 1, Math.min(lastRoom.y + lastRoom.h - 2, stairsPos.y - 1));
+    floorBossId = `floor_boss_${floor}_${bossIdNum}`;
+    pendingSpawns.push(
+      buildFloorBossSpawn(
+        floor,
+        floorBossId,
+        bx,
+        by,
+        eliteHp,
+        eliteAtk,
+        eliteDef,
+        partyThreat.attack,
+        partyThreat.defense,
+        rewardScale,
+        SHARD_DROP_MULT,
+        variant.visualVariant
+      )
+    );
+  }
+
   for (let i = 1; i < rooms.length; i++) {
     const room = rooms[i];
-    const isBossRoom = i === rooms.length - 1 && floor % 3 === 0;
-
-    if (isBossRoom) {
-      const bossIdNum = monsterIdCount++;
-      const variant = buildMonsterVisualVariant(floor, 'core_synthesizer', bossIdNum);
-      const bossHp = Math.round(135 * hpCurve);
-      pendingSpawns.push({
-        id: `boss_${floor}_${bossIdNum}`,
-        name: `${variant.evolvedPrefix}CORE SYNTHESIZER MK-${floor}`,
-        level: floor + 4,
-        archetype: 'core_synthesizer',
-        x: room.centerX,
-        y: Math.max(room.y + 1, room.centerY - 1),
-        hp: bossHp,
-        maxHp: bossHp,
-        attack: Math.round((16 + Math.floor(floor * 3.2)) * partyThreat.attack),
-        defense: Math.round((9 + Math.floor(floor * 1.6)) * partyThreat.defense),
-        expReward: Math.round(145 * rewardScale),
-        shardReward: Math.max(1, Math.round(40 * rewardScale * SHARD_DROP_MULT)),
-        color: variant.primaryColor,
-        symbol: 'Ω',
-        visualVariant: variant.visualVariant
-      });
-    }
+    const isBossRoom = i === rooms.length - 1;
 
     const numMonsters = isBossRoom
-      ? Math.min(5, 2 + Math.floor(floor / 4))
+      ? Math.min(4, 1 + Math.floor(floor / 5))
       : Math.floor(rng() * (maxPerRoom - minPerRoom + 1)) + minPerRoom;
 
     let placed = 0;
@@ -557,6 +586,10 @@ export function generateDungeon(
 
   const shopItems = generateShopItems(floor, activeEvent?.id === 'black_market');
 
+  // Seal stairs until the floor guardian falls
+  tiles[stairsPos.y][stairsPos.x].walkable = false;
+  tiles[stairsPos.y][stairsPos.x].transparent = true;
+
   const dungeon: DungeonState = {
     floor,
     width,
@@ -566,6 +599,8 @@ export function generateDungeon(
     monsters,
     pendingSpawns,
     stairsPos,
+    stairsLocked: true,
+    floorBossId,
     activeEvent,
     shopItems,
     groundCoins: [],
@@ -578,8 +613,35 @@ export function generateDungeon(
   // Puzzle props: pits/crates, pressure gates (solo gets helper crates; co-op needs teamwork)
   placePuzzles(dungeon, rng, partySize);
 
-  // Wake creatures near the spawn room so the first chamber feels alive without loading the whole floor
+  // Wake spawn room + force-activate the floor boss so stairs stay guarded immediately
   activateNearbySpawns(dungeon, startRoom.centerX, startRoom.centerY, 12);
+  if (floorBossId) {
+    const bossIdx = (dungeon.pendingSpawns || []).findIndex(s => s.id === floorBossId);
+    if (bossIdx >= 0) {
+      const spawn = dungeon.pendingSpawns!.splice(bossIdx, 1)[0];
+      dungeon.monsters.push({
+        id: spawn.id,
+        name: spawn.name,
+        level: spawn.level,
+        archetype: spawn.archetype,
+        x: spawn.x,
+        y: spawn.y,
+        hp: spawn.hp,
+        maxHp: spawn.maxHp,
+        attack: spawn.attack,
+        defense: spawn.defense,
+        expReward: spawn.expReward,
+        shardReward: spawn.shardReward,
+        alerted: true,
+        color: spawn.color,
+        symbol: spawn.symbol,
+        visualVariant: spawn.visualVariant,
+        renderScale: spawn.renderScale,
+        isFloorBoss: true,
+        bossRole: spawn.bossRole
+      });
+    }
+  }
   return dungeon;
 }
 
@@ -603,6 +665,7 @@ export function createEmptyDungeonStub(): DungeonState {
     monsters: [],
     pendingSpawns: [],
     stairsPos: { x: 0, y: 0 },
+    stairsLocked: false,
     activeEvent: null,
     shopItems: [],
     groundCoins: [],
@@ -630,7 +693,15 @@ export function activateNearbySpawns(
     if (dx * dx + dy * dy <= r2) {
       dungeon.monsters.push({
         ...spawn,
-        alerted: spawn.archetype === 'core_synthesizer'
+        alerted:
+          spawn.archetype === 'core_synthesizer' ||
+          !!spawn.isFloorBoss ||
+          spawn.archetype === 'boss_assassin' ||
+          spawn.archetype === 'boss_mage' ||
+          spawn.archetype === 'boss_tank',
+        renderScale: spawn.renderScale,
+        isFloorBoss: spawn.isFloorBoss,
+        bossRole: spawn.bossRole
       });
       activated++;
     } else {

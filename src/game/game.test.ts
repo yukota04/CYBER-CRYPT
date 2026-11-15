@@ -61,7 +61,9 @@ test('dungeon generator creates valid walkable rooms, stairs, and checkpoints', 
 
   const stairsTile = dungeon.tiles[dungeon.stairsPos.y][dungeon.stairsPos.x];
   assert.equal(stairsTile.type, 'stairs_down');
-  assert.equal(stairsTile.walkable, true);
+  // Stairs start sealed — Floor Guardian must fall first
+  assert.equal(dungeon.stairsLocked, true);
+  assert.equal(stairsTile.walkable, false);
 
   assert.equal(dungeon.checkpoints.length, 2, 'Dungeon should place strictly 2 checkpoints per map (start and end)');
   const cpStart = dungeon.checkpoints[0];
@@ -1407,7 +1409,9 @@ test('solo dungeons spawn puzzle crates; multiplayer button gates omit helper cr
 });
 
 test('pushing a crate into a pit fills the gap', async () => {
-  const { tryPushCrate } = await import('./puzzles');
+  const { tryPushCrate, makeCrate, crateBlocksTile, tryDamageCrate, tickCrateRespawns } = await import(
+    './puzzles'
+  );
   const dungeon = generateDungeon(1, 7, { partySize: 1 });
   // Build a minimal pit+crate scene
   dungeon.tiles[10][10] = {
@@ -1428,11 +1432,63 @@ test('pushing a crate into a pit fills the gap', async () => {
     explored: true,
     visible: true
   };
-  dungeon.crates = [{ id: 'c1', x: 9, y: 10 }];
+  dungeon.crates = [makeCrate('c1', 9, 10)];
+  assert.equal(crateBlocksTile(dungeon, 9, 10), true, 'crate is a solid tile blocker');
   const logs: any[] = [];
   const res = tryPushCrate(dungeon, 8.1, 10.1, 1, 0, 1, logs);
   assert.equal(res.pushed, true);
   assert.equal(dungeon.tiles[10][10].type, 'pit_filled');
   assert.equal(dungeon.tiles[10][10].walkable, true);
   assert.equal(dungeon.crates.length, 0);
+});
+
+test('crates are destructible and respawn at home', async () => {
+  const { makeCrate, tryDamageCrate, tickCrateRespawns, crateBlocksTile } = await import('./puzzles');
+  const dungeon = generateDungeon(1, 11, { partySize: 1 });
+  dungeon.tiles[5][5] = {
+    x: 5,
+    y: 5,
+    type: 'floor',
+    walkable: true,
+    transparent: true,
+    explored: true,
+    visible: true
+  };
+  dungeon.crates = [makeCrate('break_me', 5, 5)];
+  const logs: any[] = [];
+  const hit = tryDamageCrate(dungeon, 4.2, 5.0, 999, 1, logs);
+  assert.equal(hit.destroyed, true);
+  assert.equal(dungeon.crates[0].broken, true);
+  assert.equal(crateBlocksTile(dungeon, 5, 5), false, 'broken crate has no collision');
+  dungeon.crates[0].respawnIn = 0.01;
+  tickCrateRespawns(dungeon, 0.05, 2, logs);
+  assert.equal(dungeon.crates[0].broken, false);
+  assert.equal(dungeon.crates[0].x, 5);
+  assert.equal(crateBlocksTile(dungeon, 5, 5), true);
+});
+
+test('every floor has a stair-guard boss and locked stairs until cleared', async () => {
+  const { unlockStairsIfBossClear } = await import('./realtime');
+  const { floorBossRoleForFloor } = await import('./floorBosses');
+  assert.equal(floorBossRoleForFloor(1), 'assassin');
+  assert.equal(floorBossRoleForFloor(2), 'mage');
+  assert.equal(floorBossRoleForFloor(3), 'tank');
+  assert.equal(floorBossRoleForFloor(4), 'assassin');
+
+  const d1 = generateDungeon(1, 101, { partySize: 1 });
+  assert.equal(d1.stairsLocked, true);
+  assert.ok(d1.floorBossId);
+  const boss = d1.monsters.find(m => m.id === d1.floorBossId);
+  assert.ok(boss, 'floor boss should be active at spawn');
+  assert.equal(boss!.isFloorBoss, true);
+  assert.ok((boss!.renderScale || 1) > 1.4, 'boss larger than normal mobs');
+  assert.ok(boss!.maxHp > 200, 'boss tanky vs floor 1 trash');
+  const stairs = d1.tiles[d1.stairsPos.y][d1.stairsPos.x];
+  assert.equal(stairs.walkable, false, 'stairs sealed while boss lives');
+
+  // Slay boss → stairs unlock
+  d1.monsters = d1.monsters.filter(m => m.id !== d1.floorBossId);
+  assert.equal(unlockStairsIfBossClear(d1), true);
+  assert.equal(d1.stairsLocked, false);
+  assert.equal(d1.tiles[d1.stairsPos.y][d1.stairsPos.x].walkable, true);
 });
