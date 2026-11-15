@@ -20,12 +20,14 @@ import {
   computeSkillDamage,
   dropCoinsAround,
   dropPlayerLoadoutOnDeath,
+  executeSkill,
   getEffectiveSkillEnergyCost,
   getFovRadius,
   getPlayerAttackRange,
   getTotalStats,
   hasLineOfSight,
   resolveMonsterTurns,
+  resolveRangedAttack,
   restoreOnlineStashToLevel1Player,
   useConsumableItem
 } from '../game/combat';
@@ -39,6 +41,12 @@ import {
   getProbabilityStoneCost,
   getUpgradeCost
 } from '../game/items';
+import {
+  createRealtimeClock,
+  tickCoopRealtime,
+  type MoveInput,
+  type RealtimeClock
+} from '../game/realtime';
 
 export interface PendingCoopAction {
   playerId: string;
@@ -52,6 +60,11 @@ export interface PendingCoopAction {
 
 export interface InternalCoopRoom extends CoopRoomState {
   pendingActions: Map<string, PendingCoopAction>;
+  /** Continuous free-move inputs (same model as offline). */
+  realtimeInputs: Map<string, MoveInput>;
+  playerClocks: Map<string, RealtimeClock>;
+  monsterClock: RealtimeClock;
+  simAcc: number;
 }
 
 export interface CoopTurnBroadcast {
@@ -137,7 +150,11 @@ export class CoopRoomManager {
         logs: [],
         score: 0,
         monstersSlain: 0,
-        pendingActions: new Map()
+        pendingActions: new Map(),
+        realtimeInputs: new Map(),
+        playerClocks: new Map(),
+        monsterClock: createRealtimeClock(),
+        simAcc: 0
       };
       this.rooms.set(cleanId, room);
     }
@@ -314,16 +331,176 @@ export class CoopRoomManager {
     room.score = 0;
     room.monstersSlain = 0;
     room.pendingActions.clear();
+    room.realtimeInputs.clear();
+    room.playerClocks.clear();
+    room.monsterClock = createRealtimeClock();
+    room.simAcc = 0;
+    for (const slot of room.players) {
+      room.playerClocks.set(slot.playerId, createRealtimeClock());
+      room.realtimeInputs.set(slot.playerId, { dx: 0, dy: 0, autoAttack: true, attackHeld: false });
+      slot.movedThisTurn = false;
+    }
     room.logs = [
       {
         id: `coop_start_${Date.now()}`,
-        text: `ONLINE SQUAD DEPLOYED (${room.players.length} ${room.players.length === 1 ? 'OPERATIVE' : 'OPERATIVES'})! Move 1 tile per turn — all active operatives must act to advance.`,
+        text: `ONLINE SQUAD DEPLOYED (${room.players.length} ${room.players.length === 1 ? 'OPERATIVE' : 'OPERATIVES'})! Free-move combat matches Offline — stick/WASD to move, ATK/skills anytime.`,
         type: 'info',
         turn: 1
       }
     ];
 
     return { ok: true, room: this.sanitizeRoom(room) };
+  }
+
+  /** Continuous input stream — same MoveInput as offline tickRealtime. */
+  public setRealtimeInput(
+    roomId: string,
+    playerId: string,
+    input: Partial<MoveInput>
+  ): { ok: boolean; error?: string } {
+    const room = this.getRoom(roomId);
+    if (!room) return { ok: false, error: 'ROOM_NOT_FOUND' };
+    if (room.status !== 'playing' || !room.dungeon) return { ok: false, error: 'NOT_PLAYING' };
+    const slot = room.players.find(p => p.playerId === playerId);
+    if (!slot || !slot.alive || !slot.player) return { ok: false, error: 'NOT_IN_ROOM' };
+    const prev = room.realtimeInputs.get(playerId) || { dx: 0, dy: 0, autoAttack: true, attackHeld: false };
+    room.realtimeInputs.set(playerId, {
+      dx: typeof input.dx === 'number' ? input.dx : prev.dx,
+      dy: typeof input.dy === 'number' ? input.dy : prev.dy,
+      aimDx: typeof input.aimDx === 'number' ? input.aimDx : prev.aimDx,
+      aimDy: typeof input.aimDy === 'number' ? input.aimDy : prev.aimDy,
+      autoAttack: typeof input.autoAttack === 'boolean' ? input.autoAttack : prev.autoAttack,
+      attackHeld: typeof input.attackHeld === 'boolean' ? input.attackHeld : prev.attackHeld
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Advance free-move sim for every playing room (call from server interval @ ~20Hz).
+   * Same gameplay rules as offline tickRealtime.
+   */
+  public tickPlayingRooms(dt: number): Array<{ roomId: string; broadcast: CoopTurnBroadcast }> {
+    const out: Array<{ roomId: string; broadcast: CoopTurnBroadcast }> = [];
+    const step = Math.min(Math.max(dt, 0.001), 0.08);
+    for (const room of this.rooms.values()) {
+      if (room.status !== 'playing' || !room.dungeon) continue;
+      room.simAcc += step;
+      // Fixed 60Hz steps like offline
+      const FIXED = 1 / 60;
+      if (room.simAcc > 0.25) room.simAcc = 0.25;
+      let broadcast: CoopTurnBroadcast | null = null;
+      while (room.simAcc >= FIXED) {
+        broadcast = this.tickRoomFrame(room, FIXED);
+        room.simAcc -= FIXED;
+      }
+      if (broadcast) out.push({ roomId: room.roomId, broadcast });
+    }
+    return out;
+  }
+
+  private tickRoomFrame(room: InternalCoopRoom, dt: number): CoopTurnBroadcast {
+    const dungeon = room.dungeon!;
+    const agents = room.players
+      .filter(s => s.alive && s.player)
+      .map(s => {
+        if (!room.playerClocks.has(s.playerId)) room.playerClocks.set(s.playerId, createRealtimeClock());
+        return {
+          id: s.playerId,
+          player: s.player!,
+          input: room.realtimeInputs.get(s.playerId) || { dx: 0, dy: 0, autoAttack: true },
+          clock: room.playerClocks.get(s.playerId)!
+        };
+      });
+
+    const tick = tickCoopRealtime(agents, dungeon, dt, room.turn, room.monsterClock);
+    room.score += tick.kills * 150;
+    room.monstersSlain += tick.kills;
+
+    if (tick.logs.length) {
+      room.logs = [...tick.logs, ...room.logs].slice(0, 100);
+    }
+
+    // Floor transition (whole squad)
+    if (tick.floorCompleted) {
+      const nextFloor = dungeon.floor + 1;
+      const partySize = Math.max(1, room.players.filter(p => p.alive && p.player).length);
+      const nextDungeon = generateDungeon(nextFloor, undefined, { partySize });
+      const startRoom = nextDungeon.rooms[0];
+      const nextStartCp =
+        nextDungeon.checkpoints[0] || { x: startRoom.centerX, y: startRoom.centerY, activated: true };
+      const offsets = [
+        { dx: 0, dy: 0 },
+        { dx: 1, dy: 0 },
+        { dx: -1, dy: 0 }
+      ];
+      room.players.forEach((slot, idx) => {
+        if (!slot.player) return;
+        const off = offsets[idx % offsets.length];
+        const nx = nextDungeon.tiles[startRoom.centerY + off.dy]?.[startRoom.centerX + off.dx]?.walkable
+          ? startRoom.centerX + off.dx
+          : startRoom.centerX;
+        const ny = nextDungeon.tiles[startRoom.centerY + off.dy]?.[startRoom.centerX + off.dx]?.walkable
+          ? startRoom.centerY + off.dy
+          : startRoom.centerY;
+        slot.player.x = nx;
+        slot.player.y = ny;
+        slot.player.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
+        slot.lastCheckpoint = { floor: nextFloor, x: nextStartCp.x, y: nextStartCp.y };
+        slot.movedThisTurn = false;
+        room.playerClocks.set(slot.playerId, createRealtimeClock());
+        this.saveLiveSlotLoadout(slot, nextDungeon);
+      });
+      room.dungeon = nextDungeon;
+      room.score += 500;
+      room.monsterClock = createRealtimeClock();
+      this.refreshSquadFOV(nextDungeon, room.players);
+      room.logs.unshift({
+        id: `c_fl_${Date.now()}`,
+        text: `SQUAD DESCENDED TO FLOOR ${nextFloor}!`,
+        type: 'level_up',
+        turn: room.turn
+      });
+      tick.soundEvents.push('teleport');
+    } else {
+      for (const slot of room.players) {
+        if (!slot.player) continue;
+        const ar = tick.agentResults.get(slot.playerId);
+        if (slot.player.stats.hp <= 0 || ar?.gameOver) {
+          const accountId = slot.accountId || slot.playerId;
+          const cls = slot.player.characterClass || slot.characterClass || 'striker';
+          const preDeathStash = buildOnlineExitStash(slot.player, accountId, slot.username);
+          slot.preDeathLoadout = preDeathStash;
+          this.savedLoadouts.set(getOnlineStashKey(accountId, cls), preDeathStash);
+          slot.player.stats.hp = 0;
+          slot.alive = false;
+          if (ar?.deathDropCreated === false) {
+            dropPlayerLoadoutOnDeath(slot.player, dungeon, slot.playerId, slot.username, room.turn);
+          }
+          slot.movedThisTurn = false;
+        } else if (slot.alive) {
+          slot.movedThisTurn = false;
+          this.saveLiveSlotLoadout(slot, dungeon);
+        }
+      }
+      if (room.players.every(s => !s.alive)) {
+        room.status = 'gameover';
+        tick.soundEvents.push('death');
+      } else {
+        this.refreshSquadFOV(dungeon, room.players);
+      }
+    }
+
+    // Status pulse counter ≈ offline turn cadence
+    room.turn += 1;
+
+    return {
+      room: this.sanitizeRoom(room),
+      soundEvents: tick.soundEvents,
+      floatingTexts: tick.floatingTexts,
+      attackEffects: tick.attackEffects,
+      hitstopSeconds: tick.hitstopSeconds,
+      screenShake: tick.screenShake
+    };
   }
 
   private refreshSquadFOV(dungeon: DungeonState, players: CoopPlayerSlot[]) {
@@ -347,6 +524,10 @@ export class CoopRoomManager {
     }
   }
 
+  /**
+   * Legacy WS action entry — now free-move compatible (no turn lock).
+   * Moves update continuous input; skills/ranged resolve immediately like offline.
+   */
   public submitAction(
     roomId: string,
     playerId: string,
@@ -366,24 +547,62 @@ export class CoopRoomManager {
     if (!slot || !slot.player) return { ok: false, error: 'NOT_IN_ROOM' };
     if (!slot.alive) return { ok: false, error: 'OPERATIVE_DOWN' };
 
-    // Enforce 1-tile-per-turn lock until all active teammates act
-    if (slot.movedThisTurn) {
-      return { ok: false, error: 'TURN_LOCKED_WAITING_FOR_TEAMMATES' };
-    }
-
-    slot.movedThisTurn = true;
-    room.pendingActions.set(playerId, action);
-
-    const activePlayers = room.players.filter(p => p.alive && p.player);
-    const allMoved = activePlayers.every(p => p.movedThisTurn);
-
-    if (!allMoved) {
+    if (action.type === 'move' || action.type === 'wait') {
+      this.setRealtimeInput(roomId, playerId, {
+        dx: action.type === 'wait' ? 0 : action.dx || 0,
+        dy: action.type === 'wait' ? 0 : action.dy || 0
+      });
+      slot.movedThisTurn = false;
       return { ok: true, resolved: false, room: this.sanitizeRoom(room) };
     }
 
-    // All active teammates submitted -> resolve synchronized turn!
-    const broadcast = this.resolveCoopTurn(room);
-    return { ok: true, resolved: true, room: this.sanitizeRoom(room), broadcast };
+    if (action.type === 'skill' && action.skillId) {
+      const cast = executeSkill(slot.player, room.dungeon, action.skillId, room.turn, { realtime: true });
+      slot.player = cast.player;
+      room.logs = [...cast.logs, ...room.logs].slice(0, 100);
+      this.saveLiveSlotLoadout(slot, room.dungeon);
+      this.refreshSquadFOV(room.dungeon, room.players);
+      const broadcast: CoopTurnBroadcast = {
+        room: this.sanitizeRoom(room),
+        soundEvents: cast.soundEvents,
+        floatingTexts: cast.floatingTexts || [],
+        attackEffects: cast.attackEffects || [],
+        hitstopSeconds: cast.hitstopSeconds || 0,
+        screenShake: cast.screenShake || 0
+      };
+      return { ok: true, resolved: true, room: broadcast.room, broadcast };
+    }
+
+    if (action.type === 'ranged_attack') {
+      const beforeMonsters = room.dungeon.monsters.length;
+      const ranged = resolveRangedAttack(
+        slot.player,
+        room.dungeon,
+        typeof action.targetX === 'number' ? action.targetX : undefined,
+        typeof action.targetY === 'number' ? action.targetY : undefined,
+        room.turn
+      );
+      slot.player = ranged.player;
+      room.logs = [...ranged.logs, ...room.logs].slice(0, 100);
+      const kills = Math.max(0, beforeMonsters - room.dungeon.monsters.length);
+      if (kills > 0) {
+        room.monstersSlain += kills;
+        room.score += kills * 150;
+      }
+      this.saveLiveSlotLoadout(slot, room.dungeon);
+      this.refreshSquadFOV(room.dungeon, room.players);
+      const broadcast: CoopTurnBroadcast = {
+        room: this.sanitizeRoom(room),
+        soundEvents: ranged.soundEvents,
+        floatingTexts: ranged.floatingTexts || [],
+        attackEffects: ranged.attackEffects || [],
+        hitstopSeconds: ranged.hitstopSeconds || 0,
+        screenShake: ranged.screenShake || 0
+      };
+      return { ok: true, resolved: true, room: broadcast.room, broadcast };
+    }
+
+    return { ok: true, resolved: false, room: this.sanitizeRoom(room) };
   }
 
   private resolveCoopTurn(room: InternalCoopRoom): CoopTurnBroadcast {

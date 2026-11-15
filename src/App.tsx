@@ -65,7 +65,8 @@ import {
 import { soundEngine } from './game/audio';
 import { preloadAdsBitvex } from './game/adsbitvex';
 import { CanvasRenderer, CoopRemoteRenderPlayer } from './game/canvasRenderer';
-import { createRealtimeClock, tickRealtime, type RealtimeClock } from './game/realtime';
+import { createRealtimeClock, PLAYER_SPEED, tickRealtime, type RealtimeClock } from './game/realtime';
+import { predictMoveOnly } from './game/puzzles';
 import { Language, t } from './game/i18n';
 import {
   clearAuthSession,
@@ -272,6 +273,9 @@ export default function App() {
   /** True while async floor generation is in progress (blocks sim). */
   const floorTransitionRef = useRef(false);
   const applyRealtimeResultRef = useRef<(result: ReturnType<typeof tickRealtime>, dt: number) => void>(() => {});
+  /** Online client-side prediction — last authoritative server pose */
+  const serverPoseRef = useRef<{ x: number; y: number; seq: number } | null>(null);
+  const predSeqRef = useRef(0);
 
   /** Apply a player mutation to BOTH the live sim ref and React state (offline-safe). */
   const commitPlayer = useCallback((updater: (prev: Player) => Player) => {
@@ -315,23 +319,8 @@ export default function App() {
 
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickActiveRef.current = true;
-    // Mobile: face/move via stick (clear mouse aim while touching)
+    // Same continuous stick for offline + online free-move
     moveInputRef.current = { dx, dy };
-
-    if (playModeRef.current !== 'online') return;
-
-    const mag = Math.hypot(dx, dy);
-    if (mag < 0.45) {
-      onlineStickDirRef.current = null;
-      return;
-    }
-    const dir: 'up' | 'down' | 'left' | 'right' =
-      Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : dy >= 0 ? 'down' : 'up';
-    if (onlineStickDirRef.current === dir) return;
-    onlineStickDirRef.current = dir;
-    const stepDx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
-    const stepDy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
-    handlePlayerMoveRef.current(stepDx, stepDy);
   }, []);
 
   const handleJoystickRelease = useCallback(() => {
@@ -517,21 +506,35 @@ export default function App() {
     });
   }, [authScreenVisible, gameState, dungeon.floor, player.stats.hp, player.stats.maxHp, monstersSlain]);
 
-  // Keep remotePlayersRef synced when coopRoom updates
+  // Keep remotePlayersRef synced when coopRoom updates (soft-lerp to hide jitter)
   useEffect(() => {
     if (playMode === 'online' && coopRoom && coopRoom.status === 'playing') {
+      const prev = remotePlayersRef.current;
       remotePlayersRef.current = coopRoom.players
         .filter(s => s.playerId !== localPlayerId && s.player)
-        .map(s => ({
-          playerId: s.playerId,
-          username: s.username,
-          characterClass: s.player!.characterClass,
-          x: s.player!.x,
-          y: s.player!.y,
-          facing: s.player!.facing,
-          movedThisTurn: s.movedThisTurn,
-          alive: s.alive
-        }));
+        .map(s => {
+          const old = prev.find(p => p.playerId === s.playerId);
+          let x = s.player!.x;
+          let y = s.player!.y;
+          if (old && s.alive) {
+            const err = Math.hypot(old.x - x, old.y - y);
+            if (err < 2.5 && err > 0.02) {
+              const blend = Math.min(0.65, 0.35 + err * 0.12);
+              x = old.x + (x - old.x) * blend;
+              y = old.y + (y - old.y) * blend;
+            }
+          }
+          return {
+            playerId: s.playerId,
+            username: s.username,
+            characterClass: s.player!.characterClass,
+            x,
+            y,
+            facing: s.player!.facing,
+            movedThisTurn: s.movedThisTurn,
+            alive: s.alive
+          };
+        });
     } else {
       remotePlayersRef.current = [];
     }
@@ -927,35 +930,70 @@ export default function App() {
       while (
         simAccumulator >= FIXED_STEP &&
         gameStateRef.current === 'playing' &&
-        playModeRef.current === 'offline' &&
         !uiBlockedRef.current &&
         !floorTransitionRef.current &&
         playerRef.current &&
         dungeonRef.current
       ) {
-        const result = tickRealtime(
-          playerRef.current,
-          dungeonRef.current,
-          {
-            ...moveInputRef.current,
-            autoAttack: autoAttackRef.current,
-            attackHeld: attackHeldRef.current
-          },
-          FIXED_STEP,
-          turnRef.current,
-          realtimeClockRef.current
-        );
-        applyRealtimeResultRef.current(result, FIXED_STEP);
+        if (playModeRef.current === 'offline') {
+          const result = tickRealtime(
+            playerRef.current,
+            dungeonRef.current,
+            {
+              ...moveInputRef.current,
+              autoAttack: autoAttackRef.current,
+              attackHeld: attackHeldRef.current
+            },
+            FIXED_STEP,
+            turnRef.current,
+            realtimeClockRef.current
+          );
+          applyRealtimeResultRef.current(result, FIXED_STEP);
+        } else if (
+          playModeRef.current === 'online' &&
+          coopRoomRef.current?.status === 'playing'
+        ) {
+          // Client-side prediction: move locally immediately; server reconciles later
+          const inp = moveInputRef.current;
+          const remotes = remotePlayersRef.current
+            .filter(r => r.alive)
+            .map(r => ({ x: r.x, y: r.y, id: r.playerId }));
+          const next = predictMoveOnly(
+            dungeonRef.current,
+            playerRef.current.x,
+            playerRef.current.y,
+            inp.dx,
+            inp.dy,
+            PLAYER_SPEED,
+            FIXED_STEP,
+            remotes
+          );
+          if (next.x !== playerRef.current.x || next.y !== playerRef.current.y) {
+            playerRef.current = { ...playerRef.current, x: next.x, y: next.y };
+            predSeqRef.current += 1;
+            // Face move direction for prediction feel
+            if (Math.hypot(inp.dx, inp.dy) > 0.05) {
+              if (Math.abs(inp.dx) >= Math.abs(inp.dy)) {
+                playerRef.current.facing = inp.dx >= 0 ? 'right' : 'left';
+              } else {
+                playerRef.current.facing = inp.dy >= 0 ? 'down' : 'up';
+              }
+            }
+          }
+        } else {
+          break;
+        }
         simAccumulator -= FIXED_STEP;
       }
       if (
         !(
           gameStateRef.current === 'playing' &&
-          playModeRef.current === 'offline' &&
           !uiBlockedRef.current &&
           !floorTransitionRef.current &&
           playerRef.current &&
-          dungeonRef.current
+          dungeonRef.current &&
+          (playModeRef.current === 'offline' ||
+            (playModeRef.current === 'online' && coopRoomRef.current?.status === 'playing'))
         )
       ) {
         simAccumulator = 0;
@@ -1042,6 +1080,11 @@ export default function App() {
           setCoopRoom(msg.room);
           const mySlot = msg.room.players.find((p: any) => p.playerId === localPlayerId);
           if (msg.room.dungeon && mySlot?.player) {
+            dungeonRef.current = msg.room.dungeon;
+            playerRef.current = mySlot.player;
+            realtimeClockRef.current = createRealtimeClock();
+            moveInputRef.current = { dx: 0, dy: 0 };
+            heldMoveKeysRef.current.clear();
             setDungeon(msg.room.dungeon);
             setPlayer(mySlot.player);
             setTurn(msg.room.turn);
@@ -1074,24 +1117,61 @@ export default function App() {
             soundEngine.playSFX('shrine');
             refreshFOVIfNeeded(msg.room.dungeon, mySlot.player.x, mySlot.player.y, true);
           }
-        } else if (msg.type === 'coop:turn_resolved' && msg.room) {
+        } else if (
+          (msg.type === 'coop:realtime_tick' || msg.type === 'coop:turn_resolved') &&
+          msg.room
+        ) {
           setCoopError(null);
           setCoopRoom(msg.room);
           const mySlot = msg.room.players.find((p: any) => p.playerId === localPlayerId);
           if (msg.room.dungeon && mySlot?.player) {
+            // Authoritative world (tiles, crates, monsters, allies) from server
+            dungeonRef.current = msg.room.dungeon;
             setDungeon(msg.room.dungeon);
-            setPlayer(mySlot.player);
+
+            const serverP = mySlot.player;
+            const localP = playerRef.current;
+            serverPoseRef.current = { x: serverP.x, y: serverP.y, seq: predSeqRef.current };
+
+            // Reconcile prediction: soft-correct if close, snap if desynced
+            let mergedX = serverP.x;
+            let mergedY = serverP.y;
+            if (localP && mySlot.alive) {
+              const err = Math.hypot(localP.x - serverP.x, localP.y - serverP.y);
+              if (err < 0.08) {
+                mergedX = localP.x;
+                mergedY = localP.y;
+              } else if (err < 1.75) {
+                const blend = Math.min(0.55, 0.22 + err * 0.15);
+                mergedX = localP.x + (serverP.x - localP.x) * blend;
+                mergedY = localP.y + (serverP.y - localP.y) * blend;
+              }
+              // else hard snap to server
+            }
+
+            const mergedPlayer = {
+              ...serverP,
+              x: mergedX,
+              y: mergedY,
+              facing: localP?.facing || serverP.facing
+            };
+            playerRef.current = mergedPlayer;
+            setPlayer(mergedPlayer);
             setTurn(msg.room.turn);
             setScore(msg.room.score);
             setMonstersSlain(msg.room.monstersSlain);
-            setCombatLogs(msg.room.logs || []);
-            handleSoundAndVisuals(
-              msg.soundEvents || [],
-              msg.screenShake || 0,
-              msg.floatingTexts || [],
-              msg.hitstopSeconds || 0,
-              msg.attackEffects || []
-            );
+            if (Array.isArray(msg.room.logs) && msg.room.logs.length) {
+              setCombatLogs(msg.room.logs);
+            }
+            if (msg.soundEvents || msg.floatingTexts || msg.attackEffects) {
+              handleSoundAndVisuals(
+                msg.soundEvents || [],
+                msg.screenShake || 0,
+                msg.floatingTexts || [],
+                msg.hitstopSeconds || 0,
+                msg.attackEffects || []
+              );
+            }
             if (!mySlot.alive || msg.room.status === 'gameover') {
               setRunSnapshot({
                 score: msg.room.score,
@@ -1186,6 +1266,35 @@ export default function App() {
       wsRef.current.send(JSON.stringify(payload));
     }
   }, []);
+
+  // Stream free-move input to server while online (same cadence as offline feel)
+  useEffect(() => {
+    if (playMode !== 'online' || gameState !== 'playing') return;
+    const id = window.setInterval(() => {
+      if (coopRoomRef.current?.status !== 'playing') return;
+      if (uiBlockedRef.current) {
+        sendCoopWs({
+          type: 'coop:input',
+          dx: 0,
+          dy: 0,
+          autoAttack: autoAttackRef.current,
+          attackHeld: false
+        });
+        return;
+      }
+      const inp = moveInputRef.current;
+      sendCoopWs({
+        type: 'coop:input',
+        dx: inp.dx,
+        dy: inp.dy,
+        aimDx: inp.aimDx,
+        aimDy: inp.aimDy,
+        autoAttack: autoAttackRef.current,
+        attackHeld: attackHeldRef.current
+      });
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [playMode, gameState, sendCoopWs]);
 
   const tradeExecutedRef = useRef(false);
   useEffect(() => {
@@ -1640,13 +1749,16 @@ export default function App() {
   const handlePlayerMove = useCallback((dx: number, dy: number) => {
     if (gameStateRef.current !== 'playing') return;
 
-    // Online 3-Player Co-Op: forward move & lock until 3/3 act
+    // Online free-move: continuous input (same as offline), not 1-tile turns
     if (playModeRef.current === 'online' && coopRoomRef.current?.status === 'playing') {
-      const mySlot = coopRoomRef.current.players.find(p => p.playerId === localPlayerId);
-      if (mySlot?.movedThisTurn) {
-        return; // Blocked until all teammates move
-      }
-      sendCoopWs({ type: 'coop:submit_action', actionType: 'move', dx, dy });
+      moveInputRef.current = { ...moveInputRef.current, dx, dy };
+      sendCoopWs({
+        type: 'coop:input',
+        dx,
+        dy,
+        autoAttack: autoAttackRef.current,
+        attackHeld: attackHeldRef.current
+      });
       return;
     }
 
@@ -1909,8 +2021,6 @@ export default function App() {
     if (gameStateRef.current !== 'playing') return;
 
     if (playModeRef.current === 'online' && coopRoomRef.current?.status === 'playing') {
-      const mySlot = coopRoomRef.current.players.find(p => p.playerId === localPlayerId);
-      if (mySlot?.movedThisTurn) return;
       sendCoopWs({ type: 'coop:submit_action', actionType: 'skill', skillId });
       return;
     }
@@ -1959,8 +2069,14 @@ export default function App() {
       if (gameStateRef.current !== 'playing') return;
 
       if (playModeRef.current === 'online' && coopRoomRef.current?.status === 'playing') {
-        const mySlot = coopRoomRef.current.players.find(p => p.playerId === localPlayerId);
-        if (mySlot?.movedThisTurn) return;
+        // Keep attackHeld in stream so server melee matches offline Auto/ATK
+        sendCoopWs({
+          type: 'coop:input',
+          dx: moveInputRef.current.dx,
+          dy: moveInputRef.current.dy,
+          autoAttack: autoAttackRef.current,
+          attackHeld: true
+        });
         sendCoopWs({
           type: 'coop:submit_action',
           actionType: 'ranged_attack',
@@ -2245,10 +2361,8 @@ export default function App() {
         if (e.key === 'f' || e.key === 'F') {
           e.preventDefault();
           if (e.repeat) return;
-          // Offline free-move: F holds melee when Auto is off; always try ranged/strike too
-          if (playModeRef.current !== 'online') {
-            attackHeldRef.current = true;
-          }
+          // Free-move (offline + online): F holds melee when Auto is off
+          attackHeldRef.current = true;
           handleRangedAttack();
           return;
         }
@@ -2265,25 +2379,17 @@ export default function App() {
         if (dir) {
           e.preventDefault();
           if (e.repeat) return;
-          if (playModeRef.current === 'online') {
-            const dx = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
-            const dy = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
-            handlePlayerMove(dx, dy);
-          } else {
-            heldMoveKeysRef.current.add(dir);
-            syncMoveInputFromKeys();
-          }
+          // Same continuous held-key movement for offline and online
+          heldMoveKeysRef.current.add(dir);
+          syncMoveInputFromKeys();
           return;
         }
 
         if (e.key === ' ' || e.key === '.') {
           e.preventDefault();
-          if (playModeRef.current === 'online') handlePlayerMove(0, 0);
-          else {
-            heldMoveKeysRef.current.clear();
-            const prev = moveInputRef.current;
-            moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
-          }
+          heldMoveKeysRef.current.clear();
+          const prev = moveInputRef.current;
+          moveInputRef.current = { dx: 0, dy: 0, aimDx: prev.aimDx, aimDy: prev.aimDy };
           return;
         }
 
@@ -2304,7 +2410,6 @@ export default function App() {
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (playModeRef.current === 'online') return;
       if (e.key === 'f' || e.key === 'F') {
         attackHeldRef.current = false;
       }
@@ -2812,8 +2917,11 @@ export default function App() {
             e.nativeEvent.offsetX,
             e.nativeEvent.offsetY
           );
-          // PC: aim / face / melee toward mouse pointer
-          if (playModeRef.current === 'offline' && !joystickActiveRef.current) {
+          // PC: aim / face / melee toward mouse (offline + online prediction stream)
+          if (
+            (playModeRef.current === 'offline' || playModeRef.current === 'online') &&
+            !joystickActiveRef.current
+          ) {
             updateMouseAim(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
           }
         }}

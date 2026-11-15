@@ -9,6 +9,7 @@ import {
 } from './types';
 import { generateRandomLoot } from './items';
 import { getEnvironmentalEventForFloor, generateShopItems } from './events';
+import { placePuzzles } from './puzzles';
 
 /** Diamonds (soul shards) drop at 20% of previous rates (−80%). */
 const SHARD_DROP_MULT = 0.2;
@@ -569,8 +570,14 @@ export function generateDungeon(
     shopItems,
     groundCoins: [],
     checkpoints,
-    deathDrops: []
+    deathDrops: [],
+    crates: [],
+    puzzleLinks: []
   };
+
+  // Puzzle props: pits/crates, pressure gates (solo gets helper crates; co-op needs teamwork)
+  placePuzzles(dungeon, rng, partySize);
+
   // Wake creatures near the spawn room so the first chamber feels alive without loading the whole floor
   activateNearbySpawns(dungeon, startRoom.centerX, startRoom.centerY, 12);
   return dungeon;
@@ -600,7 +607,9 @@ export function createEmptyDungeonStub(): DungeonState {
     shopItems: [],
     groundCoins: [],
     checkpoints: [],
-    deathDrops: []
+    deathDrops: [],
+    crates: [],
+    puzzleLinks: []
   };
 }
 
